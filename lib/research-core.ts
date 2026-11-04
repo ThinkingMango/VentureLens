@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { getDomain } from "tldts";
 
 export const RESEARCH_MODEL = "alibaba/qwen3.8-flash";
 export const methodology = "evidence-driven-v1";
@@ -62,15 +63,25 @@ export function groundedClassifications(evidence: Evidence[], items: Classificat
   const seen = new Set<string>();
   return items.filter(item => {
     const source = byKey.get(item.source_key);
-    if (!source || seen.has(item.source_key)) return false;
+    if (!source || seen.has(item.source_key) || item.quote.trim().length < 12 || !source.excerpt.includes(item.quote)) return false;
     seen.add(item.source_key);
-    return item.quote.trim().length >= 12 && source.excerpt.includes(item.quote);
+    return true;
   });
 }
 export function eligibleEvidence(candidate: string, evidence: Evidence[], classifications: Classification[]) {
-  const byKey = new Map(classifications.map(c => [c.source_key, c]));
-  const relevant = evidence.filter(e => e.candidate_id === candidate && byKey.get(e.source_key)?.relevant);
-  const domains = new Set(relevant.map(e => new URL(e.url).hostname.replace(/^www\./, '')));
+  const byKey = new Map(groundedClassifications(evidence, classifications).map(c => [c.source_key, c]));
+  const domains = new Set<string>();
+  const urls = new Set<string>();
+  const relevant = evidence.filter(e => {
+    if (e.candidate_id !== candidate || !byKey.get(e.source_key)?.relevant) return false;
+    const url = safeSourceUrl(e.url);
+    if (!url || urls.has(url)) return false;
+    const domain = getDomain(new URL(url).hostname.replace(/\.$/, ''), { allowPrivateDomains: true });
+    if (!domain) return false;
+    urls.add(url);
+    domains.add(domain);
+    return true;
+  });
   const demand = relevant.some(e => {
     const c = byKey.get(e.source_key)!;
     return c.stance === 'supports' && ['pain', 'demand'].includes(c.kind) && ['primary', 'secondary'].includes(c.reliability);
