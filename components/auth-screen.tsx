@@ -2,123 +2,148 @@
 import { useCopy } from "@/i18n/use-copy";
 
 import Link from "next/link";
-import { useEffect, useId, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useId, useRef, useState } from "react";
 import { ArrowRight, ShieldCheck, Check, LoaderCircle } from "lucide-react";
-import { z } from "zod";
+import {
+  emailSchema,
+  emailCodeSchema,
+  emailCodeResendSeconds,
+  emailAuthError,
+  requestEmailCode,
+  verifyEmailCode,
+} from "@/lib/email-auth";
 import { Brand } from "@/components/shared";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Field, FieldLabel, FieldGroup } from "@/components/ui/field";
+import {
+  Field,
+  FieldLabel,
+  FieldGroup,
+  FieldDescription,
+} from "@/components/ui/field";
 import { createClient } from "@/lib/supabase/client";
 import { safeReturnPath } from "@/lib/workspace-schema";
 
-function authError(code: string | undefined, status: number | undefined) {
-  if (code === "email_not_confirmed")
-    return "Please confirm your email before logging in. Check your inbox and spam folder.";
-  if (code === "weak_password")
-    return "Choose a stronger password with at least 8 characters.";
-  if (status === 429 || code?.includes("rate_limit"))
-    return "Too many attempts. Please wait a few minutes before trying again.";
-  if (code === "email_address_not_authorized")
-    return "Email delivery is not configured for this address. Please contact support.";
-  if (code === "invalid_credentials" || code === "user_not_found")
-    return "Invalid email or password.";
-  return "Authentication is temporarily unavailable. Please try again.";
-}
-export function AuthScreen({ signup = false }: { signup?: boolean }) {
+export function AuthScreen() {
   const copy = useCopy();
   const feedbackId = useId();
+  const helpId = useId();
+  const codeInput = useRef<HTMLInputElement>(null);
+  const busy = useRef(false);
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [ready, setReady] = useState(false);
-  const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [code, setCode] = useState("");
+  const [step, setStep] = useState<"email" | "code">("email");
+  const [resendAt, setResendAt] = useState(0);
+  const [remaining, setRemaining] = useState(0);
   useEffect(() => {
     setReady(true);
     const notice = new URLSearchParams(window.location.search).get("notice");
-    if (notice === "password-updated")
-      setMessage(
-        "Your password was updated. Please log in with your new password.",
-      );
     if (notice === "callback")
       setError(
-        "This email link is invalid or expired. Request a fresh confirmation or password-reset link.",
+        "This email link is invalid or expired. Request a new sign-in code.",
       );
     if (notice === "configuration")
       setError(
         "Authentication configuration is temporarily unavailable. Please try again shortly.",
       );
   }, []);
-  async function submit(form: HTMLFormElement) {
+  useEffect(() => {
+    if (!resendAt) return;
+    const update = () =>
+      setRemaining(Math.max(0, Math.ceil((resendAt - Date.now()) / 1000)));
+    update();
+    const timer = window.setInterval(update, 1000);
+    return () => window.clearInterval(timer);
+  }, [resendAt]);
+  useEffect(() => {
+    if (step === "code" && !pending) codeInput.current?.focus();
+  }, [step, pending]);
+
+  async function sendCode() {
+    if (busy.current || Date.now() < resendAt) return;
+    const parsed = emailSchema.safeParse(email.trim());
+    if (!parsed.success) {
+      setError("Enter a valid email address.");
+      return;
+    }
+    busy.current = true;
     setPending(true);
     setError("");
     setMessage("");
-    const values = new FormData(form);
-    const email = String(values.get("email") ?? "").trim();
-    const password = String(values.get("password") ?? "");
-    const name = String(values.get("name") ?? "").trim();
-    if (
-      !z.email().safeParse(email).success ||
-      password.length < (signup ? 8 : 1) ||
-      password.length > 128 ||
-      (signup && (!name || name.length > 80))
-    ) {
-      setError("Enter a valid email, name, and password.");
+    try {
+      const redirect = new URL(
+        process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL ??
+          `${window.location.origin}/auth/callback`,
+      );
+      redirect.searchParams.set(
+        "next",
+        safeReturnPath(new URLSearchParams(window.location.search).get("next")),
+      );
+      const { error } = await requestEmailCode(
+        createClient(),
+        parsed.data,
+        redirect.toString(),
+      );
+      if (error) {
+        setError(emailAuthError(error));
+        if (error.status === 429 || error.code?.includes("rate_limit"))
+          setResendAt(Date.now() + emailCodeResendSeconds * 1000);
+        return;
+      }
+      setEmail(parsed.data);
+      setCode("");
+      setStep("code");
+      setResendAt(Date.now() + emailCodeResendSeconds * 1000);
+      setMessage(
+        "A sign-in code has been requested for {email}. Check your inbox and spam folder. Use the newest code.",
+      );
+    } catch {
+      setError("Authentication is temporarily unavailable. Please try again.");
+    } finally {
+      busy.current = false;
       setPending(false);
+    }
+  }
+
+  async function verifyCode() {
+    if (busy.current) return;
+    if (!emailCodeSchema.safeParse(code).success) {
+      setError("Enter the 6-digit code from your email.");
       return;
     }
+    busy.current = true;
+    setPending(true);
+    setError("");
+    setMessage("");
     try {
-      const supabase = createClient();
-      if (signup) {
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: { full_name: name },
-            emailRedirectTo:
-              process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL ??
-              `${window.location.origin}/auth/callback`,
-          },
-        });
-        if (error) {
-          if (
-            error.code === "user_already_exists" ||
-            error.code === "email_exists"
-          ) {
-            setMessage(
-              "If this address can be registered, a confirmation email is on its way. Check your inbox, or log in if you already have an account.",
-            );
-          } else setError(authError(error.code, error.status));
-        } else if (data.session) {
-          router.replace("/onboarding");
-          router.refresh();
-        } else {
-          form.reset();
-          setMessage(
-            "If this address can be registered, a confirmation email is on its way. Confirm your email before logging in. Check your spam folder too.",
-          );
-        }
-      } else {
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-        if (error) setError(authError(error.code, error.status));
-        else {
-          const next = safeReturnPath(
-            new URLSearchParams(window.location.search).get("next"),
-          );
-          router.replace(next);
-          router.refresh();
-        }
-      }
-    } catch {
-      setError(
-        "Authentication is temporarily unavailable. Please try again shortly.",
+      const { data, error } = await verifyEmailCode(
+        createClient(),
+        email,
+        code,
       );
+      if (error || !data.session) {
+        setError(
+          error
+            ? emailAuthError(error)
+            : "Authentication is temporarily unavailable. Please try again.",
+        );
+        return;
+      }
+      const next = safeReturnPath(
+        new URLSearchParams(window.location.search).get("next"),
+      );
+      window.location.replace(
+        `/auth/callback?next=${encodeURIComponent(next)}`,
+      );
+    } catch {
+      setError("Authentication is temporarily unavailable. Please try again.");
     } finally {
+      busy.current = false;
       setPending(false);
     }
   }
@@ -131,91 +156,119 @@ export function AuthScreen({ signup = false }: { signup?: boolean }) {
         </header>
         <div className="mx-auto flex w-full max-w-sm flex-col gap-7">
           <div className="flex flex-col gap-3">
-            <h1 className="text-3xl font-semibold">
-              {signup
-                ? copy("A new chapter starts here.")
-                : copy("Welcome back.")}
+            <h1 className="text-3xl font-semibold text-balance">
+              {step === "code"
+                ? copy("Check your email.")
+                : copy("Your next chapter starts here.")}
             </h1>
-            <p className="text-muted-foreground">
-              {signup
-                ? copy("Build a clearer picture of what you could build.")
-                : copy("A clearer view of your next opportunity awaits.")}
+            <p className="text-muted-foreground text-pretty">
+              {step === "code"
+                ? copy("Enter the one-time code sent to {email}.", { email })
+                : copy(
+                    "Sign in or create an account with your email. No password needed.",
+                  )}
             </p>
           </div>
           <form
             className="flex flex-col gap-6"
             data-ready={ready}
             aria-describedby={error || message ? feedbackId : undefined}
+            onKeyDown={(event) => {
+              if (
+                event.key === "Enter" &&
+                (event.nativeEvent.isComposing || event.keyCode === 229)
+              )
+                event.preventDefault();
+            }}
             onSubmit={(event) => {
               event.preventDefault();
-              if (!pending) void submit(event.currentTarget);
+              if (!pending) void (step === "code" ? verifyCode() : sendCode());
             }}
           >
             <FieldGroup>
-              {signup && (
-                <Field>
-                  <FieldLabel htmlFor="full-name">
-                    {copy("Full name")}
+              {step === "email" ? (
+                <Field data-disabled={pending} data-invalid={!!error}>
+                  <FieldLabel htmlFor="email">
+                    {copy("Email address")}
                   </FieldLabel>
                   <Input
-                    id="full-name"
-                    name="name"
+                    id="email"
+                    name="email"
+                    type="email"
                     required
-                    maxLength={80}
-                    placeholder={copy("Your name")}
-                    autoComplete="name"
+                    maxLength={254}
+                    placeholder={copy("you@company.com")}
+                    autoComplete="email"
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    value={email}
+                    onChange={(event) => {
+                      setEmail(event.target.value);
+                      setError("");
+                    }}
                     disabled={pending}
+                    aria-invalid={!!error}
+                    aria-describedby={error ? feedbackId : undefined}
                   />
                 </Field>
+              ) : (
+                <Field data-disabled={pending} data-invalid={!!error}>
+                  <FieldLabel htmlFor="email-code">
+                    {copy("Verification code")}
+                  </FieldLabel>
+                  <Input
+                    ref={codeInput}
+                    id="email-code"
+                    name="code"
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    pattern="[0-9]{6}"
+                    minLength={6}
+                    maxLength={6}
+                    required
+                    value={code}
+                    onChange={(event) => {
+                      setCode(
+                        event.target.value.replace(/\D/g, "").slice(0, 6),
+                      );
+                      setError("");
+                    }}
+                    disabled={pending}
+                    aria-invalid={!!error}
+                    aria-describedby={
+                      error ? `${helpId} ${feedbackId}` : helpId
+                    }
+                  />
+                  <FieldDescription id={helpId}>
+                    {copy(
+                      "Codes expire and can only be used once. Never share your code.",
+                    )}
+                  </FieldDescription>
+                </Field>
               )}
-              <Field>
-                <FieldLabel htmlFor="email">{copy("Email address")}</FieldLabel>
-                <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  required
-                  maxLength={254}
-                  placeholder={copy("you@company.com")}
-                  autoComplete="email"
-                  disabled={pending}
-                />
-              </Field>
-              <Field>
-                <FieldLabel htmlFor="password">{copy("Password")}</FieldLabel>
-                <Input
-                  id="password"
-                  name="password"
-                  type="password"
-                  minLength={signup ? 8 : 1}
-                  maxLength={128}
-                  required
-                  placeholder={
-                    signup
-                      ? copy("At least 8 characters")
-                      : copy("Your password")
-                  }
-                  autoComplete={signup ? "new-password" : "current-password"}
-                  disabled={pending}
-                />
-              </Field>
             </FieldGroup>
             <Button
               type="submit"
               size="lg"
-              disabled={pending || !ready}
+              disabled={
+                pending || !ready || (step === "email" && remaining > 0)
+              }
               aria-busy={pending}
             >
               {pending ? (
-                <LoaderCircle className="animate-spin" />
+                <LoaderCircle
+                  data-icon="inline-start"
+                  className="animate-spin"
+                />
               ) : (
-                <ArrowRight />
+                <ArrowRight data-icon="inline-start" />
               )}
               {pending
                 ? copy("Please wait…")
-                : signup
-                  ? copy("Create account")
-                  : copy("Log in")}
+                : step === "code"
+                  ? copy("Verify and continue")
+                  : copy("Send sign-in code")}
             </Button>
             {error && (
               <p
@@ -232,40 +285,52 @@ export function AuthScreen({ signup = false }: { signup?: boolean }) {
                 role="status"
                 className="rounded-lg bg-secondary p-4 text-sm text-foreground"
               >
-                {copy(message)}
+                {copy(message, { email })}
               </p>
             )}
+            {remaining > 0 && (
+              <p className="text-sm text-muted-foreground">
+                {copy("You can request another code in {seconds}s.", {
+                  seconds: remaining,
+                })}
+              </p>
+            )}
+            {step === "code" && (
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={pending || remaining > 0}
+                  onClick={() => void sendCode()}
+                >
+                  {copy("Resend code")}
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  disabled={pending}
+                  onClick={() => {
+                    setStep("email");
+                    setCode("");
+                    setError("");
+                    setMessage("");
+                  }}
+                >
+                  {copy("Use a different email")}
+                </Button>
+              </div>
+            )}
           </form>
-          {!signup && (
-            <Link
-              href="/forgot-password"
-              className="text-sm font-medium text-primary"
-            >
-              {copy("Forgot your password?")}
-            </Link>
-          )}
-          <Link
-            href="/verify-email"
-            className="text-sm font-medium text-primary"
-          >
-            {copy("Resend confirmation email")}
-          </Link>
           <Button variant="outline" asChild>
             <Link href="/demo/dashboard">
               {copy("Explore the demo")}
               <ArrowRight />
             </Link>
           </Button>
-          <p className="text-center text-muted-foreground">
-            {signup
-              ? copy("Already have an account?")
-              : copy("New to VentureLens?")}{" "}
-            <Link
-              href={signup ? "/login" : "/signup"}
-              className="font-medium text-primary"
-            >
-              {signup ? copy("Log in") : copy("Get started")}
-            </Link>
+          <p className="text-center text-sm text-muted-foreground">
+            {copy(
+              "One email, one code. The same simple flow for new and returning users.",
+            )}
           </p>
         </div>
         <p className="text-sm text-muted-foreground">

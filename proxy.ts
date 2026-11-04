@@ -4,7 +4,7 @@ import { NextResponse, type NextRequest } from "next/server";
 export async function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;
   const isPrivate =
-    /^\/(dashboard|research|saved|profile|billing|onboarding|opportunities|reset-password)(\/|$)/.test(
+    /^\/(dashboard|research|saved|profile|billing|onboarding|opportunities)(\/|$)/.test(
       path,
     );
   const isAuth = path === "/login" || path === "/signup";
@@ -62,6 +62,5 @@ export const config = {
     "/login",
     "/signup",
     "/api/workspace/:path*",
-    "/reset-password/:path*",
   ],
 };

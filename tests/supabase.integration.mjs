@@ -15,17 +15,15 @@ if (!url || !key || !secret)
 const options = { auth: { persistSession: false, autoRefreshToken: false } };
 const admin = createClient(url, secret, options);
 const users = [];
-const password = `Vl-test-${randomUUID()}!`;
 const accounts = [];
 try {
   for (let index = 0; index < 2; index++) {
     const email = `venturelens-test-${randomUUID()}@example.com`;
     const { data, error } = await admin.auth.admin.createUser({
       email,
-      password,
       email_confirm: true,
       user_metadata: {
-        full_name: `Test founder ${index}`,
+        ...(index ? { full_name: `Test founder ${index}` } : {}),
         is_admin: true,
         paid: true,
       },
@@ -37,9 +35,40 @@ try {
     );
     users.push(data.user.id);
     const client = createClient(url, key, options);
-    const login = await client.auth.signInWithPassword({ email, password });
-    assert.equal(login.error, null, "Password login succeeds");
+    const issued = await admin.auth.admin.generateLink({
+      type: "magiclink",
+      email,
+    });
+    assert.equal(
+      issued.error,
+      null,
+      "Issue a temporary OTP through the supported Admin API without sending mail",
+    );
+    const token = issued.data.properties.email_otp;
+    assert.match(
+      token,
+      /^\d{6}$/,
+      "The configured provider uses six-digit email codes",
+    );
+    const invalid = await client.auth.verifyOtp({
+      email,
+      token: "not-a-code",
+      type: "email",
+    });
+    assert.ok(invalid.error, "Invalid codes do not authenticate");
+    const login = await client.auth.verifyOtp({ email, token, type: "email" });
+    assert.equal(
+      login.error,
+      null,
+      "Native email-code login succeeds without a password",
+    );
     assert.equal(login.data.user.id, data.user.id);
+    const replay = await createClient(url, key, options).auth.verifyOtp({
+      email,
+      token,
+      type: "email",
+    });
+    assert.ok(replay.error, "A consumed code cannot be replayed");
     accounts.push({ client, user: data.user, session: login.data.session });
   }
   const [a, b] = accounts;
@@ -133,15 +162,13 @@ try {
       `${table}: another user's rows are invisible`,
     );
   }
-  const forged = await b.client
-    .from("research_projects")
-    .insert({
-      user_id: a.user.id,
-      name: "Forged brief",
-      sector: "B2B SaaS",
-      model: "B2B subscription",
-      geography: "United States",
-    });
+  const forged = await b.client.from("research_projects").insert({
+    user_id: a.user.id,
+    name: "Forged brief",
+    sector: "B2B SaaS",
+    model: "B2B subscription",
+    geography: "United States",
+  });
   assert.ok(forged.error, "Forged ownership insert rejected");
   const foreignUpdate = await b.client
     .from("founder_profiles")
@@ -174,15 +201,13 @@ try {
     forgedRun.error,
     "Browser cannot forge research runs even with paid/admin metadata",
   );
-  const forgedOpportunity = await b.client
-    .from("opportunities")
-    .insert({
-      user_id: b.user.id,
-      run_id: run.data.id,
-      title: "Forged result",
-      score: 99,
-      payload: {},
-    });
+  const forgedOpportunity = await b.client.from("opportunities").insert({
+    user_id: b.user.id,
+    run_id: run.data.id,
+    title: "Forged result",
+    score: 99,
+    payload: {},
+  });
   assert.ok(forgedOpportunity.error, "Browser cannot forge opportunity scores");
   const anonymous = createClient(url, key, options);
   const anonymousRead = await anonymous.from("research_projects").select("id");
@@ -197,10 +222,10 @@ try {
     "Logout clears the current session",
   );
   console.log(
-    "PASS: confirmed fixture registration, signup trigger, login, profile/project persistence, session restoration, logout, anonymous denial, and cross-user read/write protection.",
+    "PASS: passwordless fixture registration, name-optional signup trigger, native email OTP login, invalid-code rejection, replay protection, profile/project persistence, session restoration, logout, anonymous denial, and cross-user read/write protection.",
   );
   console.log(
-    "Email delivery, public sign-up confirmation, and recovery-link completion need a controlled mailbox and separate browser verification.",
+    "Email delivery and public signup code delivery need configured email templates and a controlled mailbox; they are not exercised by the Admin API fixtures.",
   );
 } finally {
   const failures = [];
