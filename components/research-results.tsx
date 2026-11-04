@@ -1,0 +1,324 @@
+"use client";
+import { useState } from "react";
+import Link from "@/components/workspace-link";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Download,
+  LayoutGrid,
+  Columns3,
+  Bookmark,
+  Plus,
+} from "lucide-react";
+import { OpportunityCard } from "@/components/opportunity-card";
+import { PageHeader, DemoNote } from "@/components/shared";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Badge } from "@/components/ui/badge";
+import { useDemo } from "@/components/demo-provider";
+import { opportunities, demoNotice } from "@/lib/demo-data";
+import { LiveResearchResults } from "@/components/live-workspace";
+export function ResearchResults({
+  savedOnly = false,
+}: {
+  savedOnly?: boolean;
+}) {
+  const { run, saved, isDemo } = useDemo();
+  const [query, setQuery] = useState("");
+  const [confidence, setConfidence] = useState("All confidence levels");
+  const [sort, setSort] = useState("Highest score");
+  const [view, setView] = useState<"cards" | "compare">("cards");
+  const list = opportunities
+    .filter(
+      (o) =>
+        (!savedOnly || saved.includes(o.id)) &&
+        `${o.title} ${o.category} ${o.buyer}`
+          .toLowerCase()
+          .includes(query.toLowerCase()) &&
+        (confidence === "All confidence levels" || o.confidence === confidence),
+    )
+    .sort((a, b) =>
+      sort === "Highest score"
+        ? b.score - a.score
+        : a.title.localeCompare(b.title),
+    );
+  function download() {
+    const text = [
+      "VentureLens AI — SYNTHETIC DEMONSTRATION",
+      demoNotice,
+      `Research: ${run.name}`,
+      `Configuration: ${run.sector}; ${run.model}; ${run.geography}`,
+      "Demo results are fixed illustrative fixtures, not tailored AI output.",
+      "",
+      ...list.map(
+        (o) =>
+          `${o.title}\nDemo score: ${o.score}/100\nBuyer: ${o.buyer}\nDescription: ${o.description}\nIllustrative monthly price: ${o.revenue}\nRisk: ${o.risk}\n`,
+      ),
+    ].join("\n");
+    const url = URL.createObjectURL(new Blob([text], { type: "text/plain" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "venturelens-demo-research.txt";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+  if (!isDemo) return <LiveResearchResults savedOnly={savedOnly} />;
+  return (
+    <>
+      {!savedOnly && (
+        <Link
+          href="/research"
+          className="flex w-fit items-center gap-2 text-muted-foreground hover:text-primary"
+        >
+          <ArrowLeft className="size-4" />
+          My research
+        </Link>
+      )}
+      <PageHeader
+        title={savedOnly ? "Saved opportunities" : run.name}
+        description={
+          savedOnly
+            ? "Review your shortlist and compare the assumptions behind each idea."
+            : "Research results · Compare buyer needs, economics, and validation priorities."
+        }
+      >
+        <Button variant="outline" onClick={download}>
+          <Download />
+          Export demo brief
+        </Button>
+      </PageHeader>
+      <div className="flex flex-col gap-3 border-y py-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <Badge variant="secondary">Demonstration report</Badge>
+          {!savedOnly && (
+            <p className="text-sm text-muted-foreground">
+              {run.sector} · {run.model} · {run.geography}
+            </p>
+          )}
+        </div>
+        <DemoNote />
+        <details className="text-sm text-muted-foreground">
+          <summary className="w-fit rounded-sm underline-offset-4 hover:text-primary hover:underline">
+            How to interpret this report
+          </summary>
+          <p className="mt-2 max-w-3xl">
+            Scores and confidence labels compare invented scenarios; they do not
+            measure verified demand. These fixed examples do not change with
+            your research configuration. All amounts are monthly USD assumptions
+            per customer, not forecasts.
+          </p>
+        </details>
+      </div>
+      {!savedOnly && (
+        <section
+          aria-labelledby="research-summary"
+          className="surface flex flex-col gap-4 p-5 md:p-6"
+        >
+          <h2 id="research-summary" className="text-lg font-semibold">
+            Research summary
+          </h2>
+          <p className="max-w-3xl leading-relaxed">
+            Proposal preparation leads this four-workflow demo. Buyer access,
+            review effort, and willingness to pay remain unvalidated for every
+            opportunity.
+          </p>
+          <div className="flex border-t pt-4">
+            <Button variant="link" asChild className="h-auto justify-start p-0">
+              <Link href="/opportunities/proposal-copilot">
+                Review leading hypothesis
+                <ArrowRight data-icon="inline-end" />
+              </Link>
+            </Button>
+          </div>
+        </section>
+      )}
+      <section className="flex flex-col gap-5">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <h2
+            className="text-lg font-semibold"
+            aria-live="polite"
+            aria-atomic="true"
+          >
+            {`${list.length} ${savedOnly ? "saved opportunities" : "opportunity hypotheses"}`}
+          </h2>
+          <div
+            className="flex rounded-md border bg-card p-1"
+            aria-label="Results view"
+          >
+            <Button
+              size="sm"
+              variant={view === "cards" ? "secondary" : "ghost"}
+              onClick={() => setView("cards")}
+              aria-pressed={view === "cards"}
+            >
+              <LayoutGrid />
+              Cards
+            </Button>
+            <Button
+              size="sm"
+              variant={view === "compare" ? "secondary" : "ghost"}
+              onClick={() => setView("compare")}
+              aria-pressed={view === "compare"}
+            >
+              <Columns3 />
+              Compare
+            </Button>
+          </div>
+        </div>
+        <FieldGroup className="grid grid-cols-2 gap-4 md:flex md:flex-row md:items-end">
+          <Field className="col-span-2 min-w-0 md:flex-1">
+            <FieldLabel htmlFor="opportunity-search">
+              Search opportunities
+            </FieldLabel>
+            <Input
+              id="opportunity-search"
+              type="search"
+              placeholder="Idea, buyer, or industry"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+          </Field>
+          <Field className="md:w-52 md:shrink-0">
+            <FieldLabel htmlFor="confidence-filter">Demo confidence</FieldLabel>
+            <select
+              id="confidence-filter"
+              className="field-select"
+              value={confidence}
+              onChange={(e) => setConfidence(e.target.value)}
+            >
+              {["All confidence levels", "Higher", "Medium", "Lower"].map(
+                (v) => (
+                  <option key={v} value={v}>
+                    {v === "All confidence levels" ? "All levels" : v}
+                  </option>
+                ),
+              )}
+            </select>
+          </Field>
+          <Field className="md:w-44 md:shrink-0">
+            <FieldLabel htmlFor="opportunity-sort">Sort by</FieldLabel>
+            <select
+              id="opportunity-sort"
+              className="field-select"
+              value={sort}
+              onChange={(e) => setSort(e.target.value)}
+            >
+              <option>Highest score</option>
+              <option>Alphabetical</option>
+            </select>
+          </Field>
+        </FieldGroup>
+        {list.length === 0 ? (
+          <div className="surface flex flex-col items-center gap-4 p-12 text-center">
+            <Bookmark className="size-8 text-muted-foreground" />
+            <h3 className="text-lg font-semibold">
+              {query || confidence !== "All confidence levels"
+                ? "No matching opportunities"
+                : "No saved opportunities yet"}
+            </h3>
+            <p className="text-muted-foreground">
+              {savedOnly
+                ? "Save an opportunity from your research results to build your shortlist."
+                : "Try a broader search or a different confidence filter."}
+            </p>
+            {query || confidence !== "All confidence levels" ? (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setQuery("");
+                  setConfidence("All confidence levels");
+                }}
+              >
+                Clear filters
+              </Button>
+            ) : (
+              <Button asChild variant="outline">
+                <Link href="/research/results">
+                  Explore opportunities
+                  <ArrowRight data-icon="inline-end" />
+                </Link>
+              </Button>
+            )}
+          </div>
+        ) : view === "cards" ? (
+          <div className="grid gap-5 md:grid-cols-2">
+            {list.map((o) => (
+              <OpportunityCard key={o.id} opportunity={o} />
+            ))}
+          </div>
+        ) : (
+          <div
+            className="surface overflow-x-auto"
+            tabIndex={0}
+            role="region"
+            aria-label="Opportunity comparison; scroll horizontally to see all columns"
+          >
+            <table className="w-full min-w-[780px] text-left">
+              <caption className="p-5 text-left text-sm text-muted-foreground">
+                Synthetic comparison · All amounts in USD. Monthly price and
+                delivery-cost scenarios are assumptions, not forecasts.
+              </caption>
+              <thead className="border-y bg-background">
+                <tr>
+                  {[
+                    "Opportunity",
+                    "Demo score",
+                    "Buyer",
+                    "Price / month",
+                    "Delivery cost / month",
+                  ].map((t) => (
+                    <th
+                      scope="col"
+                      key={t}
+                      className="px-5 py-4 text-sm font-medium text-muted-foreground"
+                    >
+                      {t}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {list.map((o) => (
+                  <tr key={o.id} className="border-b last:border-b-0">
+                    <td className="max-w-56 px-5 py-5">
+                      <Link
+                        className="font-medium text-primary hover:underline"
+                        href={`/opportunities/${o.id}`}
+                      >
+                        {o.title}
+                      </Link>
+                    </td>
+                    <td className="px-5 py-5 font-semibold">{o.score}/100</td>
+                    <td className="max-w-48 px-5 py-5 text-sm text-muted-foreground">
+                      {o.buyer}
+                    </td>
+                    <td className="px-5 py-5">{o.revenue}</td>
+                    <td className="px-5 py-5">{o.cost}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+      <div className="flex flex-col justify-between gap-4 rounded-xl border border-dashed p-6 sm:flex-row sm:items-center">
+        <div>
+          <h2 className="font-semibold">
+            A score is a starting point, not a verdict.
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Open an opportunity to review its assumptions and plan buyer
+            conversations.
+          </p>
+        </div>
+        <Button variant="outline" asChild>
+          <Link href="/research/new">
+            <Plus />
+            New exploration
+          </Link>
+        </Button>
+      </div>
+    </>
+  );
+}
