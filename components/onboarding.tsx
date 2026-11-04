@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import Link from "next/link";
+import Link from "@/components/workspace-link";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -41,7 +41,8 @@ const steps = [
   },
 ];
 export function Onboarding({ editing = false }: { editing?: boolean }) {
-  const { profile, setProfile } = useDemo();
+  const { profile, setProfile, isDemo, href, busy } = useDemo();
+  const [error, setError] = useState("");
   const [draft, setDraft] = useState(profile);
   const [step, setStep] = useState(0);
   const router = useRouter();
@@ -102,16 +103,31 @@ export function Onboarding({ editing = false }: { editing?: boolean }) {
         </div>
         <form
           className="flex flex-col gap-8"
-          onSubmit={(e) => {
+          onSubmit={async (e) => {
             e.preventDefault();
+            if (busy) return;
+            setError("");
             if (step < 3) setStep(step + 1);
             else {
-              setProfile(draft);
-              toast.success("Demo profile updated", {
-                description:
-                  "Your preferences stay in memory until you refresh.",
-              });
-              router.push("/dashboard");
+              try {
+                await setProfile(draft);
+                toast.success(
+                  isDemo ? "Demo profile updated" : "Founder profile saved",
+                  {
+                    description: isDemo
+                      ? "Your preferences stay in memory until you refresh."
+                      : "Your profile is saved privately to your account.",
+                  },
+                );
+                router.push(href("/dashboard"));
+                router.refresh();
+              } catch (error) {
+                setError(
+                  error instanceof Error
+                    ? error.message
+                    : "Your profile could not be saved.",
+                );
+              }
             }
           }}
         >
@@ -212,6 +228,11 @@ export function Onboarding({ editing = false }: { editing?: boolean }) {
               </>
             )}
           </FieldGroup>
+          {error && (
+            <p role="alert" className="rounded-lg border p-4 text-sm">
+              {error}
+            </p>
+          )}
           <div className="flex items-center justify-between border-t pt-5">
             <Button
               type="button"
@@ -219,14 +240,20 @@ export function Onboarding({ editing = false }: { editing?: boolean }) {
               onClick={() =>
                 step > 0
                   ? setStep(step - 1)
-                  : router.push(editing ? "/dashboard" : "/")
+                  : router.push(editing ? href("/dashboard") : "/")
               }
             >
               <ArrowLeft />
               {step > 0 ? "Back" : "Cancel"}
             </Button>
-            <Button type="submit">
-              {step === 3 ? "Save demo profile" : "Continue"}
+            <Button type="submit" disabled={busy} aria-busy={busy}>
+              {busy
+                ? "Saving…"
+                : step === 3
+                  ? isDemo
+                    ? "Save demo profile"
+                    : "Save founder profile"
+                  : "Continue"}
               <ArrowRight />
             </Button>
           </div>
@@ -250,10 +277,10 @@ export function Onboarding({ editing = false }: { editing?: boolean }) {
       <header className="mx-auto flex max-w-6xl items-center justify-between px-5 py-7">
         <Brand />
         <Link
-          href="/dashboard"
+          href={isDemo ? "/dashboard" : "/demo/dashboard"}
           className="text-sm text-muted-foreground hover:text-primary"
         >
-          Skip to demo workspace
+          {isDemo ? "Skip to demo workspace" : "Explore the separate demo"}
         </Link>
       </header>
       <main className="mx-auto flex max-w-4xl flex-col gap-6 px-5 py-8">
@@ -268,7 +295,9 @@ export function Onboarding({ editing = false }: { editing?: boolean }) {
         {form}
         <DemoNote />
         <p className="text-center text-sm text-muted-foreground">
-          Demo only. Your answers are not transmitted or persisted.
+          {isDemo
+            ? "Demo only. Your answers are not transmitted or persisted."
+            : "Your answers are saved privately to your account. You can update them anytime."}
         </p>
       </main>
     </div>

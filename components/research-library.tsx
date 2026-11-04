@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import Link from "next/link";
+import Link from "@/components/workspace-link";
 import { Plus, ArrowUpRight, Search, FileText } from "lucide-react";
 import { PageHeader, DemoNote } from "@/components/shared";
 import { Button } from "@/components/ui/button";
@@ -8,22 +8,37 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useDemo } from "@/components/demo-provider";
 export function ResearchLibrary() {
-  const { run } = useDemo();
+  const { run, data, isDemo } = useDemo();
   const [query, setQuery] = useState("");
-  const runs = [
-    {
-      title: run.name,
-      sector: run.sector,
-      count: 4,
-      date: "Current demo session",
-    },
-    {
-      title: "Recurring-revenue tools for small teams",
-      sector: "B2B SaaS",
-      count: 4,
-      date: "Sample research history",
-    },
-  ].filter((r) => r.title.toLowerCase().includes(query.toLowerCase()));
+  const runs = (
+    isDemo
+      ? [
+          {
+            title: run.name,
+            sector: run.sector,
+            count: 4,
+            date: "Current demo session",
+          },
+          {
+            title: "Recurring-revenue tools for small teams",
+            sector: "B2B SaaS",
+            count: 4,
+            date: "Sample research history",
+          },
+        ]
+      : (data?.projects ?? []).map((project) => ({
+          title: project.name,
+          sector: project.sector,
+          count:
+            data?.runs.filter(
+              (item) =>
+                item.project_id === project.id && item.status === "completed",
+            ).length ?? 0,
+          date: new Date(project.created_at).toLocaleDateString("en-US", {
+            dateStyle: "medium",
+          }),
+        }))
+  ).filter((r) => r.title.toLowerCase().includes(query.toLowerCase()));
   return (
     <>
       <PageHeader
@@ -55,7 +70,9 @@ export function ResearchLibrary() {
             <thead className="bg-background text-sm text-muted-foreground">
               <tr>
                 <th className="px-6 py-3 font-medium">Research</th>
-                <th className="px-4 py-3 font-medium">Opportunities</th>
+                <th className="px-4 py-3 font-medium">
+                  {isDemo ? "Opportunities" : "Completed runs"}
+                </th>
                 <th className="px-4 py-3 font-medium">Status</th>
                 <th className="px-4 py-3 font-medium">Open</th>
               </tr>
@@ -79,7 +96,9 @@ export function ResearchLibrary() {
                   </td>
                   <td className="px-4 py-6">{r.count}</td>
                   <td className="px-4 py-6">
-                    <Badge variant="secondary">Demo complete</Badge>
+                    <Badge variant="secondary">
+                      {isDemo ? "Demo complete" : "Brief saved"}
+                    </Badge>
                   </td>
                   <td className="px-4 py-6">
                     <Link
@@ -96,7 +115,9 @@ export function ResearchLibrary() {
         </div>
         {runs.length === 0 && (
           <p className="p-10 text-center text-muted-foreground">
-            No research matches “{query}”. Try a different search.
+            {query
+              ? `No research matches “${query}”. Try a different search.`
+              : "No research briefs yet. Create your first brief to get started."}
           </p>
         )}
       </div>

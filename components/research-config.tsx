@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
+import Link from "@/components/workspace-link";
 import {
   ArrowLeft,
   ArrowRight,
@@ -21,7 +21,7 @@ import {
   FieldError,
 } from "@/components/ui/field";
 export function ResearchConfig() {
-  const { run, setRun, profile } = useDemo();
+  const { run, setRun, profile, isDemo, href, busy } = useDemo();
   const [draft, setDraft] = useState(run);
   const [nameError, setNameError] = useState("");
   const router = useRouter();
@@ -36,14 +36,19 @@ export function ResearchConfig() {
       </Link>
       <PageHeader
         title="What would you like to explore?"
-        description="Configure a research brief and preview a clearly labeled demonstration report."
+        description={
+          isDemo
+            ? "Configure a research brief and preview a clearly labeled demonstration report."
+            : "Save a private research brief. Live research execution is not connected yet."
+        }
       />
       <div className="grid gap-6 xl:grid-cols-[1.6fr_1fr]">
         <section className="surface p-6 md:p-8">
           <form
             className="flex flex-col gap-7"
-            onSubmit={(e) => {
+            onSubmit={async (e) => {
               e.preventDefault();
+              if (busy) return;
               if (!draft.name.trim()) {
                 setNameError(
                   "Enter a research name, such as Agency workflow research.",
@@ -51,8 +56,19 @@ export function ResearchConfig() {
                 document.getElementById("research-name")?.focus();
                 return;
               }
-              setRun({ ...draft, name: draft.name.trim() });
-              router.push("/research/results?demo=1");
+              try {
+                await setRun({ ...draft, name: draft.name.trim() });
+                router.push(
+                  href(isDemo ? "/research/results?demo=1" : "/research"),
+                );
+                router.refresh();
+              } catch (error) {
+                setNameError(
+                  error instanceof Error
+                    ? error.message
+                    : "Your research brief could not be saved.",
+                );
+              }
             }}
           >
             <h2 className="text-lg font-semibold">Set your research focus</h2>
@@ -91,7 +107,10 @@ export function ResearchConfig() {
                   className="field-select"
                   value={draft.sector}
                   onChange={(e) =>
-                    setDraft({ ...draft, sector: e.target.value })
+                    setDraft({
+                      ...draft,
+                      sector: e.target.value as typeof draft.sector,
+                    })
                   }
                 >
                   {[
@@ -112,7 +131,10 @@ export function ResearchConfig() {
                   className="field-select"
                   value={draft.model}
                   onChange={(e) =>
-                    setDraft({ ...draft, model: e.target.value })
+                    setDraft({
+                      ...draft,
+                      model: e.target.value as typeof draft.model,
+                    })
                   }
                 >
                   {[
@@ -132,7 +154,10 @@ export function ResearchConfig() {
                   className="field-select"
                   value={draft.geography}
                   onChange={(e) =>
-                    setDraft({ ...draft, geography: e.target.value })
+                    setDraft({
+                      ...draft,
+                      geography: e.target.value as typeof draft.geography,
+                    })
                   }
                 >
                   {[
@@ -152,24 +177,34 @@ export function ResearchConfig() {
                 </FieldLabel>
                 <textarea
                   id="context"
+                  value={draft.context}
+                  onChange={(event) =>
+                    setDraft({ ...draft, context: event.target.value })
+                  }
                   aria-describedby="context-help"
                   maxLength={1000}
                   className="field-select min-h-24"
                   placeholder="A buyer group, a problem you’ve noticed, or a niche you know well…"
                 />
                 <FieldDescription id="context-help">
-                  Up to 1,000 characters. This demo does not save or process
-                  these notes. Configuration appears in the brief, but results
-                  remain the same synthetic examples.
+                  {isDemo
+                    ? "Up to 1,000 characters. Demo notes stay in memory; results remain fixed synthetic examples."
+                    : "Up to 1,000 characters. Saved privately with your research brief. No AI request is made."}
                 </FieldDescription>
               </Field>
             </FieldGroup>
             <div className="flex flex-wrap items-center justify-between gap-4 border-t pt-5">
               <span className="text-sm text-muted-foreground">
-                0 credits used in demo mode
+                {isDemo
+                  ? "0 credits used in demo mode"
+                  : "Brief only · No research run or charge is created"}
               </span>
-              <Button type="submit">
-                Preview research results
+              <Button type="submit" disabled={busy} aria-busy={busy}>
+                {busy
+                  ? "Saving…"
+                  : isDemo
+                    ? "Preview research results"
+                    : "Save research brief"}
                 <ArrowRight />
               </Button>
             </div>
@@ -182,8 +217,9 @@ export function ResearchConfig() {
               <h2 className="font-semibold">Your founder context</h2>
             </div>
             <p className="text-sm text-muted-foreground">
-              Reference your experience while exploring. Profile changes do not
-              personalize demo results.
+              {isDemo
+                ? "Reference your experience while exploring. Profile changes do not personalize demo results."
+                : "Your founder profile is saved to your account. Live personalized research is not enabled yet."}
             </p>
             <dl className="flex flex-col gap-4">
               {[

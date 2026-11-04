@@ -1,5 +1,5 @@
 "use client";
-import Link from "next/link";
+import Link from "@/components/workspace-link";
 import {
   ArrowRight,
   ArrowUpRight,
@@ -22,8 +22,10 @@ import { OpportunityCard } from "@/components/opportunity-card";
 import { ScoreChart } from "@/components/score-chart";
 import { opportunities } from "@/lib/demo-data";
 import { useDemo } from "@/components/demo-provider";
+import { LiveDashboard } from "@/components/live-workspace";
 export function Dashboard() {
-  const { profile, saved, run } = useDemo();
+  const { profile, saved, run, isDemo } = useDemo();
+  if (!isDemo) return <LiveDashboard />;
   return (
     <>
       <PageHeader

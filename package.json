@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "next dev --hostname 0.0.0.0",
     "build": "next build",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test tests/workspace.test.mjs",
+    "test:integration": "node --env-file-if-exists=/vercel/share/.env.project --env-file-if-exists=.env.development.local tests/supabase.integration.mjs"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.6",

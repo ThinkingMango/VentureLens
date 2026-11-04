@@ -39,13 +39,13 @@ export function Landing() {
           </p>
           <div className="flex flex-wrap justify-center gap-3">
             <Button asChild size="lg">
-              <Link href="/onboarding">
+              <Link href="/signup">
                 Find your next opportunity
                 <ArrowRight />
               </Link>
             </Button>
             <Button asChild variant="outline" size="lg">
-              <Link href="/dashboard">
+              <Link href="/demo/dashboard">
                 Explore the demo
                 <ArrowUpRight />
               </Link>
@@ -99,7 +99,7 @@ export function Landing() {
                     </p>
                   </div>
                   <Link
-                    href="/research/results"
+                    href="/demo/research/results"
                     className="hidden items-center gap-1 text-sm text-primary sm:flex"
                   >
                     View research
@@ -109,7 +109,7 @@ export function Landing() {
                 <div className="grid gap-4 sm:grid-cols-2">
                   {opportunities.slice(0, 2).map((o) => (
                     <Link
-                      href={`/opportunities/${o.id}`}
+                      href={`/demo/opportunities/${o.id}`}
                       key={o.id}
                       className="flex flex-col gap-4 rounded-lg border bg-card p-5 hover:border-primary/40"
                     >
@@ -228,7 +228,7 @@ export function Landing() {
             starting point for a business that fits you.
           </p>
           <Button asChild size="lg">
-            <Link href="/onboarding">
+            <Link href="/signup">
               Build your founder profile
               <ArrowRight />
             </Link>

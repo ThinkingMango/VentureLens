@@ -3,6 +3,11 @@ const config: NextConfig = {
   async headers() {
     return [
       {
+        source:
+          "/:path(dashboard|research|saved|profile|billing|onboarding|opportunities|reset-password|login|signup)/:rest*",
+        headers: [{ key: "X-Frame-Options", value: "SAMEORIGIN" }],
+      },
+      {
         source: "/:path*",
         headers: [
           { key: "X-Content-Type-Options", value: "nosniff" },

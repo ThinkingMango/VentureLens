@@ -1,0 +1,123 @@
+import { z } from "zod";
+
+export const profileSchema = z.object({
+  name: z.string().trim().min(1, "Enter your name.").max(80),
+  role: z.enum([
+    "Aspiring founder",
+    "Exploring a side business",
+    "Experienced founder",
+    "Independent professional",
+  ]),
+  industry: z.enum([
+    "Professional services",
+    "B2B SaaS",
+    "Finance & operations",
+    "Healthcare",
+    "Education",
+    "Other",
+  ]),
+  skills: z.string().trim().min(1, "Add your skills or experience.").max(500),
+  hours: z.enum([
+    "Under 5 hours",
+    "5–10 hours",
+    "10–20 hours",
+    "20–40 hours",
+    "Full time",
+  ]),
+  budget: z.enum(["Under $1,000", "$1,000–5,000", "$5,000–15,000", "$15,000+"]),
+  goal: z.enum([
+    "Build a sustainable side business",
+    "Transition to full-time entrepreneurship",
+    "Find a scalable startup opportunity",
+    "Expand my consulting practice",
+  ]),
+});
+export type Profile = z.infer<typeof profileSchema>;
+export const projectSchema = z.object({
+  name: z.string().trim().min(1).max(100),
+  sector: z.enum([
+    "Professional services",
+    "B2B SaaS",
+    "Finance & operations",
+    "Education",
+    "Healthcare",
+  ]),
+  model: z.enum([
+    "B2B subscription",
+    "Productized service",
+    "Usage-based software",
+    "Open to possibilities",
+  ]),
+  geography: z.enum([
+    "United States",
+    "United Kingdom",
+    "European Union",
+    "Global / English-speaking",
+  ]),
+  context: z.string().trim().max(1000).default(""),
+});
+export type ResearchBrief = z.infer<typeof projectSchema>;
+export type Project = ResearchBrief & { id: string; created_at: string };
+export type ResearchRun = {
+  id: string;
+  project_id: string;
+  status: string;
+  created_at: string;
+};
+export const opportunitySchema = z.object({
+  id: z.string(),
+  title: z.string().max(200),
+  category: z.string(),
+  description: z.string(),
+  buyer: z.string(),
+  pain: z.string(),
+  score: z.number().min(0).max(100),
+  confidence: z.string(),
+  revenue: z.string(),
+  cost: z.string(),
+  risk: z.string(),
+  scores: z.array(z.number().min(0).max(100)).length(5),
+  icon: z.enum(["file", "headset", "chart", "workflow"]),
+});
+export type WorkspaceOpportunity = z.infer<typeof opportunitySchema>;
+export type WorkspaceData = {
+  userId: string;
+  email: string;
+  profile: Profile;
+  onboarded: boolean;
+  projects: Project[];
+  runs: ResearchRun[];
+  opportunities: WorkspaceOpportunity[];
+  saved: string[];
+  completed: string[];
+};
+export const emptyProfile: Profile = {
+  name: "",
+  role: "Aspiring founder",
+  industry: "Professional services",
+  skills: "",
+  hours: "10–20 hours",
+  budget: "Under $1,000",
+  goal: "Build a sustainable side business",
+};
+export const emptyBrief: ResearchBrief = {
+  name: "",
+  sector: "Professional services",
+  model: "B2B subscription",
+  geography: "United States",
+  context: "",
+};
+export function safeReturnPath(
+  value: string | null | undefined,
+  fallback = "/dashboard",
+) {
+  if (
+    !value ||
+    !/^\/(dashboard|research|saved|profile|billing|onboarding|opportunities|reset-password)(\/|\?|$)/.test(
+      value,
+    ) ||
+    /[\\\r\n]/.test(value)
+  )
+    return fallback;
+  return value;
+}

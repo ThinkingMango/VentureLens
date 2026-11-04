@@ -164,7 +164,7 @@ export function Pricing() {
         </section>
         <div className="text-center">
           <Button asChild variant="outline">
-            <Link href="/dashboard">
+            <Link href="/demo/dashboard">
               Try the demo workspace
               <ArrowRight />
             </Link>

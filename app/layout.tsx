@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist } from "next/font/google";
 import { Toaster } from "sonner";
-import { DemoProvider } from "@/components/demo-provider";
 import "./globals.css";
 const geist = Geist({ subsets: ["latin"], variable: "--font-geist" });
 export const metadata: Metadata = {
@@ -10,7 +9,7 @@ export const metadata: Metadata = {
     template: "%s · VentureLens AI",
   },
   description:
-    "Compare buyer problems, evidence limitations, business economics, and validation plans for GenAI-enabled opportunities. Explore clearly labeled synthetic demonstration reports.",
+    "Build your founder profile, save private research briefs, and manage your opportunity shortlist in a secure personal workspace. Explore sample reports in a separate demo.",
 };
 export const viewport: Viewport = {
   themeColor: "#f6f8fb",
@@ -25,7 +24,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`bg-background ${geist.variable}`}>
       <body className="font-sans antialiased">
-        <DemoProvider>{children}</DemoProvider>
+        {children}
         <Toaster position="bottom-right" />
       </body>
     </html>

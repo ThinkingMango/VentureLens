@@ -1,12 +1,39 @@
 "use client";
-import Link from "next/link";
+import Link from "@/components/workspace-link";
 import { ArrowUpRight, CreditCard, Telescope } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader, DemoNote } from "@/components/shared";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PricingCards } from "@/components/pricing";
+import { useDemo } from "@/components/demo-provider";
 export function Billing() {
+  const { isDemo } = useDemo();
+  if (!isDemo)
+    return (
+      <>
+        <PageHeader
+          title="Credits & billing"
+          description="Payments and research credits are not enabled yet."
+        />
+        <section className="surface flex flex-col gap-4 p-6">
+          <h2 className="text-xl font-semibold">
+            No billing service connected
+          </h2>
+          <p className="leading-relaxed text-muted-foreground">
+            No credits, charges, subscriptions, or payment methods have been
+            provisioned for this account. You can save research briefs without
+            making a payment.
+          </p>
+          <Button asChild variant="outline" className="w-fit">
+            <Link href="/research/new">
+              Create a research brief
+              <ArrowUpRight />
+            </Link>
+          </Button>
+        </section>
+      </>
+    );
   const disconnected = () =>
     toast.info("Live billing is not connected", {
       description:

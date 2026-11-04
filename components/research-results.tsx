@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import Link from "next/link";
+import Link from "@/components/workspace-link";
 import {
   ArrowLeft,
   ArrowRight,
@@ -18,12 +18,13 @@ import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Badge } from "@/components/ui/badge";
 import { useDemo } from "@/components/demo-provider";
 import { opportunities, demoNotice } from "@/lib/demo-data";
+import { LiveResearchResults } from "@/components/live-workspace";
 export function ResearchResults({
   savedOnly = false,
 }: {
   savedOnly?: boolean;
 }) {
-  const { run, saved } = useDemo();
+  const { run, saved, isDemo } = useDemo();
   const [query, setQuery] = useState("");
   const [confidence, setConfidence] = useState("All confidence levels");
   const [sort, setSort] = useState("Highest score");
@@ -62,6 +63,7 @@ export function ResearchResults({
     a.click();
     URL.revokeObjectURL(url);
   }
+  if (!isDemo) return <LiveResearchResults savedOnly={savedOnly} />;
   return (
     <>
       {!savedOnly && (

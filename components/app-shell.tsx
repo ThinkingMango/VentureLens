@@ -1,7 +1,9 @@
 "use client";
-import Link from "next/link";
+import Link from "@/components/workspace-link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import { toast } from "sonner";
+import { createClient } from "@/lib/supabase/client";
 import {
   LayoutDashboard,
   Telescope,
@@ -37,10 +39,23 @@ const nav = [
   { title: "Founder profile", href: "/profile", icon: UserRound },
 ];
 export function AppShell({ children }: { children: React.ReactNode }) {
-  const path = usePathname();
+  const pathname = usePathname();
+  const path = pathname.startsWith("/demo/") ? pathname.slice(5) : pathname;
   const [open, setOpen] = useState(false);
   const [help, setHelp] = useState(false);
-  const { profile, saved } = useDemo();
+  const { profile, saved, data, isDemo } = useDemo();
+  const [signingOut, setSigningOut] = useState(false);
+  async function logout() {
+    setSigningOut(true);
+    try {
+      const { error } = await createClient().auth.signOut({ scope: "local" });
+      if (error) throw error;
+      window.location.replace("/login");
+    } catch {
+      toast.error("You could not be logged out. Please try again.");
+      setSigningOut(false);
+    }
+  }
   const title = path.startsWith("/opportunities")
     ? "Opportunity detail"
     : path === "/research/new"
@@ -67,11 +82,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <div className="flex flex-1 flex-col px-4 py-5">
         <div className="mb-7 flex items-center gap-3 rounded-lg border p-3">
           <span className="flex size-8 items-center justify-center rounded-md bg-secondary font-semibold text-primary">
-            A
+            {profile.name.slice(0, 1) || "F"}
           </span>
           <div className="flex-1">
             <p className="font-medium">Personal workspace</p>
-            <p className="text-sm text-muted-foreground">Demo account</p>
+            <p className="text-sm text-muted-foreground">
+              {isDemo ? "Demo account" : "Private account"}
+            </p>
           </div>
           <ChevronDown className="size-4 text-muted-foreground" />
         </div>
@@ -109,29 +126,31 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </Link>
         </Button>
         <div className="mt-auto flex flex-col gap-5 pt-12">
-          <div className="rounded-lg border bg-background p-4">
-            <div className="flex items-center justify-between">
-              <span className="font-medium">Your research credits</span>
-              <span className="text-primary">
-                <Telescope className="size-4" />
-              </span>
+          {isDemo && (
+            <div className="rounded-lg border bg-background p-4">
+              <div className="flex items-center justify-between">
+                <span className="font-medium">Your research credits</span>
+                <span className="text-primary">
+                  <Telescope className="size-4" />
+                </span>
+              </div>
+              <p className="mt-3">
+                <strong className="text-xl font-semibold">8</strong>
+                <span className="text-muted-foreground"> / 10 available</span>
+              </p>
+              <div className="progress-track mt-3">
+                <div className="progress-fill w-4/5" />
+              </div>
+              <Link
+                href="/billing"
+                onClick={() => setOpen(false)}
+                className="mt-3 flex items-center justify-between font-medium text-primary"
+              >
+                Manage credits
+                <ArrowUpRight className="size-4" />
+              </Link>
             </div>
-            <p className="mt-3">
-              <strong className="text-xl font-semibold">8</strong>
-              <span className="text-muted-foreground"> / 10 available</span>
-            </p>
-            <div className="progress-track mt-3">
-              <div className="progress-fill w-4/5" />
-            </div>
-            <Link
-              href="/billing"
-              onClick={() => setOpen(false)}
-              className="mt-3 flex items-center justify-between font-medium text-primary"
-            >
-              Manage credits
-              <ArrowUpRight className="size-4" />
-            </Link>
-          </div>
+          )}
           <div className="flex flex-col gap-1">
             <Link
               href="/billing"
@@ -149,6 +168,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               Help & resources
               <ArrowUpRight className="ml-auto size-4" />
             </button>
+            {!isDemo && (
+              <button
+                className="nav-link text-left"
+                onClick={logout}
+                disabled={signingOut}
+              >
+                {signingOut ? "Logging out…" : "Log out"}
+              </button>
+            )}
+            {isDemo && (
+              <Link className="nav-link" href="/signup">
+                Create a real account
+                <ArrowRight className="ml-auto size-4" />
+              </Link>
+            )}
           </div>
         </div>
       </div>
@@ -161,8 +195,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           {profile.name.slice(0, 1)}
         </span>
         <div className="flex-1">
-          <p className="font-medium">{profile.name} Morgan</p>
-          <p className="text-sm text-muted-foreground">Demo founder</p>
+          <p className="font-medium">
+            {profile.name}
+            {isDemo ? " Morgan" : ""}
+          </p>
+          <p className="max-w-40 truncate text-sm text-muted-foreground">
+            {isDemo ? "Demo founder" : data?.email}
+          </p>
         </div>
         <ChevronDown className="size-4 text-muted-foreground" />
       </Link>
@@ -183,7 +222,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <DialogContent className="left-0 top-0 flex h-dvh w-72 max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-y-auto rounded-none border-0 bg-card p-0 text-foreground sm:rounded-none [&>button]:hidden">
           <DialogTitle className="sr-only">Workspace navigation</DialogTitle>
           <DialogDescription className="sr-only">
-            Navigate your demo workspace.
+            {isDemo
+              ? "Navigate your demo workspace."
+              : "Navigate your private workspace."}
           </DialogDescription>
           {sidebar}
         </DialogContent>
@@ -213,7 +254,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             >
               <FlaskConical className="size-3.5" />
               <span>
-                Demo<span className="hidden sm:inline"> mode</span>
+                {isDemo ? (
+                  <>
+                    Demo<span className="hidden sm:inline"> mode</span>
+                  </>
+                ) : (
+                  "Private workspace"
+                )}
               </span>
             </Badge>
             <button
@@ -224,7 +271,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Bell className="size-[18px]" />
             </button>
             <span className="hidden size-8 items-center justify-center rounded-full bg-secondary font-medium text-primary sm:flex">
-              {profile.name.slice(0, 1)}M
+              {profile.name.slice(0, 1)}
+              {isDemo ? "M" : ""}
             </span>
           </div>
         </header>
@@ -248,20 +296,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <Dialog open={help} onOpenChange={setHelp}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Your demo workspace</DialogTitle>
+            <DialogTitle>
+              {isDemo ? "Your demo workspace" : "Your private workspace"}
+            </DialogTitle>
             <DialogDescription>
-              Explore the complete research journey without connecting any
-              services.
+              {isDemo
+                ? "Explore the complete research journey without connecting any services."
+                : "Your founder profile and research briefs are securely saved to your account."}
             </DialogDescription>
           </DialogHeader>
           <p>
-            Research, opportunity scores, credits, and sources are synthetic.
-            Saved ideas and profile changes stay in memory until you refresh. No
-            real account, payment, or AI request is created.
+            {isDemo
+              ? "Research, opportunity scores, credits, and sources are synthetic. Saved ideas and profile changes stay in memory until you refresh. No real account, payment, or AI request is created."
+              : "Your records are private to your verified session. Live AI research and payments are not connected yet. No synthetic opportunities or credit balances are added to your account."}
           </p>
           <Button asChild onClick={() => setHelp(false)}>
             <Link href="/research/new">
-              Start a demo research run
+              {isDemo ? "Start a demo research run" : "Create a research brief"}
               <ArrowRight />
             </Link>
           </Button>

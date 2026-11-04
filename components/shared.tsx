@@ -1,4 +1,5 @@
-import Link from "next/link";
+"use client";
+import Link from "@/components/workspace-link";
 import {
   Aperture,
   ArrowUpRight,
@@ -13,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { demoNotice } from "@/lib/demo-data";
+import { useOptionalWorkspace } from "@/components/demo-provider";
 export function Brand({ compact = false }: { compact?: boolean }) {
   return (
     <Link
@@ -38,6 +40,8 @@ export function DemoNote({
   className?: string;
   short?: boolean;
 }) {
+  const workspace = useOptionalWorkspace();
+  if (workspace && !workspace.isDemo) return null;
   return (
     <div
       className={cn(

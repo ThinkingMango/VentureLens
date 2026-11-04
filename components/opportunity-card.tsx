@@ -1,5 +1,5 @@
 "use client";
-import Link from "next/link";
+import Link from "@/components/workspace-link";
 import { Bookmark, ArrowRight } from "lucide-react";
 import {
   Card,
@@ -20,7 +20,7 @@ export function OpportunityCard({
 }: {
   opportunity: Opportunity;
 }) {
-  const { saved, toggleSave } = useDemo();
+  const { saved, toggleSave, isDemo, busy } = useDemo();
   return (
     <Card className="flex h-full min-w-0 flex-col transition-colors hover:border-primary/40">
       <CardHeader className="gap-3 pb-5">
@@ -31,6 +31,7 @@ export function OpportunityCard({
             size="icon"
             aria-label={`${saved.includes(o.id) ? "Unsave" : "Save"} ${o.title}`}
             aria-pressed={saved.includes(o.id)}
+            disabled={busy}
             onClick={() => toggleSave(o.id)}
           >
             <Bookmark
@@ -81,7 +82,9 @@ export function OpportunityCard({
         </dl>
         <div className="flex flex-wrap items-center gap-2">
           <Confidence level={o.confidence} />
-          <span className="text-sm text-muted-foreground">Demo assessment</span>
+          <span className="text-sm text-muted-foreground">
+            {isDemo ? "Demo assessment" : "Research assessment"}
+          </span>
         </div>
       </CardContent>
       <CardFooter className="flex-wrap justify-between gap-3 border-t px-6 py-4">
@@ -90,7 +93,7 @@ export function OpportunityCard({
             {o.score}
             <span className="text-sm font-normal">/100</span>
           </strong>
-          Demo score
+          {isDemo ? "Demo score" : "Research score"}
         </p>
         <Button asChild variant="link" className="h-auto p-0">
           <Link

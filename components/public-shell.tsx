@@ -22,7 +22,7 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
               How it works
             </Link>
             <Link
-              href="/dashboard"
+              href="/demo/dashboard"
               className="text-muted-foreground hover:text-primary"
             >
               Explore the platform
@@ -61,7 +61,7 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
             className="flex flex-col gap-4 border-t p-5 lg:hidden"
             aria-label="Mobile main navigation"
           >
-            <Link href="/dashboard">Explore the platform</Link>
+            <Link href="/demo/dashboard">Explore the platform</Link>
             <Link href="/pricing">Pricing</Link>
             <Link href="/login">Log in</Link>
             <Link href="/signup">Get started</Link>
@@ -78,12 +78,12 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
             </p>
           </div>
           <p className="max-w-sm text-sm text-muted-foreground">
-            Frontend demonstration. All opportunities, research evidence, and
-            prices are illustrative.
+            Private accounts and saved research briefs. Sample reports and
+            illustrative prices are available in the separate demo.
           </p>
           <div className="flex gap-6">
             <Link href="/pricing">Pricing</Link>
-            <Link href="/dashboard">Explore demo</Link>
+            <Link href="/demo/dashboard">Explore demo</Link>
           </div>
         </div>
       </footer>
