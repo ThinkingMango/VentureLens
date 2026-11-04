@@ -36,6 +36,37 @@ test('inclusion requires two independent domains and non-vendor demand evidence'
   assert.equal(eligibleEvidence('c2',evidence,classes).length,0);
   assert.equal(eligibleEvidence('c1',[evidence[0],{...evidence[1],url:'https://www.buyers.org/another'}],classes).length,0);
 });
+test('subdomains and trailing dots do not create independent sources',()=>{
+  for (const urls of [
+    ['https://news.buyers.org/pain','https://research.buyers.org/report'],
+    ['https://buyers.org/pain','https://buyers.org./report'],
+    ['https://news.buyers.co.uk/pain','https://research.buyers.co.uk/report'],
+  ]) {
+    assert.equal(eligibleEvidence('c1', evidence.map((item,i)=>({...item,url:urls[i]})), classes).length, 0);
+  }
+  const independent = evidence.map((item,i)=>({...item,url:i ? 'https://survey.co.uk/report' : 'https://buyers.co.uk/pain'}));
+  assert.equal(eligibleEvidence('c1', independent, classes).length, 2);
+});
+test('public suffix rules distinguish independently hosted publications',()=>{
+  const hosted = evidence.map((item,i)=>({...item,url:i ? 'https://survey.github.io/report' : 'https://buyers.github.io/pain'}));
+  assert.equal(eligibleEvidence('c1',hosted,classes).length,2);
+  const samePublisher = hosted.map((item,i)=>({...item,url:i ? 'https://news.buyers.github.io/report' : 'https://buyers.github.io/pain'}));
+  assert.equal(eligibleEvidence('c1',samePublisher,classes).length,0);
+});
+test('duplicate page fragments do not inflate the evidence count',()=>{
+  const duplicate = {...evidence[0],source_key:'c1-s3',url:evidence[0].url+'#summary'};
+  const classification = {...classes[0],source_key:duplicate.source_key};
+  assert.equal(eligibleEvidence('c1',[...evidence,duplicate],[...classes,classification]).length,2);
+});
+test('inclusion independently rechecks quoted evidence and source URLs',()=>{
+  assert.equal(eligibleEvidence('c1',evidence,classes.map(c=>({...c,quote:'A fabricated quotation that is not in either source.'}))).length,0);
+  assert.equal(eligibleEvidence('c1',[evidence[0],{...evidence[1],url:'not a URL'}],classes).length,0);
+  assert.equal(eligibleEvidence('c1',[evidence[0],{...evidence[1],url:'http://127.0.0.1/report'}],classes).length,0);
+});
+test('invalid duplicate classifications do not hide a later grounded quote',()=>{
+  const output = groundedClassifications(evidence,[{...classes[0],quote:'An invented quotation from nowhere.'},classes[0],classes[1]]);
+  assert.deepEqual(output,classes);
+});
 test('source URLs reject executable protocols, credentials and local addresses',()=>{
   for(const url of ['javascript:alert(1)','data:text/html,a','http://localhost/x','http://127.0.0.1/x','http://[::1]/','https://user:pass@buyers.org/','https://foo.local']) assert.equal(safeSourceUrl(url),null);
   assert.equal(safeSourceUrl('https://buyers.org/report#part'),'https://buyers.org/report');
