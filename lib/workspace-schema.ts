@@ -55,6 +55,7 @@ export const projectSchema = z.object({
     "Global / English-speaking",
   ]),
   context: z.string().trim().max(1000).default(""),
+  discovery_mode: z.enum(["founder", "market", "combined"]).optional(),
 });
 export type ResearchBrief = z.infer<typeof projectSchema>;
 export type Project = ResearchBrief & { id: string; created_at: string };
@@ -63,6 +64,9 @@ export type ResearchRun = {
   project_id: string;
   status: string;
   created_at: string;
+  stage: string;
+  error_code: string | null;
+  retry_count: number;
 };
 export const opportunitySchema = z.object({
   id: z.string(),
@@ -78,6 +82,14 @@ export const opportunitySchema = z.object({
   risk: z.string(),
   scores: z.array(z.number().min(0).max(100)).length(5),
   icon: z.enum(["file", "headset", "chart", "workflow"]),
+  candidate_id: z.string().optional(),
+  evidence: z.array(z.object({ source_key: z.string(), url: z.string().url(), title: z.string(), excerpt: z.string(), retrieved_at: z.string(), published_at: z.string().nullable() })).optional(),
+  assumptions: z.array(z.string()).optional(),
+  validation: z.array(z.string()).optional(),
+  rationale: z.string().optional(),
+  critique: z.string().optional(),
+  falsification: z.string().optional(),
+  penalty: z.number().optional(),
 });
 export type WorkspaceOpportunity = z.infer<typeof opportunitySchema>;
 export type WorkspaceData = {

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useDemo } from "@/components/demo-provider";
+import { stageLabels } from "@/lib/research-core";
 export function ResearchLibrary() {
   const { run, data, isDemo } = useDemo();
   const [query, setQuery] = useState("");
@@ -14,12 +15,14 @@ export function ResearchLibrary() {
     isDemo
       ? [
           {
+            id: "demo-current", target: "/research/results", status: "Demo complete",
             title: run.name,
             sector: run.sector,
             count: 4,
             date: "Current demo session",
           },
           {
+            id: "demo-history", target: "/research/results", status: "Demo complete",
             title: "Recurring-revenue tools for small teams",
             sector: "B2B SaaS",
             count: 4,
@@ -27,6 +30,9 @@ export function ResearchLibrary() {
           },
         ]
       : (data?.projects ?? []).map((project) => ({
+          id: project.id,
+          target: data?.runs.find(item => item.project_id === project.id) ? `/research/${data.runs.find(item => item.project_id === project.id)!.id}` : "/research/new",
+          status: (() => { const latest = data?.runs.find(item => item.project_id === project.id); return !latest ? "简报已保存" : latest.status === "failed" ? "研究中止" : latest.status === "pending" ? "等待处理" : stageLabels[latest.stage] ?? latest.status; })(),
           title: project.name,
           sector: project.sector,
           count:
@@ -79,10 +85,10 @@ export function ResearchLibrary() {
             </thead>
             <tbody>
               {runs.map((r) => (
-                <tr key={r.title} className="border-t">
+                <tr key={r.id} className="border-t">
                   <td className="px-6 py-6">
                     <Link
-                      href="/research/results"
+                      href={r.target}
                       className="flex items-center gap-3 hover:text-primary"
                     >
                       <FileText className="size-5 shrink-0 text-primary" />
@@ -97,12 +103,12 @@ export function ResearchLibrary() {
                   <td className="px-4 py-6">{r.count}</td>
                   <td className="px-4 py-6">
                     <Badge variant="secondary">
-                      {isDemo ? "Demo complete" : "Brief saved"}
+                      {r.status}
                     </Badge>
                   </td>
                   <td className="px-4 py-6">
                     <Link
-                      href="/research/results"
+                      href={r.target}
                       aria-label={`Open ${r.title}`}
                     >
                       <ArrowUpRight className="size-5 text-muted-foreground" />

@@ -39,12 +39,12 @@ export async function readWorkspace(
       .maybeSingle(),
     supabase
       .from("research_projects")
-      .select("id,name,sector,model,geography,context,created_at")
+      .select("id,name,sector,model,geography,context,discovery_mode,created_at")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false }),
     supabase
       .from("research_runs")
-      .select("id,project_id,status,created_at")
+      .select("id,project_id,status,stage,error_code,retry_count,created_at")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false }),
     supabase

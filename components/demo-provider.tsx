@@ -22,6 +22,7 @@ type WorkspaceState = {
   toggleTask: (id: string) => void;
   href: (path: string) => string;
   busy: boolean;
+  refresh: () => Promise<unknown>;
 };
 const WorkspaceContext = createContext<WorkspaceState | null>(null);
 export function DemoProvider({ children }: { children: React.ReactNode }) {
@@ -55,6 +56,7 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
         run,
         completed,
         busy: false,
+        refresh: async () => undefined,
         toggleSave: (id) => setSaved((items) => toggle(items, id)),
         setProfile: async (p) => setProfile(p),
         setRun: async (r) => setRun(r),
@@ -137,6 +139,7 @@ export function WorkspaceProvider({
         run,
         completed: data.completed,
         busy,
+        refresh: () => mutate(),
         href: (path) => path,
         setProfile: (profile) => persist({ action: "profile", profile }),
         setRun: (project) => persist({ action: "project", project }),

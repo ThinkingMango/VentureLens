@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "@/components/workspace-link";
 import {
@@ -21,8 +21,10 @@ import {
   FieldError,
 } from "@/components/ui/field";
 export function ResearchConfig() {
-  const { run, setRun, profile, isDemo, href, busy } = useDemo();
+  const { run, setRun, profile, isDemo, href, busy, refresh } = useDemo();
   const [draft, setDraft] = useState(run);
+  const [submitting, setSubmitting] = useState(false);
+  const requestKey = useRef<string | null>(null);
   const [nameError, setNameError] = useState("");
   const router = useRouter();
   return (
@@ -39,7 +41,7 @@ export function ResearchConfig() {
         description={
           isDemo
             ? "Configure a research brief and preview a clearly labeled demonstration report."
-            : "Save a private research brief. Live research execution is not connected yet."
+            : "创建证据驱动的研究任务。仅限已授权的开发账号，不连接计费。"
         }
       />
       <div className="grid gap-6 xl:grid-cols-[1.6fr_1fr]">
@@ -48,7 +50,7 @@ export function ResearchConfig() {
             className="flex flex-col gap-7"
             onSubmit={async (e) => {
               e.preventDefault();
-              if (busy) return;
+              if (busy || submitting) return;
               if (!draft.name.trim()) {
                 setNameError(
                   "Enter a research name, such as Agency workflow research.",
@@ -56,18 +58,29 @@ export function ResearchConfig() {
                 document.getElementById("research-name")?.focus();
                 return;
               }
+              setSubmitting(true);
               try {
-                await setRun({ ...draft, name: draft.name.trim() });
-                router.push(
-                  href(isDemo ? "/research/results?demo=1" : "/research"),
-                );
+                const brief = { ...draft, name: draft.name.trim() };
+                if (isDemo) {
+                  await setRun(brief);
+                  router.push(href("/research/results?demo=1"));
+                } else {
+                  requestKey.current ??= crypto.randomUUID();
+                  const response = await fetch("/api/research", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "start", brief, requestKey: requestKey.current }) });
+                  const result = await response.json();
+                  if (!response.ok) throw new Error(result.error ?? "研究暂时无法启动。");
+                  await refresh().catch(() => undefined);
+                  router.push(`/research/${result.id}`);
+                }
                 router.refresh();
               } catch (error) {
                 setNameError(
                   error instanceof Error
                     ? error.message
-                    : "Your research brief could not be saved.",
+                    : "研究暂时无法启动。",
                 );
+              } finally {
+                setSubmitting(false);
               }
             }}
           >
@@ -99,6 +112,15 @@ export function ResearchConfig() {
                     to 100 characters.
                   </FieldDescription>
                 )}
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="discovery-mode">发现模式</FieldLabel>
+                <select id="discovery-mode" className="field-select" value={draft.discovery_mode ?? "combined"} onChange={(e) => setDraft({ ...draft, discovery_mode: e.target.value as "founder" | "market" | "combined" })}>
+                  <option value="combined">综合发现 · Combined Discovery</option>
+                  <option value="founder">创始人优势 · Founder Advantage</option>
+                  <option value="market">市场优先 · Market-First</option>
+                </select>
+                <FieldDescription>市场优先不使用个人背景进行机会发现或评分；其余模式结合你的技能和资源。</FieldDescription>
               </Field>
               <Field>
                 <FieldLabel htmlFor="sector">Industry or market</FieldLabel>
@@ -189,7 +211,7 @@ export function ResearchConfig() {
                 <FieldDescription id="context-help">
                   {isDemo
                     ? "Up to 1,000 characters. Demo notes stay in memory; results remain fixed synthetic examples."
-                    : "Up to 1,000 characters. Saved privately with your research brief. No AI request is made."}
+                    : "最多 1,000 字符。研究配置会保存；必要的市场背景会发送至 Qwen 和外部检索服务，请勿包含敏感信息。"}
                 </FieldDescription>
               </Field>
             </FieldGroup>
@@ -197,14 +219,14 @@ export function ResearchConfig() {
               <span className="text-sm text-muted-foreground">
                 {isDemo
                   ? "0 credits used in demo mode"
-                  : "Brief only · No research run or charge is created"}
+                  : "开发白名单 · 最多 3 次任务 · 每次估算预算上限 US$0.25"}
               </span>
-              <Button type="submit" disabled={busy} aria-busy={busy}>
-                {busy
-                  ? "Saving…"
+              <Button type="submit" disabled={busy || submitting} aria-busy={busy || submitting}>
+                {busy || submitting
+                  ? "提交中…"
                   : isDemo
                     ? "Preview research results"
-                    : "Save research brief"}
+                    : "启动证据研究"}
                 <ArrowRight />
               </Button>
             </div>
@@ -219,7 +241,7 @@ export function ResearchConfig() {
             <p className="text-sm text-muted-foreground">
               {isDemo
                 ? "Reference your experience while exploring. Profile changes do not personalize demo results."
-                : "Your founder profile is saved to your account. Live personalized research is not enabled yet."}
+                : "研究会保存此刻的画像快照。创始人优势和综合发现模式使用这些信息；市场优先模式不使用。"}
             </p>
             <dl className="flex flex-col gap-4">
               {[

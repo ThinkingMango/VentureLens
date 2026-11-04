@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { OpportunityCard } from "@/components/opportunity-card";
 import { Input } from "@/components/ui/input";
 import type { WorkspaceOpportunity } from "@/lib/workspace-schema";
+import { stageLabels } from "@/lib/research-core";
+import { OpportunityEvidence } from "@/components/opportunity-evidence";
 
 export function WorkspaceEmpty({
   title,
@@ -74,7 +76,7 @@ export function LiveDashboard() {
       {data.projects.length === 0 ? (
         <WorkspaceEmpty
           title="Start with a question worth exploring."
-          description="Create your first research brief. Your profile and briefs are saved privately to your account. Live AI research is not connected yet; no sample results are added to your workspace."
+          description="创建第一份研究简报。获授权的开发账号可启动 Qwen 与真实外部检索；研究配置、证据及报告私有保存，绝不添加演示结果。"
         />
       ) : (
         <section className="surface flex flex-col gap-5 p-6">
@@ -84,11 +86,11 @@ export function LiveDashboard() {
             {data.projects[0].sector} · {data.projects[0].geography}
           </p>
           <p className="text-sm text-muted-foreground">
-            Brief saved. Live research execution is not connected yet.
+            {data.runs[0] ? `任务状态：${data.runs[0].status === "failed" ? "研究中止" : stageLabels[data.runs[0].stage] ?? data.runs[0].status}` : "简报已保存，可创建新的研究任务。"}
           </p>
           <Button variant="outline" asChild className="w-fit">
-            <Link href="/research">
-              View research library
+            <Link href={data.runs[0] ? `/research/${data.runs[0].id}` : "/research"}>
+              查看研究任务
               <ArrowRight />
             </Link>
           </Button>
@@ -164,7 +166,7 @@ export function LiveResearchResults({
               ? "Try another search term."
               : savedOnly
                 ? "Save an opportunity from your completed research to add it here. Demonstration opportunities remain in the demo and are never copied into your account."
-                : "Your research briefs are saved, but live research execution is not connected yet. No fabricated reports or synthetic scores appear in this workspace."
+                : "尚无通过证据核验的报告。可从研究历史查看任务进度或失败原因；检索不可用或证据不足时不会生成虚构结果。"
           }
         />
       )}
@@ -214,6 +216,7 @@ export function LiveOpportunityDetail({
           ))}
         </dl>
       </section>
+      <OpportunityEvidence opportunity={item} />
       <section className="surface flex flex-col gap-4 p-6">
         <h2 className="text-xl font-semibold">Your first validation sprint</h2>
         <p className="text-sm text-muted-foreground">
