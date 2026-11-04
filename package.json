@@ -8,7 +8,8 @@
     "build": "next build",
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-strip-types --test tests/workspace.test.mjs tests/research.test.mjs",
-    "test:integration": "node --env-file-if-exists=/vercel/share/.env.project --env-file-if-exists=.env.development.local tests/supabase.integration.mjs"
+    "test:integration": "node --env-file-if-exists=/vercel/share/.env.project --env-file-if-exists=.env.development.local tests/supabase.integration.mjs",
+    "test:research:e2e": "node --experimental-strip-types --env-file-if-exists=/vercel/share/.env.project --env-file-if-exists=.env.development.local tests/research.e2e.mjs"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.6",
