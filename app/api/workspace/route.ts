@@ -29,11 +29,20 @@ export async function GET() {
       data: { user },
     } = await supabase.auth.getUser();
     if (!user)
-      return json({ error: "Please log in to access your workspace." }, 401);
+      return json(
+        {
+          code: "AUTH_REQUIRED",
+          error: "Please log in to access your workspace.",
+        },
+        401,
+      );
     return json(await readWorkspace(supabase, user));
   } catch {
     return json(
-      { error: "Your workspace could not be loaded. Please try again." },
+      {
+        code: "WORKSPACE_UNAVAILABLE",
+        error: "Your workspace could not be loaded. Please try again.",
+      },
       503,
     );
   }
@@ -49,19 +58,31 @@ export async function POST(request: NextRequest) {
     sameOrigin = false;
   }
   if (!sameOrigin)
-    return json({ error: "Request origin is not allowed." }, 403);
+    return json(
+      { code: "INVALID_ORIGIN", error: "Request origin is not allowed." },
+      403,
+    );
   if (!request.headers.get("content-type")?.startsWith("application/json"))
-    return json({ error: "JSON is required." }, 415);
+    return json({ code: "JSON_REQUIRED", error: "JSON is required." }, 415);
   if (Number(request.headers.get("content-length") ?? 0) > 12000)
-    return json({ error: "Request is too large." }, 413);
+    return json(
+      { code: "REQUEST_TOO_LARGE", error: "Request is too large." },
+      413,
+    );
   try {
     const raw = await request.text();
     if (new TextEncoder().encode(raw).length > 12000)
-      return json({ error: "Request is too large." }, 413);
+      return json(
+        { code: "REQUEST_TOO_LARGE", error: "Request is too large." },
+        413,
+      );
     const parsed = mutationSchema.safeParse(JSON.parse(raw));
     if (!parsed.success)
       return json(
-        { error: parsed.error.issues[0]?.message ?? "Check the form fields." },
+        {
+          code: "INVALID_INPUT",
+          error: parsed.error.issues[0]?.message ?? "Check the form fields.",
+        },
         400,
       );
     const supabase = await createClient();
@@ -70,7 +91,10 @@ export async function POST(request: NextRequest) {
     } = await supabase.auth.getUser();
     if (!user)
       return json(
-        { error: "Your session has expired. Please log in again." },
+        {
+          code: "AUTH_REQUIRED",
+          error: "Your session has expired. Please log in again.",
+        },
         401,
       );
     const input = parsed.data;
@@ -95,7 +119,11 @@ export async function POST(request: NextRequest) {
         .eq("user_id", user.id)
         .maybeSingle();
       if (lookupError) throw lookupError;
-      if (!opportunity) return json({ error: "Opportunity not found." }, 404);
+      if (!opportunity)
+        return json(
+          { code: "NOT_FOUND", error: "Opportunity not found." },
+          404,
+        );
       if (input.action === "save") {
         if (input.saved) {
           const { error } = await supabase
@@ -138,9 +166,12 @@ export async function POST(request: NextRequest) {
     return json(await readWorkspace(supabase, user));
   } catch (error) {
     if (error instanceof SyntaxError)
-      return json({ error: "Invalid JSON." }, 400);
+      return json({ code: "INVALID_INPUT", error: "Invalid JSON." }, 400);
     return json(
-      { error: "Your change could not be saved. Please try again." },
+      {
+        code: "SAVE_FAILED",
+        error: "Your change could not be saved. Please try again.",
+      },
       503,
     );
   }

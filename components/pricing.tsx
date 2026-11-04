@@ -1,4 +1,6 @@
 "use client";
+import { useCopy, useFormats } from "@/i18n/use-copy";
+
 import Link from "next/link";
 import { Check, ArrowRight, CreditCard } from "lucide-react";
 import { toast } from "sonner";
@@ -58,6 +60,8 @@ export const plans = [
   },
 ];
 export function PricingCards() {
+  const copy = useCopy();
+  const format = useFormats();
   return (
     <div className="grid gap-5 md:grid-cols-3">
       {plans.map((p) => (
@@ -72,20 +76,22 @@ export function PricingCards() {
           <CardHeader className="gap-3">
             {p.popular && (
               <Badge className="mb-1 w-fit rounded-md">
-                Ongoing exploration
+                {copy("Ongoing exploration")}
               </Badge>
             )}
-            <CardTitle>{p.name}</CardTitle>
-            <CardDescription>{p.description}</CardDescription>
+            <CardTitle>{copy(p.name)}</CardTitle>
+            <CardDescription>{copy(p.description)}</CardDescription>
             <p className="pt-3">
               <strong className="text-4xl font-semibold tracking-tight">
-                ${p.price}
+                {format.usd(p.price, 0)}
               </strong>
-              <span className="ml-2 text-muted-foreground">{p.period}</span>
+              <span className="ml-2 text-muted-foreground">
+                {copy(p.period)}
+              </span>
             </p>
           </CardHeader>
           <CardContent className="flex flex-1 flex-col gap-5">
-            <p className="font-medium text-primary">{p.credits}</p>
+            <p className="font-medium text-primary">{copy(p.credits)}</p>
             <ul className="flex flex-col gap-3">
               {p.features.map((f) => (
                 <li
@@ -93,7 +99,7 @@ export function PricingCards() {
                   className="flex items-start gap-2 text-sm text-muted-foreground"
                 >
                   <Check className="mt-0.5 size-4 shrink-0 text-primary" />
-                  {f}
+                  {copy(f)}
                 </li>
               ))}
             </ul>
@@ -103,13 +109,14 @@ export function PricingCards() {
               variant={p.popular ? "default" : "outline"}
               className="w-full"
               onClick={() =>
-                toast.info("Illustrative package only", {
-                  description:
+                toast.info(copy("Illustrative package only"), {
+                  description: copy(
                     "Stripe is not connected. No purchase, subscription, or charge will be created.",
+                  ),
                 })
               }
             >
-              Preview {p.name}
+              {copy("Preview {plan}", { plan: copy(p.name) })}
               <ArrowRight />
             </Button>
           </CardFooter>
@@ -119,29 +126,34 @@ export function PricingCards() {
   );
 }
 export function Pricing() {
+  const copy = useCopy();
   return (
     <PublicShell>
       <main className="mx-auto flex max-w-6xl flex-col gap-12 px-5 py-16 md:px-8 md:py-20">
         <div className="flex flex-col items-center gap-5 text-center">
           <h1 className="text-balance text-4xl font-semibold md:text-5xl">
-            Invest in a clearer starting point.
+            {copy("Invest in a clearer starting point.")}
           </h1>
           <p className="max-w-xl text-base text-muted-foreground">
-            A focused sprint or a regular research habit. Choose the pace that
-            works for your next chapter.
+            {copy(
+              "A focused sprint or a regular research habit. Choose the pace that works for your next chapter.",
+            )}
           </p>
           <Badge variant="secondary">
-            Illustrative pricing · Checkout is not connected
+            {copy("Illustrative pricing · Checkout is not connected")}
           </Badge>
         </div>
         <PricingCards />
         <div className="flex justify-center gap-2 text-center text-sm text-muted-foreground">
           <CreditCard className="size-4 shrink-0" />
-          All prices are synthetic package examples in USD. No payments are
-          accepted.
+          {copy(
+            "All prices are synthetic package examples in USD. No payments are accepted.",
+          )}
         </div>
         <section className="mx-auto flex w-full max-w-3xl flex-col gap-5">
-          <h2 className="text-2xl font-semibold">A few things worth knowing</h2>
+          <h2 className="text-2xl font-semibold">
+            {copy("A few things worth knowing")}
+          </h2>
           {[
             {
               q: "What does a research credit cover?",
@@ -149,7 +161,7 @@ export function Pricing() {
             },
             {
               q: "Are the opportunities verified?",
-              a: "No. This initial version uses clearly labeled synthetic data. Future live research will need cited sources, evidence dates, and explicit confidence levels.",
+              a: "Demo reports use synthetic data. Authorized development accounts can run evidence-driven research with original links and retrieval dates. Neither mode guarantees buyer demand; validate findings with customers.",
             },
             {
               q: "Can I cancel a subscription?",
@@ -157,15 +169,17 @@ export function Pricing() {
             },
           ].map((f) => (
             <details key={f.q} className="rounded-lg border p-5">
-              <summary className="cursor-pointer font-medium">{f.q}</summary>
-              <p className="mt-3 text-muted-foreground">{f.a}</p>
+              <summary className="cursor-pointer font-medium">
+                {copy(f.q)}
+              </summary>
+              <p className="mt-3 text-muted-foreground">{copy(f.a)}</p>
             </details>
           ))}
         </section>
         <div className="text-center">
           <Button asChild variant="outline">
             <Link href="/demo/dashboard">
-              Try the demo workspace
+              {copy("Try the demo workspace")}
               <ArrowRight />
             </Link>
           </Button>

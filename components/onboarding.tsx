@@ -1,4 +1,6 @@
 "use client";
+import { useCopy } from "@/i18n/use-copy";
+
 import { useState } from "react";
 import Link from "@/components/workspace-link";
 import { useRouter } from "next/navigation";
@@ -13,6 +15,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Brand, DemoNote, PageHeader } from "@/components/shared";
+import { LanguageSwitcher } from "@/components/language-switcher";
 import { useDemo } from "@/components/demo-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,6 +44,7 @@ const steps = [
   },
 ];
 export function Onboarding({ editing = false }: { editing?: boolean }) {
+  const copy = useCopy();
   const { profile, setProfile, isDemo, href, busy } = useDemo();
   const [error, setError] = useState("");
   const [draft, setDraft] = useState(profile);
@@ -50,7 +54,7 @@ export function Onboarding({ editing = false }: { editing?: boolean }) {
     setDraft((p) => ({ ...p, [key]: value }));
   const select = (id: keyof typeof draft, label: string, options: string[]) => (
     <Field>
-      <FieldLabel htmlFor={id}>{label}</FieldLabel>
+      <FieldLabel htmlFor={id}>{copy(label)}</FieldLabel>
       <select
         className="field-select"
         id={id}
@@ -58,7 +62,9 @@ export function Onboarding({ editing = false }: { editing?: boolean }) {
         onChange={(e) => update(id, e.target.value)}
       >
         {options.map((o) => (
-          <option key={o}>{o}</option>
+          <option key={o} value={o}>
+            {copy(o)}
+          </option>
         ))}
       </select>
     </Field>
@@ -66,7 +72,7 @@ export function Onboarding({ editing = false }: { editing?: boolean }) {
   const form = (
     <div className="grid overflow-hidden rounded-xl border bg-card md:grid-cols-[240px_1fr]">
       <aside className="flex flex-col gap-6 border-b bg-background p-6 md:border-r md:border-b-0">
-        <p className="font-semibold">Your founder profile</p>
+        <p className="font-semibold">{copy("Your founder profile")}</p>
         <ol className="flex flex-col gap-6">
           {steps.map((s, i) => (
             <li
@@ -86,20 +92,27 @@ export function Onboarding({ editing = false }: { editing?: boolean }) {
               >
                 {step > i ? <Check className="size-4" /> : i + 1}
               </span>
-              <span className="pt-0.5 text-sm font-medium">{s.title}</span>
+              <span className="pt-0.5 text-sm font-medium">
+                {copy(s.title)}
+              </span>
             </li>
           ))}
         </ol>
         <p className="mt-auto hidden pt-8 text-sm text-muted-foreground">
-          A few thoughtful answers.
-          <br />A more personal perspective.
+          {copy("A few thoughtful answers.")}
+          <br />
+          {copy("A more personal perspective.")}
         </p>
       </aside>
       <div className="flex flex-col gap-8 p-6 sm:p-10">
         <div className="flex flex-col gap-3">
-          <p className="text-sm text-muted-foreground">Step {step + 1} of 4</p>
-          <h1 className="text-2xl font-semibold">{steps[step].title}</h1>
-          <p className="text-muted-foreground">{steps[step].description}</p>
+          <p className="text-sm text-muted-foreground">
+            {copy("Step {step} of {total}", { step: step + 1, total: 4 })}
+          </p>
+          <h1 className="text-2xl font-semibold">{copy(steps[step].title)}</h1>
+          <p className="text-muted-foreground">
+            {copy(steps[step].description)}
+          </p>
         </div>
         <form
           className="flex flex-col gap-8"
@@ -112,11 +125,15 @@ export function Onboarding({ editing = false }: { editing?: boolean }) {
               try {
                 await setProfile(draft);
                 toast.success(
-                  isDemo ? "Demo profile updated" : "Founder profile saved",
+                  isDemo
+                    ? copy("Demo profile updated")
+                    : copy("Founder profile saved"),
                   {
-                    description: isDemo
-                      ? "Your preferences stay in memory until you refresh."
-                      : "Your profile is saved privately to your account.",
+                    description: copy(
+                      isDemo
+                        ? "Your preferences stay in memory until you refresh."
+                        : "Your profile is saved privately to your account.",
+                    ),
                   },
                 );
                 router.push(href("/dashboard"));
@@ -136,7 +153,7 @@ export function Onboarding({ editing = false }: { editing?: boolean }) {
               <>
                 <Field>
                   <FieldLabel htmlFor="name">
-                    What should we call you?
+                    {copy("What should we call you?")}
                   </FieldLabel>
                   <Input
                     id="name"
@@ -144,7 +161,7 @@ export function Onboarding({ editing = false }: { editing?: boolean }) {
                     maxLength={40}
                     required
                     onChange={(e) => update("name", e.target.value)}
-                    placeholder="Your first name"
+                    placeholder={copy("Your first name")}
                   />
                 </Field>
                 {select("role", "Where are you in your founder journey?", [
@@ -167,7 +184,7 @@ export function Onboarding({ editing = false }: { editing?: boolean }) {
                 ])}
                 <Field>
                   <FieldLabel htmlFor="skills">
-                    What skills or experiences can you build on?
+                    {copy("What skills or experiences can you build on?")}
                   </FieldLabel>
                   <textarea
                     id="skills"
@@ -178,8 +195,9 @@ export function Onboarding({ editing = false }: { editing?: boolean }) {
                     onChange={(e) => update("skills", e.target.value)}
                   />
                   <p className="text-sm text-muted-foreground">
-                    Think domain expertise, technical abilities, and access to
-                    potential buyers.
+                    {copy(
+                      "Think domain expertise, technical abilities, and access to potential buyers.",
+                    )}
                   </p>
                 </Field>
               </>
@@ -210,17 +228,24 @@ export function Onboarding({ editing = false }: { editing?: boolean }) {
                   "Expand my consulting practice",
                 ])}
                 <div className="rounded-lg bg-background p-5">
-                  <p className="font-medium">Your profile, at a glance</p>
+                  <p className="font-medium">
+                    {copy("Your profile, at a glance")}
+                  </p>
                   <dl className="mt-4 flex flex-col gap-3 text-sm">
                     {[
                       ["Founder", draft.name],
                       ["Industry", draft.industry],
-                      ["Time", `${draft.hours} / week`],
+                      [
+                        "Time",
+                        copy("{hours} / week", { hours: copy(draft.hours) }),
+                      ],
                       ["Budget", draft.budget],
                     ].map(([k, v]) => (
                       <div key={k} className="flex justify-between gap-3">
-                        <dt className="text-muted-foreground">{k}</dt>
-                        <dd className="text-right font-medium">{v}</dd>
+                        <dt className="text-muted-foreground">{copy(k)}</dt>
+                        <dd className="text-right font-medium">
+                          {k === "Founder" ? copy(v) : copy(v)}
+                        </dd>
                       </div>
                     ))}
                   </dl>
@@ -230,7 +255,7 @@ export function Onboarding({ editing = false }: { editing?: boolean }) {
           </FieldGroup>
           {error && (
             <p role="alert" className="rounded-lg border p-4 text-sm">
-              {error}
+              {copy(error)}
             </p>
           )}
           <div className="flex items-center justify-between border-t pt-5">
@@ -244,16 +269,16 @@ export function Onboarding({ editing = false }: { editing?: boolean }) {
               }
             >
               <ArrowLeft />
-              {step > 0 ? "Back" : "Cancel"}
+              {step > 0 ? copy("Back") : copy("Cancel")}
             </Button>
             <Button type="submit" disabled={busy} aria-busy={busy}>
               {busy
-                ? "Saving…"
+                ? copy("Saving…")
                 : step === 3
                   ? isDemo
-                    ? "Save demo profile"
-                    : "Save founder profile"
-                  : "Continue"}
+                    ? copy("Save demo profile")
+                    : copy("Save founder profile")
+                  : copy("Continue")}
               <ArrowRight />
             </Button>
           </div>
@@ -265,8 +290,10 @@ export function Onboarding({ editing = false }: { editing?: boolean }) {
     return (
       <>
         <PageHeader
-          title="Your founder profile"
-          description="The starting point for opportunities that fit you."
+          title={copy("Your founder profile")}
+          description={copy(
+            "The starting point for opportunities that fit you.",
+          )}
         />
         {form}
         <DemoNote />
@@ -274,30 +301,35 @@ export function Onboarding({ editing = false }: { editing?: boolean }) {
     );
   return (
     <div className="min-h-screen">
-      <header className="mx-auto flex max-w-6xl items-center justify-between px-5 py-7">
+      <header className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-5 py-7">
         <Brand />
+        <LanguageSwitcher />
         <Link
           href={isDemo ? "/dashboard" : "/demo/dashboard"}
           className="text-sm text-muted-foreground hover:text-primary"
         >
-          {isDemo ? "Skip to demo workspace" : "Explore the separate demo"}
+          {isDemo
+            ? copy("Skip to demo workspace")
+            : copy("Explore the separate demo")}
         </Link>
       </header>
       <main className="mx-auto flex max-w-4xl flex-col gap-6 px-5 py-8">
         <div className="mb-3 text-center">
           <h2 className="text-3xl font-semibold">
-            Better opportunities start with you.
+            {copy("Better opportunities start with you.")}
           </h2>
           <p className="mt-3 text-muted-foreground">
-            Let’s build a picture of the founder behind the idea.
+            {copy("Let’s build a picture of the founder behind the idea.")}
           </p>
         </div>
         {form}
         <DemoNote />
         <p className="text-center text-sm text-muted-foreground">
           {isDemo
-            ? "Demo only. Your answers are not transmitted or persisted."
-            : "Your answers are saved privately to your account. You can update them anytime."}
+            ? copy("Demo only. Your answers are not transmitted or persisted.")
+            : copy(
+                "Your answers are saved privately to your account. You can update them anytime.",
+              )}
         </p>
       </main>
     </div>

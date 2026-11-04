@@ -1,4 +1,6 @@
 "use client";
+import { useCopy } from "@/i18n/use-copy";
+
 import Link from "@/components/workspace-link";
 import {
   ArrowRight,
@@ -20,22 +22,27 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { PageHeader, SectionTitle, DemoNote } from "@/components/shared";
 import { OpportunityCard } from "@/components/opportunity-card";
 import { ScoreChart } from "@/components/score-chart";
-import { opportunities } from "@/lib/demo-data";
+import { useDemoContent } from "@/i18n/demo";
 import { useDemo } from "@/components/demo-provider";
 import { LiveDashboard } from "@/components/live-workspace";
 export function Dashboard() {
+  const copy = useCopy();
+  const { opportunities } = useDemoContent();
   const { profile, saved, run, isDemo } = useDemo();
   if (!isDemo) return <LiveDashboard />;
   return (
     <>
       <PageHeader
-        title={`A little clarity. A lot of possibility.`}
-        description={`Welcome back, ${profile.name}. Let’s find a business worth building.`}
+        title={copy("A little clarity. A lot of possibility.")}
+        description={copy(
+          "Welcome back, {name}. Let’s find a business worth building.",
+          { name: profile.name },
+        )}
       >
         <Button asChild>
           <Link href="/research/new">
             <Plus />
-            New research
+            {copy("New research")}
           </Link>
         </Button>
       </PageHeader>
@@ -46,21 +53,21 @@ export function Dashboard() {
             className="gap-1.5 rounded-md border-primary/20 bg-card/70 text-primary"
           >
             <Sparkles className="size-3.5" />
-            Your next chapter starts with evidence
+            {copy("Your next chapter starts with evidence")}
           </Badge>
           <div className="flex flex-col gap-2">
             <h2 className="text-2xl font-semibold tracking-tight text-balance">
-              Big ideas deserve a closer look.
+              {copy("Big ideas deserve a closer look.")}
             </h2>
             <p className="max-w-lg leading-relaxed text-muted-foreground">
-              Find recurring-revenue opportunities that fit your strengths. Move
-              beyond inspiration—with a clearer view of the buyer, the market,
-              and your next step.
+              {copy(
+                "Find recurring-revenue opportunities that fit your strengths. Move beyond inspiration—with a clearer view of the buyer, the market, and your next step.",
+              )}
             </p>
           </div>
           <Button asChild className="mt-1">
             <Link href="/research/new">
-              Explore new opportunities
+              {copy("Explore new opportunities")}
               <ArrowRight />
             </Link>
           </Button>
@@ -85,7 +92,7 @@ export function Dashboard() {
         </div>
       </section>
       <section
-        aria-label="Workspace statistics"
+        aria-label={copy("Workspace statistics")}
         className="grid grid-cols-2 gap-4 xl:grid-cols-4"
       >
         {[
@@ -116,20 +123,24 @@ export function Dashboard() {
         ].map((s) => (
           <div className="surface flex flex-col gap-4 p-5" key={s.label}>
             <div className="flex items-center justify-between gap-2">
-              <span className="text-sm text-muted-foreground">{s.label}</span>
+              <span className="text-sm text-muted-foreground">
+                {copy(s.label)}
+              </span>
               <s.icon className="size-[18px] shrink-0 text-muted-foreground" />
             </div>
             <p className="stat-value">{s.value}</p>
-            <p className="text-sm text-muted-foreground">{s.detail}</p>
+            <p className="text-sm text-muted-foreground">{copy(s.detail)}</p>
           </div>
         ))}
       </section>
       <section className="flex flex-col gap-5">
         <SectionTitle
-          title="Opportunities worth a closer look"
-          description="A few possibilities, selected for your founder profile."
+          title={copy("Opportunities worth a closer look")}
+          description={copy(
+            "A few possibilities, selected for your founder profile.",
+          )}
           href="/research/results"
-          label="Explore all"
+          label={copy("Explore all")}
         />
         <div className="grid gap-5 md:grid-cols-2 2xl:grid-cols-3">
           {opportunities.slice(0, 2).map((o) => (
@@ -139,7 +150,10 @@ export function Dashboard() {
       </section>
       <div className="grid gap-6 xl:grid-cols-[1.4fr_1fr]">
         <section className="surface flex flex-col gap-5 p-6">
-          <SectionTitle title="Your research workspace" href="/research" />
+          <SectionTitle
+            title={copy("Your research workspace")}
+            href="/research"
+          />
           <div className="flex items-start gap-4 rounded-lg border p-4">
             <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-secondary text-primary">
               <FileText className="size-5" />
@@ -152,14 +166,17 @@ export function Dashboard() {
                 {run.name}
               </Link>
               <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
-                <span>4 opportunities</span>
+                <span>{copy("4 opportunities")}</span>
                 <span className="flex items-center gap-1">
                   <Clock3 className="size-3.5" />
-                  Demo run
+                  {copy("Demo run")}
                 </span>
               </div>
             </div>
-            <Link href="/research/results" aria-label="Open research results">
+            <Link
+              href="/research/results"
+              aria-label={copy("Open research results")}
+            >
               <ArrowUpRight className="size-5 text-muted-foreground" />
             </Link>
           </div>
@@ -168,10 +185,10 @@ export function Dashboard() {
               <Check className="size-4" />
             </span>
             <p className="text-sm text-muted-foreground">
-              Your founder profile is ready.
+              {copy("Your founder profile is ready.")}
               <br />
               <Link href="/profile" className="font-medium text-primary">
-                Fine-tune your preferences
+                {copy("Fine-tune your preferences")}
                 <ArrowRight className="ml-1 inline size-3.5" />
               </Link>
             </p>
@@ -179,7 +196,7 @@ export function Dashboard() {
         </section>
         <Card>
           <CardHeader>
-            <CardTitle>How the opportunities compare</CardTitle>
+            <CardTitle>{copy("How the opportunities compare")}</CardTitle>
           </CardHeader>
           <CardContent>
             <ScoreChart />
@@ -193,16 +210,18 @@ export function Dashboard() {
           </span>
           <div>
             <h2 className="font-medium">
-              The best validation starts with a conversation.
+              {copy("The best validation starts with a conversation.")}
             </h2>
             <p className="text-sm text-muted-foreground">
-              Pick one buyer problem. Talk to five people who live with it.
+              {copy(
+                "Pick one buyer problem. Talk to five people who live with it.",
+              )}
             </p>
           </div>
         </div>
         <Button variant="outline" asChild>
           <Link href="/opportunities/proposal-copilot?tab=validation">
-            Plan your validation
+            {copy("Plan your validation")}
             <ArrowRight />
           </Link>
         </Button>

@@ -1,7 +1,9 @@
 "use client";
+import { useCopy } from "@/i18n/use-copy";
+
 import Link from "@/components/workspace-link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -12,15 +14,14 @@ import {
   CreditCard,
   CircleHelp,
   ArrowUpRight,
-  ChevronDown,
   Plus,
   PanelLeft,
   X,
   ArrowRight,
-  Bell,
   FlaskConical,
 } from "lucide-react";
 import { Brand } from "@/components/shared";
+import { LanguageSwitcher } from "@/components/language-switcher";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -39,10 +40,13 @@ const nav = [
   { title: "Founder profile", href: "/profile", icon: UserRound },
 ];
 export function AppShell({ children }: { children: React.ReactNode }) {
+  const copy = useCopy();
   const pathname = usePathname();
   const path = pathname.startsWith("/demo/") ? pathname.slice(5) : pathname;
   const [open, setOpen] = useState(false);
   const [help, setHelp] = useState(false);
+  const helpTrigger = useRef<HTMLButtonElement | null>(null);
+  const navTrigger = useRef<HTMLButtonElement | null>(null);
   const { profile, saved, data, isDemo } = useDemo();
   const [signingOut, setSigningOut] = useState(false);
   async function logout() {
@@ -52,7 +56,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       if (error) throw error;
       window.location.replace("/login");
     } catch {
-      toast.error("You could not be logged out. Please try again.");
+      toast.error(copy("You could not be logged out. Please try again."));
       setSigningOut(false);
     }
   }
@@ -64,7 +68,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         ? "Research results"
         : path === "/billing"
           ? "Credits & billing"
-          : nav.find((n) => n.href === path)?.title || "Workspace";
+          : /^\/research\/[^/]+$/.test(path)
+            ? "Research run & report"
+            : nav.find((n) => n.href === path)?.title || "Workspace";
   const sidebar = (
     <>
       <div className="flex h-20 items-center justify-between px-6">
@@ -73,7 +79,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           variant="ghost"
           size="icon"
           className="lg:hidden"
-          aria-label="Close navigation"
+          aria-label={copy("Close navigation")}
           onClick={() => setOpen(false)}
         >
           <X />
@@ -82,20 +88,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <div className="flex flex-1 flex-col px-4 py-5">
         <div className="mb-7 flex items-center gap-3 rounded-lg border p-3">
           <span className="flex size-8 items-center justify-center rounded-md bg-secondary font-semibold text-primary">
-            {profile.name.slice(0, 1) || "F"}
+            {profile.name.slice(0, 1) || copy("F")}
           </span>
           <div className="flex-1">
-            <p className="font-medium">Personal workspace</p>
+            <p className="font-medium">{copy("Personal workspace")}</p>
             <p className="text-sm text-muted-foreground">
-              {isDemo ? "Demo account" : "Private account"}
+              {isDemo ? copy("Demo account") : copy("Private account")}
             </p>
           </div>
-          <ChevronDown className="size-4 text-muted-foreground" />
         </div>
         <p className="mb-3 px-3 text-sm font-medium text-muted-foreground">
-          WORKSPACE
+          {copy("WORKSPACE")}
         </p>
-        <nav aria-label="Workspace navigation" className="flex flex-col gap-1">
+        <nav
+          aria-label={copy("Workspace navigation")}
+          className="flex flex-col gap-1"
+        >
           {nav.map((n) => (
             <Link
               key={n.href}
@@ -112,7 +120,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               )}
             >
               <n.icon className="size-[18px]" />
-              {n.title}
+              {copy(n.title)}
               {n.href === "/saved" && (
                 <span className="ml-auto text-sm">{saved.length}</span>
               )}
@@ -122,21 +130,26 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <Button asChild className="mt-6">
           <Link href="/research/new" onClick={() => setOpen(false)}>
             <Plus />
-            New research
+            {copy("New research")}
           </Link>
         </Button>
         <div className="mt-auto flex flex-col gap-5 pt-12">
           {isDemo && (
             <div className="rounded-lg border bg-background p-4">
               <div className="flex items-center justify-between">
-                <span className="font-medium">Your research credits</span>
+                <span className="font-medium">
+                  {copy("Your research credits")}
+                </span>
                 <span className="text-primary">
                   <Telescope className="size-4" />
                 </span>
               </div>
               <p className="mt-3">
                 <strong className="text-xl font-semibold">8</strong>
-                <span className="text-muted-foreground"> / 10 available</span>
+                <span className="text-muted-foreground">
+                  {" "}
+                  {copy("/ 10 available")}
+                </span>
               </p>
               <div className="progress-track mt-3">
                 <div className="progress-fill w-4/5" />
@@ -146,7 +159,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 onClick={() => setOpen(false)}
                 className="mt-3 flex items-center justify-between font-medium text-primary"
               >
-                Manage credits
+                {copy("Manage credits")}
                 <ArrowUpRight className="size-4" />
               </Link>
             </div>
@@ -158,14 +171,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               className={cn("nav-link", path === "/billing" && "active")}
             >
               <CreditCard className="size-[18px]" />
-              Credits & billing
+              {copy("Credits & billing")}
             </Link>
             <button
               className="nav-link text-left"
-              onClick={() => setHelp(true)}
+              onClick={(event) => {
+                helpTrigger.current = event.currentTarget;
+                setHelp(true);
+              }}
             >
               <CircleHelp className="size-[18px]" />
-              Help & resources
+              {copy("Help & resources")}
               <ArrowUpRight className="ml-auto size-4" />
             </button>
             {!isDemo && (
@@ -174,12 +190,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 onClick={logout}
                 disabled={signingOut}
               >
-                {signingOut ? "Logging out…" : "Log out"}
+                {signingOut ? copy("Logging out…") : copy("Log out")}
               </button>
             )}
             {isDemo && (
               <Link className="nav-link" href="/signup">
-                Create a real account
+                {copy("Create a real account")}
                 <ArrowRight className="ml-auto size-4" />
               </Link>
             )}
@@ -197,13 +213,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="flex-1">
           <p className="font-medium">
             {profile.name}
-            {isDemo ? " Morgan" : ""}
+            {isDemo ? copy("Morgan") : ""}
           </p>
           <p className="max-w-40 truncate text-sm text-muted-foreground">
-            {isDemo ? "Demo founder" : data?.email}
+            {isDemo ? copy("Demo founder") : data?.email}
           </p>
         </div>
-        <ChevronDown className="size-4 text-muted-foreground" />
+        <UserRound className="size-4 text-muted-foreground" />
       </Link>
     </>
   );
@@ -213,66 +229,73 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         href="#main-content"
         className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:bg-card focus:p-3"
       >
-        Skip to content
+        {copy("Skip to content")}
       </a>
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r bg-card lg:flex">
         {sidebar}
       </aside>
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="left-0 top-0 flex h-dvh w-72 max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-y-auto rounded-none border-0 bg-card p-0 text-foreground sm:rounded-none [&>button]:hidden">
-          <DialogTitle className="sr-only">Workspace navigation</DialogTitle>
+        <DialogContent
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            navTrigger.current?.focus();
+          }}
+          className="left-0 top-0 flex h-dvh w-72 max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-y-auto rounded-none border-0 bg-card p-0 text-foreground sm:rounded-none [&>button]:hidden"
+        >
+          <DialogTitle className="sr-only">
+            {copy("Workspace navigation")}
+          </DialogTitle>
           <DialogDescription className="sr-only">
             {isDemo
-              ? "Navigate your demo workspace."
-              : "Navigate your private workspace."}
+              ? copy("Navigate your demo workspace.")
+              : copy("Navigate your private workspace.")}
           </DialogDescription>
           {sidebar}
         </DialogContent>
       </Dialog>
       <div className="lg:pl-64">
-        <header className="flex h-[72px] items-center justify-between gap-3 border-b bg-card px-5 md:px-8">
+        <header className="flex min-h-20 flex-wrap items-center justify-between gap-3 border-b bg-card px-4 py-3 md:px-8">
           <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             <Button
               variant="ghost"
               size="icon"
               className="shrink-0 lg:hidden"
+              ref={navTrigger}
               onClick={() => setOpen(true)}
-              aria-label="Open navigation"
+              aria-label={copy("Open navigation")}
             >
               <PanelLeft />
             </Button>
             <span className="hidden text-muted-foreground sm:inline">
-              Workspace
+              {copy("Workspace")}
             </span>
             <span className="hidden text-muted-foreground sm:inline">/</span>
-            <span className="truncate font-medium">{title}</span>
+            <span className="font-medium">{copy(title)}</span>
           </div>
-          <div className="flex shrink-0 items-center gap-1 sm:gap-3">
+          <div className="ml-auto flex shrink-0 flex-wrap items-center gap-1 sm:gap-3">
+            <LanguageSwitcher />
             <Badge
               variant="secondary"
               className="gap-1.5 rounded-md font-normal"
             >
               <FlaskConical className="size-3.5" />
               <span>
-                {isDemo ? (
-                  <>
-                    Demo<span className="hidden sm:inline"> mode</span>
-                  </>
-                ) : (
-                  "Private workspace"
-                )}
+                {isDemo ? <>{copy("Demo mode")}</> : copy("Private workspace")}
               </span>
             </Badge>
             <button
-              aria-label="Notifications"
+              aria-label={copy("Help & resources")}
               className="flex size-11 items-center justify-center rounded-md text-muted-foreground hover:bg-secondary"
-              onClick={() => setHelp(true)}
+              onClick={(event) => {
+                helpTrigger.current = event.currentTarget;
+                setHelp(true);
+              }}
             >
-              <Bell className="size-[18px]" />
+              <CircleHelp className="size-[18px]" />
             </button>
             <span className="hidden size-8 items-center justify-center rounded-full bg-secondary font-medium text-primary sm:flex">
               {profile.name.slice(0, 1)}
-              {isDemo ? "M" : ""}
+              {isDemo ? copy("M") : ""}
             </span>
           </div>
         </header>
@@ -282,7 +305,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         >
           {children}
           <footer className="flex flex-wrap items-center justify-between gap-2 border-t pt-5 text-sm text-muted-foreground">
-            <p>Thoughtful research. Better decisions.</p>
+            <p>{copy("Thoughtful research. Better decisions.")}</p>
             <Link
               href="/"
               className="flex items-center gap-1 hover:text-primary"
@@ -294,25 +317,42 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </main>
       </div>
       <Dialog open={help} onOpenChange={setHelp}>
-        <DialogContent>
+        <DialogContent
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            helpTrigger.current?.focus();
+          }}
+        >
           <DialogHeader>
             <DialogTitle>
-              {isDemo ? "Your demo workspace" : "Your private workspace"}
+              {isDemo
+                ? copy("Your demo workspace")
+                : copy("Your private workspace")}
             </DialogTitle>
             <DialogDescription>
               {isDemo
-                ? "Explore the complete research journey without connecting any services."
-                : "Your founder profile and research briefs are securely saved to your account."}
+                ? copy(
+                    "Explore the complete research journey without connecting any services.",
+                  )
+                : copy(
+                    "Your founder profile and research briefs are securely saved to your account.",
+                  )}
             </DialogDescription>
           </DialogHeader>
           <p>
             {isDemo
-              ? "Research, opportunity scores, credits, and sources are synthetic. Saved ideas and profile changes stay in memory until you refresh. No real account, payment, or AI request is created."
-              : "Your records are private to your verified session. Live AI research and payments are not connected yet. No synthetic opportunities or credit balances are added to your account."}
+              ? copy(
+                  "Research, opportunity scores, credits, and sources are synthetic. Saved ideas and profile changes stay in memory until you refresh. No real account, payment, or AI request is created.",
+                )
+              : copy(
+                  "Your records are private to your verified session. Authorized development accounts can run Qwen research with external retrieval. Payments are not connected. Demo opportunities and balances never enter your account.",
+                )}
           </p>
           <Button asChild onClick={() => setHelp(false)}>
             <Link href="/research/new">
-              {isDemo ? "Start a demo research run" : "Create a research brief"}
+              {isDemo
+                ? copy("Start a demo research run")
+                : copy("Create a research brief")}
               <ArrowRight />
             </Link>
           </Button>

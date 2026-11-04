@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import { withWorkflow } from "workflow/next";
+import createNextIntlPlugin from "next-intl/plugin";
 const config: NextConfig = {
   async headers() {
     return [
@@ -23,4 +24,5 @@ const config: NextConfig = {
     ];
   },
 };
-export default withWorkflow(config);
+const withNextIntl = createNextIntlPlugin();
+export default withWorkflow(withNextIntl(config));

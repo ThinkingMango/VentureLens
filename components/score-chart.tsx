@@ -1,4 +1,6 @@
 "use client";
+import { useCopy } from "@/i18n/use-copy";
+
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import {
   ChartContainer,
@@ -6,6 +8,7 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart";
 export function ScoreChart() {
+  const copy = useCopy();
   const data = [
     { name: "Proposal", score: 87 },
     { name: "Feedback", score: 83 },
@@ -13,14 +16,20 @@ export function ScoreChart() {
     { name: "Workflow", score: 76 },
   ];
   return (
-    <figure aria-label="Synthetic opportunity scores: proposal 87, feedback 83, finance 79, workflow 76 out of 100">
+    <figure
+      aria-label={copy(
+        "Synthetic opportunity scores: proposal 87, feedback 83, finance 79, workflow 76 out of 100",
+      )}
+    >
       <ChartContainer
-        config={{ score: { label: "Demo score", color: "var(--chart-1)" } }}
+        config={{
+          score: { label: copy("Demo score"), color: "var(--chart-1)" },
+        }}
         className="h-48 min-h-48 w-full aspect-auto"
       >
         <BarChart
           accessibilityLayer
-          data={data}
+          data={data.map((item) => ({ ...item, name: copy(item.name) }))}
           margin={{ top: 5, right: 0, left: -25, bottom: 0 }}
         >
           <CartesianGrid
@@ -56,7 +65,7 @@ export function ScoreChart() {
         </BarChart>
       </ChartContainer>
       <figcaption className="mt-4 text-sm text-muted-foreground">
-        Illustrative composite scores, not validated rankings.
+        {copy("Illustrative composite scores, not validated rankings.")}
       </figcaption>
     </figure>
   );

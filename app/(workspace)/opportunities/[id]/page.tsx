@@ -1,11 +1,15 @@
+import { getCopy } from "@/i18n/server";
 import { notFound } from "next/navigation";
 import { z } from "zod";
 import { loadWorkspace } from "@/lib/workspace";
 import { LiveOpportunityDetail } from "@/components/live-workspace";
-export const metadata = {
-  title: "Opportunity",
-  robots: { index: false, follow: false },
-};
+export async function generateMetadata() {
+  const copy = await getCopy();
+  return {
+    title: copy("Opportunity"),
+    robots: { index: false, follow: false },
+  };
+}
 export default async function Page({
   params,
 }: {

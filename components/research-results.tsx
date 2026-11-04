@@ -1,4 +1,6 @@
 "use client";
+import { useCopy } from "@/i18n/use-copy";
+
 import { useState } from "react";
 import Link from "@/components/workspace-link";
 import {
@@ -17,13 +19,16 @@ import { Input } from "@/components/ui/input";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Badge } from "@/components/ui/badge";
 import { useDemo } from "@/components/demo-provider";
-import { opportunities, demoNotice } from "@/lib/demo-data";
+import { demoNotice } from "@/lib/demo-data";
+import { useDemoContent } from "@/i18n/demo";
 import { LiveResearchResults } from "@/components/live-workspace";
 export function ResearchResults({
   savedOnly = false,
 }: {
   savedOnly?: boolean;
 }) {
+  const copy = useCopy();
+  const { opportunities } = useDemoContent();
   const { run, saved, isDemo } = useDemo();
   const [query, setQuery] = useState("");
   const [confidence, setConfidence] = useState("All confidence levels");
@@ -45,18 +50,33 @@ export function ResearchResults({
     );
   function download() {
     const text = [
-      "VentureLens AI — SYNTHETIC DEMONSTRATION",
-      demoNotice,
-      `Research: ${run.name}`,
-      `Configuration: ${run.sector}; ${run.model}; ${run.geography}`,
-      "Demo results are fixed illustrative fixtures, not tailored AI output.",
+      copy("VentureLens AI — SYNTHETIC DEMONSTRATION"),
+      copy(demoNotice),
+      copy("Research: {name}", { name: run.name }),
+      copy("Configuration: {sector}; {model}; {geography}", {
+        sector: copy(run.sector),
+        model: copy(run.model),
+        geography: copy(run.geography),
+      }),
+      copy(
+        "Demo results are fixed illustrative fixtures, not tailored AI output.",
+      ),
       "",
-      ...list.map(
-        (o) =>
-          `${o.title}\nDemo score: ${o.score}/100\nBuyer: ${o.buyer}\nDescription: ${o.description}\nIllustrative monthly price: ${o.revenue}\nRisk: ${o.risk}\n`,
+      ...list.map((o) =>
+        [
+          o.title,
+          copy("Demo score: {score}/100", { score: o.score }),
+          copy("Buyer: {buyer}", { buyer: o.buyer }),
+          copy("Description: {description}", { description: o.description }),
+          copy("Illustrative monthly price: {price}", { price: o.revenue }),
+          copy("Risk: {risk}", { risk: o.risk }),
+          "",
+        ].join("\n"),
       ),
     ].join("\n");
-    const url = URL.createObjectURL(new Blob([text], { type: "text/plain" }));
+    const url = URL.createObjectURL(
+      new Blob(["\uFEFF", text], { type: "text/plain;charset=utf-8" }),
+    );
     const a = document.createElement("a");
     a.href = url;
     a.download = "venturelens-demo-research.txt";
@@ -72,41 +92,44 @@ export function ResearchResults({
           className="flex w-fit items-center gap-2 text-muted-foreground hover:text-primary"
         >
           <ArrowLeft className="size-4" />
-          My research
+          {copy("My research")}
         </Link>
       )}
       <PageHeader
-        title={savedOnly ? "Saved opportunities" : run.name}
+        title={savedOnly ? copy("Saved opportunities") : run.name}
         description={
           savedOnly
-            ? "Review your shortlist and compare the assumptions behind each idea."
-            : "Research results · Compare buyer needs, economics, and validation priorities."
+            ? copy(
+                "Review your shortlist and compare the assumptions behind each idea.",
+              )
+            : copy(
+                "Research results · Compare buyer needs, economics, and validation priorities.",
+              )
         }
       >
         <Button variant="outline" onClick={download}>
           <Download />
-          Export demo brief
+          {copy("Export demo brief")}
         </Button>
       </PageHeader>
       <div className="flex flex-col gap-3 border-y py-4">
         <div className="flex flex-wrap items-center gap-3">
-          <Badge variant="secondary">Demonstration report</Badge>
+          <Badge variant="secondary">{copy("Demonstration report")}</Badge>
           {!savedOnly && (
             <p className="text-sm text-muted-foreground">
-              {run.sector} · {run.model} · {run.geography}
+              {copy(run.sector)} · {copy(run.model)} · {copy(run.geography)}
             </p>
           )}
         </div>
         <DemoNote />
         <details className="text-sm text-muted-foreground">
           <summary className="w-fit rounded-sm underline-offset-4 hover:text-primary hover:underline">
-            How to interpret this report
+            {copy("How to interpret this report")}
           </summary>
           <p className="mt-2 max-w-3xl">
-            Scores and confidence labels compare invented scenarios; they do not
-            measure verified demand. These fixed examples do not change with
-            your research configuration. All amounts are monthly USD assumptions
-            per customer, not forecasts.
+            {copy(
+              "Scores and confidence labels compare invented scenarios; they do not measure verified demand. These fixed examples do not change with your research configuration. All amounts are monthly USD assumptions per customer, not forecasts.",
+            )}
           </p>
         </details>
       </div>
@@ -116,17 +139,17 @@ export function ResearchResults({
           className="surface flex flex-col gap-4 p-5 md:p-6"
         >
           <h2 id="research-summary" className="text-lg font-semibold">
-            Research summary
+            {copy("Research summary")}
           </h2>
           <p className="max-w-3xl leading-relaxed">
-            Proposal preparation leads this four-workflow demo. Buyer access,
-            review effort, and willingness to pay remain unvalidated for every
-            opportunity.
+            {copy(
+              "Proposal preparation leads this four-workflow demo. Buyer access, review effort, and willingness to pay remain unvalidated for every opportunity.",
+            )}
           </p>
           <div className="flex border-t pt-4">
             <Button variant="link" asChild className="h-auto justify-start p-0">
               <Link href="/opportunities/proposal-copilot">
-                Review leading hypothesis
+                {copy("Review leading hypothesis")}
                 <ArrowRight data-icon="inline-end" />
               </Link>
             </Button>
@@ -140,11 +163,19 @@ export function ResearchResults({
             aria-live="polite"
             aria-atomic="true"
           >
-            {`${list.length} ${savedOnly ? "saved opportunities" : "opportunity hypotheses"}`}
+            {savedOnly
+              ? copy(
+                  "{count, plural, one {# saved opportunity} other {# saved opportunities}}",
+                  { count: list.length },
+                )
+              : copy(
+                  "{count, plural, one {# opportunity hypothesis} other {# opportunity hypotheses}}",
+                  { count: list.length },
+                )}
           </h2>
           <div
             className="flex rounded-md border bg-card p-1"
-            aria-label="Results view"
+            aria-label={copy("Results view")}
           >
             <Button
               size="sm"
@@ -153,7 +184,7 @@ export function ResearchResults({
               aria-pressed={view === "cards"}
             >
               <LayoutGrid />
-              Cards
+              {copy("Cards")}
             </Button>
             <Button
               size="sm"
@@ -162,25 +193,27 @@ export function ResearchResults({
               aria-pressed={view === "compare"}
             >
               <Columns3 />
-              Compare
+              {copy("Compare")}
             </Button>
           </div>
         </div>
         <FieldGroup className="grid grid-cols-2 gap-4 md:flex md:flex-row md:items-end">
           <Field className="col-span-2 min-w-0 md:flex-1">
             <FieldLabel htmlFor="opportunity-search">
-              Search opportunities
+              {copy("Search opportunities")}
             </FieldLabel>
             <Input
               id="opportunity-search"
               type="search"
-              placeholder="Idea, buyer, or industry"
+              placeholder={copy("Idea, buyer, or industry")}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
           </Field>
           <Field className="md:w-52 md:shrink-0">
-            <FieldLabel htmlFor="confidence-filter">Demo confidence</FieldLabel>
+            <FieldLabel htmlFor="confidence-filter">
+              {copy("Demo confidence")}
+            </FieldLabel>
             <select
               id="confidence-filter"
               className="field-select"
@@ -190,22 +223,26 @@ export function ResearchResults({
               {["All confidence levels", "Higher", "Medium", "Lower"].map(
                 (v) => (
                   <option key={v} value={v}>
-                    {v === "All confidence levels" ? "All levels" : v}
+                    {v === "All confidence levels"
+                      ? copy("All levels")
+                      : copy(v)}
                   </option>
                 ),
               )}
             </select>
           </Field>
           <Field className="md:w-44 md:shrink-0">
-            <FieldLabel htmlFor="opportunity-sort">Sort by</FieldLabel>
+            <FieldLabel htmlFor="opportunity-sort">
+              {copy("Sort by")}
+            </FieldLabel>
             <select
               id="opportunity-sort"
               className="field-select"
               value={sort}
               onChange={(e) => setSort(e.target.value)}
             >
-              <option>Highest score</option>
-              <option>Alphabetical</option>
+              <option value="Highest score">{copy("Highest score")}</option>
+              <option value="Alphabetical">{copy("Alphabetical")}</option>
             </select>
           </Field>
         </FieldGroup>
@@ -214,13 +251,17 @@ export function ResearchResults({
             <Bookmark className="size-8 text-muted-foreground" />
             <h3 className="text-lg font-semibold">
               {query || confidence !== "All confidence levels"
-                ? "No matching opportunities"
-                : "No saved opportunities yet"}
+                ? copy("No matching opportunities")
+                : copy("No saved opportunities yet")}
             </h3>
             <p className="text-muted-foreground">
               {savedOnly
-                ? "Save an opportunity from your research results to build your shortlist."
-                : "Try a broader search or a different confidence filter."}
+                ? copy(
+                    "Save an opportunity from your research results to build your shortlist.",
+                  )
+                : copy(
+                    "Try a broader search or a different confidence filter.",
+                  )}
             </p>
             {query || confidence !== "All confidence levels" ? (
               <Button
@@ -252,12 +293,15 @@ export function ResearchResults({
             className="surface overflow-x-auto"
             tabIndex={0}
             role="region"
-            aria-label="Opportunity comparison; scroll horizontally to see all columns"
+            aria-label={copy(
+              "Opportunity comparison; scroll horizontally to see all columns",
+            )}
           >
             <table className="w-full min-w-[780px] text-left">
               <caption className="p-5 text-left text-sm text-muted-foreground">
-                Synthetic comparison · All amounts in USD. Monthly price and
-                delivery-cost scenarios are assumptions, not forecasts.
+                {copy(
+                  "Synthetic comparison · All amounts in USD. Monthly price and delivery-cost scenarios are assumptions, not forecasts.",
+                )}
               </caption>
               <thead className="border-y bg-background">
                 <tr>
@@ -273,7 +317,7 @@ export function ResearchResults({
                       key={t}
                       className="px-5 py-4 text-sm font-medium text-muted-foreground"
                     >
-                      {t}
+                      {copy(t)}
                     </th>
                   ))}
                 </tr>
@@ -305,17 +349,18 @@ export function ResearchResults({
       <div className="flex flex-col justify-between gap-4 rounded-xl border border-dashed p-6 sm:flex-row sm:items-center">
         <div>
           <h2 className="font-semibold">
-            A score is a starting point, not a verdict.
+            {copy("A score is a starting point, not a verdict.")}
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Open an opportunity to review its assumptions and plan buyer
-            conversations.
+            {copy(
+              "Open an opportunity to review its assumptions and plan buyer conversations.",
+            )}
           </p>
         </div>
         <Button variant="outline" asChild>
           <Link href="/research/new">
             <Plus />
-            New exploration
+            {copy("New exploration")}
           </Link>
         </Button>
       </div>

@@ -1,10 +1,13 @@
 "use client";
+import { useCopy } from "@/i18n/use-copy";
+
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, ShieldCheck, Check, LoaderCircle } from "lucide-react";
 import { z } from "zod";
 import { Brand } from "@/components/shared";
+import { LanguageSwitcher } from "@/components/language-switcher";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field, FieldLabel, FieldGroup } from "@/components/ui/field";
@@ -25,6 +28,8 @@ function authError(code: string | undefined, status: number | undefined) {
   return "Authentication is temporarily unavailable. Please try again.";
 }
 export function AuthScreen({ signup = false }: { signup?: boolean }) {
+  const copy = useCopy();
+  const feedbackId = useId();
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -120,21 +125,27 @@ export function AuthScreen({ signup = false }: { signup?: boolean }) {
   return (
     <main className="grid min-h-screen lg:grid-cols-2">
       <section className="flex flex-col justify-between gap-10 bg-card p-6 sm:p-12">
-        <Brand />
+        <header className="flex flex-wrap items-center justify-between gap-3">
+          <Brand />
+          <LanguageSwitcher />
+        </header>
         <div className="mx-auto flex w-full max-w-sm flex-col gap-7">
           <div className="flex flex-col gap-3">
             <h1 className="text-3xl font-semibold">
-              {signup ? "A new chapter starts here." : "Welcome back."}
+              {signup
+                ? copy("A new chapter starts here.")
+                : copy("Welcome back.")}
             </h1>
             <p className="text-muted-foreground">
               {signup
-                ? "Build a clearer picture of what you could build."
-                : "A clearer view of your next opportunity awaits."}
+                ? copy("Build a clearer picture of what you could build.")
+                : copy("A clearer view of your next opportunity awaits.")}
             </p>
           </div>
           <form
             className="flex flex-col gap-6"
             data-ready={ready}
+            aria-describedby={error || message ? feedbackId : undefined}
             onSubmit={(event) => {
               event.preventDefault();
               if (!pending) void submit(event.currentTarget);
@@ -143,33 +154,35 @@ export function AuthScreen({ signup = false }: { signup?: boolean }) {
             <FieldGroup>
               {signup && (
                 <Field>
-                  <FieldLabel htmlFor="full-name">Full name</FieldLabel>
+                  <FieldLabel htmlFor="full-name">
+                    {copy("Full name")}
+                  </FieldLabel>
                   <Input
                     id="full-name"
                     name="name"
                     required
                     maxLength={80}
-                    placeholder="Your name"
+                    placeholder={copy("Your name")}
                     autoComplete="name"
                     disabled={pending}
                   />
                 </Field>
               )}
               <Field>
-                <FieldLabel htmlFor="email">Email address</FieldLabel>
+                <FieldLabel htmlFor="email">{copy("Email address")}</FieldLabel>
                 <Input
                   id="email"
                   name="email"
                   type="email"
                   required
                   maxLength={254}
-                  placeholder="you@company.com"
+                  placeholder={copy("you@company.com")}
                   autoComplete="email"
                   disabled={pending}
                 />
               </Field>
               <Field>
-                <FieldLabel htmlFor="password">Password</FieldLabel>
+                <FieldLabel htmlFor="password">{copy("Password")}</FieldLabel>
                 <Input
                   id="password"
                   name="password"
@@ -178,7 +191,9 @@ export function AuthScreen({ signup = false }: { signup?: boolean }) {
                   maxLength={128}
                   required
                   placeholder={
-                    signup ? "At least 8 characters" : "Your password"
+                    signup
+                      ? copy("At least 8 characters")
+                      : copy("Your password")
                   }
                   autoComplete={signup ? "new-password" : "current-password"}
                   disabled={pending}
@@ -196,22 +211,28 @@ export function AuthScreen({ signup = false }: { signup?: boolean }) {
               ) : (
                 <ArrowRight />
               )}
-              {pending ? "Please wait…" : signup ? "Create account" : "Log in"}
+              {pending
+                ? copy("Please wait…")
+                : signup
+                  ? copy("Create account")
+                  : copy("Log in")}
             </Button>
             {error && (
               <p
+                id={feedbackId}
                 role="alert"
                 className="rounded-lg border p-4 text-sm text-foreground"
               >
-                {error}
+                {copy(error)}
               </p>
             )}
             {message && (
               <p
+                id={feedbackId}
                 role="status"
                 className="rounded-lg bg-secondary p-4 text-sm text-foreground"
               >
-                {message}
+                {copy(message)}
               </p>
             )}
           </form>
@@ -220,47 +241,50 @@ export function AuthScreen({ signup = false }: { signup?: boolean }) {
               href="/forgot-password"
               className="text-sm font-medium text-primary"
             >
-              Forgot your password?
+              {copy("Forgot your password?")}
             </Link>
           )}
           <Link
             href="/verify-email"
             className="text-sm font-medium text-primary"
           >
-            Resend confirmation email
+            {copy("Resend confirmation email")}
           </Link>
           <Button variant="outline" asChild>
             <Link href="/demo/dashboard">
-              Explore the demo
+              {copy("Explore the demo")}
               <ArrowRight />
             </Link>
           </Button>
           <p className="text-center text-muted-foreground">
-            {signup ? "Already have an account?" : "New to VentureLens?"}{" "}
+            {signup
+              ? copy("Already have an account?")
+              : copy("New to VentureLens?")}{" "}
             <Link
               href={signup ? "/login" : "/signup"}
               className="font-medium text-primary"
             >
-              {signup ? "Log in" : "Get started"}
+              {signup ? copy("Log in") : copy("Get started")}
             </Link>
           </p>
         </div>
         <p className="text-sm text-muted-foreground">
-          Secure authentication · Your workspace stays private.
+          {copy("Secure authentication · Your workspace stays private.")}
         </p>
       </section>
       <section className="hidden flex-col justify-center gap-8 bg-secondary p-16 lg:flex">
         <ShieldCheck className="size-12 text-primary" strokeWidth={1.3} />
         <h2 className="max-w-md text-4xl font-semibold leading-tight">
-          The next great business
+          {copy("The next great business")}
           <br />
-          might be the right one
+          {copy("might be the right one")}
           <br />
-          for you.
+          {copy("for you.")}
         </h2>
         <p className="max-w-md text-base text-muted-foreground">
-          Start with your experience. Follow the evidence. Build conviction one
-          conversation at a time.
+          {copy(
+            "Start with your experience. Follow the evidence. Build conviction one conversation at a time.",
+          )}
         </p>
         <ul className="flex flex-col gap-4">
           {[
@@ -270,7 +294,7 @@ export function AuthScreen({ signup = false }: { signup?: boolean }) {
           ].map((text) => (
             <li className="flex items-center gap-3" key={text}>
               <Check className="size-4 text-primary" />
-              {text}
+              {copy(text)}
             </li>
           ))}
         </ul>
