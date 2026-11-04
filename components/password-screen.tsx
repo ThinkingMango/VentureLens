@@ -1,8 +1,11 @@
 "use client";
+import { useCopy } from "@/i18n/use-copy";
+
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Brand } from "@/components/shared";
+import { LanguageSwitcher } from "@/components/language-switcher";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
@@ -13,6 +16,8 @@ export function PasswordScreen({
 }: {
   mode: "recover" | "reset" | "verify";
 }) {
+  const copy = useCopy();
+  const feedbackId = useId();
   const [pending, setPending] = useState(false);
   const [ready, setReady] = useState(false);
   const [message, setMessage] = useState("");
@@ -120,19 +125,27 @@ export function PasswordScreen({
   }
   return (
     <main className="mx-auto flex min-h-screen max-w-lg flex-col gap-10 px-6 py-10">
-      <Brand />
+      <header className="flex flex-wrap items-center justify-between gap-3">
+        <Brand />
+        <LanguageSwitcher />
+      </header>
       <section className="surface flex flex-col gap-6 p-6 sm:p-8">
-        <h1 className="text-3xl font-semibold text-balance">{title}</h1>
+        <h1 className="text-3xl font-semibold text-balance">{copy(title)}</h1>
         <p className="text-muted-foreground">
           {mode === "reset"
-            ? "Update your password, then log in again. Existing sessions will be signed out."
+            ? copy(
+                "Update your password, then log in again. Existing sessions will be signed out.",
+              )
             : mode === "verify"
-              ? "Request a fresh confirmation link to activate your account."
-              : "We’ll send you a link to securely reset your password."}
+              ? copy(
+                  "Request a fresh confirmation link to activate your account.",
+                )
+              : copy("We’ll send you a link to securely reset your password.")}
         </p>
         <form
           className="flex flex-col gap-6"
           data-ready={ready}
+          aria-describedby={error || message ? feedbackId : undefined}
           onSubmit={(event) => {
             event.preventDefault();
             if (!pending) void submit(event.currentTarget);
@@ -142,7 +155,9 @@ export function PasswordScreen({
             {mode === "reset" ? (
               <>
                 <Field>
-                  <FieldLabel htmlFor="new-password">New password</FieldLabel>
+                  <FieldLabel htmlFor="new-password">
+                    {copy("New password")}
+                  </FieldLabel>
                   <Input
                     id="new-password"
                     name="password"
@@ -156,7 +171,7 @@ export function PasswordScreen({
                 </Field>
                 <Field>
                   <FieldLabel htmlFor="confirm-password">
-                    Confirm password
+                    {copy("Confirm password")}
                   </FieldLabel>
                   <Input
                     id="confirm-password"
@@ -172,7 +187,9 @@ export function PasswordScreen({
               </>
             ) : (
               <Field>
-                <FieldLabel htmlFor="recovery-email">Email address</FieldLabel>
+                <FieldLabel htmlFor="recovery-email">
+                  {copy("Email address")}
+                </FieldLabel>
                 <Input
                   id="recovery-email"
                   name="email"
@@ -191,26 +208,26 @@ export function PasswordScreen({
             aria-busy={pending}
           >
             {pending
-              ? "Please wait…"
+              ? copy("Please wait…")
               : mode === "reset"
-                ? "Update password"
+                ? copy("Update password")
                 : mode === "verify"
-                  ? "Resend confirmation email"
-                  : "Send reset link"}
+                  ? copy("Resend confirmation email")
+                  : copy("Send reset link")}
           </Button>
           {error && (
-            <p role="alert" className="text-sm">
-              {error}
+            <p id={feedbackId} role="alert" className="text-sm">
+              {copy(error)}
             </p>
           )}
           {message && (
-            <p role="status" className="text-sm text-primary">
-              {message}
+            <p id={feedbackId} role="status" className="text-sm text-primary">
+              {copy(message)}
             </p>
           )}
         </form>
         <Link className="text-sm font-medium text-primary" href="/login">
-          Back to log in
+          {copy("Back to log in")}
         </Link>
       </section>
     </main>

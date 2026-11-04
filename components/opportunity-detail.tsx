@@ -1,6 +1,8 @@
 "use client";
+import { useCopy } from "@/i18n/use-copy";
+
 import Link from "@/components/workspace-link";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -9,12 +11,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";
-import {
-  type Opportunity,
-  type DemoSource,
-  scoreLabels,
-  researchReports,
-} from "@/lib/demo-data";
+import { type Opportunity, scoreLabels } from "@/lib/demo-data";
 import { useDemo } from "@/components/demo-provider";
 import { DemoNote, Confidence, SectionTitle } from "@/components/shared";
 import { Button } from "@/components/ui/button";
@@ -27,26 +24,35 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { useDemoContent } from "@/i18n/demo";
 
 const tabs = ["Overview", "Evidence", "Economics", "Validation"] as const;
 export function OpportunityDetail({
-  opportunity: o,
+  opportunity: original,
   initialTab = "Overview",
 }: {
   opportunity: Opportunity;
   initialTab?: string;
 }) {
+  const copy = useCopy();
+  const content = useDemoContent();
+  const o = content.opportunity(original);
   const [tab, setTab] = useState(
     tabs.find((t) => t.toLowerCase() === initialTab.toLowerCase()) ||
       "Overview",
   );
   const { saved, toggleSave, completed, toggleTask } = useDemo();
-  const [source, setSource] = useState<DemoSource | null>(null);
-  const report = researchReports[o.id];
+  const [sourceIndex, setSourceIndex] = useState<number | null>(null);
+  const sourceTrigger = useRef<HTMLButtonElement | null>(null);
+  const report = content.report(o.id);
+  const source = sourceIndex === null ? null : report.sources[sourceIndex];
   const tasks = [
     {
       title: "Write down your riskiest assumption",
-      text: `Start with: ${o.buyer.toLowerCase()} experience this problem often enough to pay for a solution.`,
+      text: copy(
+        "Start with this assumption: {buyer} experience this problem often enough to pay for a solution.",
+        { buyer: o.buyer },
+      ),
     },
     {
       title: "Find five potential buyers",
@@ -68,7 +74,7 @@ export function OpportunityDetail({
         className="flex w-fit items-center gap-2 text-sm text-muted-foreground hover:text-primary"
       >
         <ArrowLeft className="size-4" />
-        Research results
+        {copy("Research results")}
       </Link>
       <header className="flex flex-col gap-5">
         <div className="flex flex-col items-start justify-between gap-4 xl:flex-row">
@@ -78,7 +84,7 @@ export function OpportunityDetail({
               {o.description}
             </p>
             <p className="text-sm text-muted-foreground">
-              {o.category} · Opportunity hypothesis
+              {o.category} {copy("· Opportunity hypothesis")}
             </p>
           </div>
           <Button
@@ -92,7 +98,9 @@ export function OpportunityDetail({
                 saved.includes(o.id) ? "fill-primary/15 text-primary" : ""
               }
             />
-            {saved.includes(o.id) ? "Saved opportunity" : "Save opportunity"}
+            {saved.includes(o.id)
+              ? copy("Saved opportunity")
+              : copy("Save opportunity")}
           </Button>
         </div>
         <div className="border-y py-4">
@@ -100,26 +108,30 @@ export function OpportunityDetail({
         </div>
         <dl className="grid grid-cols-2 gap-4 sm:grid-cols-[1.4fr_1fr_1fr]">
           <div className="col-span-2 flex flex-col gap-1 sm:col-span-1">
-            <dt className="text-sm text-muted-foreground">Likely buyer</dt>
+            <dt className="text-sm text-muted-foreground">
+              {copy("Likely buyer")}
+            </dt>
             <dd className="font-medium">{o.buyer}</dd>
           </div>
           <div className="flex flex-col gap-1">
             <dt className="text-sm text-muted-foreground">
-              Price hypothesis / month
+              {copy("Price hypothesis / month")}
             </dt>
             <dd className="font-semibold tabular-nums">
               {o.revenue}{" "}
               <span className="text-sm font-normal text-muted-foreground">
-                USD / customer
+                {copy("USD / customer")}
               </span>
             </dd>
           </div>
           <div className="flex flex-col gap-1">
-            <dt className="text-sm text-muted-foreground">Demo assessment</dt>
+            <dt className="text-sm text-muted-foreground">
+              {copy("Demo assessment")}
+            </dt>
             <dd className="font-semibold tabular-nums">
               {o.score}/100{" "}
               <span className="text-sm font-normal text-muted-foreground">
-                · {o.confidence} confidence
+                · {copy("{level} confidence", { level: copy(o.confidence) })}
               </span>
             </dd>
           </div>
@@ -127,7 +139,7 @@ export function OpportunityDetail({
       </header>
       <div
         role="tablist"
-        aria-label="Opportunity sections"
+        aria-label={copy("Opportunity sections")}
         className="flex overflow-x-auto border-b"
       >
         {tabs.map((t) => (
@@ -156,7 +168,7 @@ export function OpportunityDetail({
               tab === t && "border-primary text-primary",
             )}
           >
-            {t}
+            {copy(t)}
           </button>
         ))}
       </div>
@@ -172,11 +184,13 @@ export function OpportunityDetail({
             <>
               <section className="report-section">
                 <h2 className="text-xl font-semibold">
-                  The problem worth solving
+                  {copy("The problem worth solving")}
                 </h2>
                 <p className="max-w-prose text-lg leading-relaxed">{o.pain}</p>
                 <div className="flex flex-col gap-3 border-t pt-5">
-                  <h3 className="font-semibold">The GenAI-enabled approach</h3>
+                  <h3 className="font-semibold">
+                    {copy("The GenAI-enabled approach")}
+                  </h3>
                   <p className="max-w-prose leading-relaxed text-muted-foreground">
                     {report.approach}
                   </p>
@@ -184,7 +198,7 @@ export function OpportunityDetail({
               </section>
               <section className="report-section">
                 <h2 className="text-xl font-semibold">
-                  Buyer and buying context
+                  {copy("Buyer and buying context")}
                 </h2>
                 <p className="font-medium">{o.buyer}</p>
                 <dl className="grid gap-6 sm:grid-cols-2">
@@ -198,26 +212,30 @@ export function OpportunityDetail({
                     ],
                   ].map(([k, v]) => (
                     <div key={k} className="flex flex-col gap-2">
-                      <dt className="text-sm font-medium">{k}</dt>
+                      <dt className="text-sm font-medium">{copy(k)}</dt>
                       <dd className="text-sm leading-relaxed text-muted-foreground">
-                        {v}
+                        {copy(v)}
                       </dd>
                     </div>
                   ))}
                 </dl>
                 <p className="text-sm text-muted-foreground">
-                  Illustrative buyer hypotheses, not interview findings.
+                  {copy(
+                    "Illustrative buyer hypotheses, not interview findings.",
+                  )}
                 </p>
               </section>
               <section className="report-section">
-                <h2 className="text-xl font-semibold">Key risk to validate</h2>
+                <h2 className="text-xl font-semibold">
+                  {copy("Key risk to validate")}
+                </h2>
                 <p className="max-w-prose leading-relaxed">{o.risk}</p>
                 <Button
                   variant="link"
                   className="h-auto justify-start whitespace-normal p-0 text-left"
                   onClick={() => setTab("Validation")}
                 >
-                  Turn assumptions into a validation plan
+                  {copy("Turn assumptions into a validation plan")}
                   <ArrowRight data-icon="inline-end" />
                 </Button>
               </section>
@@ -227,14 +245,15 @@ export function OpportunityDetail({
             <>
               <section className="report-section">
                 <SectionTitle
-                  title="Evidence and limitations"
-                  description="Three synthetic source records · No verified citations"
+                  title={copy("Evidence and limitations")}
+                  description={copy(
+                    "Three synthetic source records · No verified citations",
+                  )}
                 />
                 <p className="max-w-prose text-muted-foreground">
-                  These invented records demonstrate how a research report
-                  separates observations, interpretations, and remaining
-                  uncertainty. No interviews or external research were
-                  conducted.
+                  {copy(
+                    "These invented records demonstrate how a research report separates observations, interpretations, and remaining uncertainty. No interviews or external research were conducted.",
+                  )}
                 </p>
               </section>
               {report.sources.map((s) => (
@@ -242,21 +261,23 @@ export function OpportunityDetail({
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge variant="outline">{s.type}</Badge>
                     <span className="text-sm text-muted-foreground">
-                      Synthetic · Not verified
+                      {copy("Synthetic · Not verified")}
                     </span>
                   </div>
-                  <h3 className="text-lg font-semibold">{s.title}</h3>
-                  <p className="text-sm text-muted-foreground">{s.detail}</p>
+                  <h3 className="text-lg font-semibold">{copy(s.title)}</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {copy(s.detail)}
+                  </p>
                   <dl className="flex flex-col gap-4">
                     <div className="flex flex-col gap-1">
                       <dt className="text-sm font-medium">
-                        Example observation
+                        {copy("Example observation")}
                       </dt>
                       <dd className="leading-relaxed">{s.observation}</dd>
                     </div>
                     <div className="flex flex-col gap-1">
                       <dt className="text-sm font-medium">
-                        Working interpretation
+                        {copy("Working interpretation")}
                       </dt>
                       <dd className="text-sm leading-relaxed text-muted-foreground">
                         {s.implication}
@@ -266,20 +287,25 @@ export function OpportunityDetail({
                   <Button
                     variant="link"
                     className="h-auto justify-start p-0"
-                    onClick={() => setSource(s)}
+                    onClick={(event) => {
+                      sourceTrigger.current = event.currentTarget;
+                      setSourceIndex(report.sources.indexOf(s));
+                    }}
                   >
                     <FileText data-icon="inline-start" />
-                    Review source limitations
+                    {copy("Review source limitations")}
                     <ChevronRight data-icon="inline-end" />
                   </Button>
                 </section>
               ))}
               <section className="report-section">
-                <h3 className="font-semibold">What real evidence would need</h3>
+                <h3 className="font-semibold">
+                  {copy("What real evidence would need")}
+                </h3>
                 <p className="text-sm text-muted-foreground">
-                  A traceable source URL or interview record, collection date,
-                  methodology, relevant quotation, and a clear separation
-                  between observation and inference.
+                  {copy(
+                    "A traceable source URL or interview record, collection date, methodology, relevant quotation, and a clear separation between observation and inference.",
+                  )}
                 </p>
               </section>
             </>
@@ -287,12 +313,13 @@ export function OpportunityDetail({
           {tab === "Economics" && (
             <section className="report-section">
               <SectionTitle
-                title="A scenario, not a forecast"
-                description="Illustrative monthly unit economics · USD"
+                title={copy("A scenario, not a forecast")}
+                description={copy("Illustrative monthly unit economics · USD")}
               />
               <p className="max-w-prose text-muted-foreground">
-                These amounts are assumptions, not market-tested prices. Compare
-                the cost of delivering an outcome with what a buyer might pay.
+                {copy(
+                  "These amounts are assumptions, not market-tested prices. Compare the cost of delivering an outcome with what a buyer might pay.",
+                )}
               </p>
               <dl className="flex flex-col">
                 {[
@@ -305,31 +332,41 @@ export function OpportunityDetail({
                     key={k}
                     className="flex flex-col justify-between gap-2 border-b py-4 sm:flex-row sm:gap-6"
                   >
-                    <dt className="text-sm text-muted-foreground">{k}</dt>
+                    <dt className="text-sm text-muted-foreground">{copy(k)}</dt>
                     <dd className="shrink-0 font-semibold tabular-nums sm:text-right">
-                      {v}
+                      {copy(v)}
                     </dd>
                   </div>
                 ))}
               </dl>
-              <h3 className="font-semibold">The assumptions that matter</h3>
+              <h3 className="font-semibold">
+                {copy("The assumptions that matter")}
+              </h3>
               <ul className="flex list-disc flex-col gap-3 pl-5 text-muted-foreground">
-                <li>Buyers encounter the problem repeatedly, not just once.</li>
                 <li>
-                  AI inference, hosting, and human review fit within the
-                  delivery budget.
+                  {copy(
+                    "Buyers encounter the problem repeatedly, not just once.",
+                  )}
                 </li>
                 <li>
-                  The outcome is valuable enough to support a subscription.
+                  {copy(
+                    "AI inference, hosting, and human review fit within the delivery budget.",
+                  )}
                 </li>
                 <li>
-                  Acquisition cost, churn, taxes, and support still need to be
-                  modeled.
+                  {copy(
+                    "The outcome is valuable enough to support a subscription.",
+                  )}
+                </li>
+                <li>
+                  {copy(
+                    "Acquisition cost, churn, taxes, and support still need to be modeled.",
+                  )}
                 </li>
               </ul>
               <Button variant="outline" asChild>
                 <Link href="/research/results">
-                  Compare opportunity scenarios
+                  {copy("Compare opportunity scenarios")}
                   <ArrowRight data-icon="inline-end" />
                 </Link>
               </Button>
@@ -338,22 +375,28 @@ export function OpportunityDetail({
           {tab === "Validation" && (
             <section className="report-section">
               <SectionTitle
-                title="Your first validation sprint"
-                description="Test the problem before building the product."
+                title={copy("Your first validation sprint")}
+                description={copy(
+                  "Test the problem before building the product.",
+                )}
               />
               <p className="text-sm text-muted-foreground">
-                Demo checklist · Changes reset on refresh. No interviews are
-                scheduled or messages sent.
+                {copy(
+                  "Demo checklist · Changes reset on refresh. No interviews are scheduled or messages sent.",
+                )}
               </p>
               <div className="flex flex-col gap-3">
                 <p className="text-sm text-muted-foreground" aria-live="polite">
-                  {taskCount} of {tasks.length} steps complete
+                  {copy("{count} of {total} steps complete", {
+                    count: taskCount,
+                    total: tasks.length,
+                  })}
                 </p>
                 <progress
                   className="h-2 w-full accent-primary"
                   value={taskCount}
                   max={tasks.length}
-                  aria-label="Validation steps complete"
+                  aria-label={copy("Validation steps complete")}
                 />
               </div>
               <div className="flex flex-col">
@@ -369,31 +412,35 @@ export function OpportunityDetail({
                       className="mt-1 size-5 shrink-0"
                     />
                     <span className="flex flex-col gap-2">
-                      <span className="font-medium">{t.title}</span>
+                      <span className="font-medium">{copy(t.title)}</span>
                       <span className="text-sm leading-relaxed text-muted-foreground">
-                        {t.text}
+                        {copy(t.text)}
                       </span>
                     </span>
                   </label>
                 ))}
               </div>
               <div className="flex flex-col gap-3 border-t pt-5">
-                <h3 className="font-semibold">A better first question</h3>
+                <h3 className="font-semibold">
+                  {copy("A better first question")}
+                </h3>
                 <blockquote className="max-w-prose text-base leading-relaxed">
-                  “Walk me through the last time you dealt with this. What did
-                  you do, and what happened next?”
+                  {copy(
+                    "“Walk me through the last time you dealt with this. What did you do, and what happened next?”",
+                  )}
                 </blockquote>
               </div>
               <Button
                 variant="outline"
                 onClick={() =>
-                  toast.info("Interview integrations are not connected", {
-                    description:
+                  toast.info(copy("Interview integrations are not connected"), {
+                    description: copy(
                       "Use this checklist to plan your own conversations. No messages or calendar invites are sent.",
+                    ),
                   })
                 }
               >
-                About scheduling interviews
+                {copy("About scheduling interviews")}
                 <ChevronRight data-icon="inline-end" />
               </Button>
             </section>
@@ -406,9 +453,9 @@ export function OpportunityDetail({
           >
             <div className="flex items-center justify-between gap-3">
               <h2 id="score-title" className="font-semibold">
-                Score breakdown
+                {copy("Score breakdown")}
               </h2>
-              <Badge variant="outline">Demo</Badge>
+              <Badge variant="outline">{copy("Demo")}</Badge>
             </div>
             <div className="flex items-baseline gap-2">
               <span className="text-4xl font-semibold tabular-nums tracking-tight">
@@ -421,10 +468,10 @@ export function OpportunityDetail({
               {scoreLabels.map((s, i) => (
                 <div key={s} className="flex flex-col gap-2">
                   <div className="flex justify-between gap-3 text-sm">
-                    <dt className="text-muted-foreground">{s}</dt>
+                    <dt className="text-muted-foreground">{copy(s)}</dt>
                     <dd className="font-medium tabular-nums">
                       {o.scores[i]}
-                      <span className="sr-only"> out of 100</span>
+                      <span className="sr-only"> {copy("out of 100")}</span>
                     </dd>
                   </div>
                   <div className="progress-track" aria-hidden="true">
@@ -437,13 +484,13 @@ export function OpportunityDetail({
               ))}
             </dl>
             <p className="text-sm text-muted-foreground">
-              Illustrative composite assessment, not a probability of success or
-              an investment recommendation. Confidence is relative within this
-              demo.
+              {copy(
+                "Illustrative composite assessment, not a probability of success or an investment recommendation. Confidence is relative within this demo.",
+              )}
             </p>
           </section>
           <section className="flex flex-col gap-3 px-1">
-            <h2 className="font-semibold">What to test first</h2>
+            <h2 className="font-semibold">{copy("What to test first")}</h2>
             <p className="text-sm leading-relaxed text-muted-foreground">
               {report.firstTest}
             </p>
@@ -457,26 +504,33 @@ export function OpportunityDetail({
                   ?.scrollIntoView({ block: "start", behavior: "smooth" });
               }}
             >
-              Plan your validation
+              {copy("Plan your validation")}
               <ArrowRight data-icon="inline-end" />
             </Button>
           </section>
         </aside>
       </div>
-      <Dialog open={!!source} onOpenChange={(v) => !v && setSource(null)}>
-        <DialogContent className="max-h-[85dvh] overflow-y-auto">
+      <Dialog open={!!source} onOpenChange={(v) => !v && setSourceIndex(null)}>
+        <DialogContent
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            sourceTrigger.current?.focus();
+          }}
+          className="max-h-[85dvh] overflow-y-auto"
+        >
           <DialogHeader>
             <DialogTitle>{source?.title}</DialogTitle>
             <DialogDescription>
-              Synthetic source record · No verified external source
+              {copy("Synthetic source record · No verified external source")}
             </DialogDescription>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">{source?.detail}</p>
-          <h3 className="font-semibold">Limitations</h3>
+          <h3 className="font-semibold">{copy("Limitations")}</h3>
           <p className="leading-relaxed">{source?.limitation}</p>
           <p className="text-sm text-muted-foreground">
-            This invented record is not evidence of buyer demand and should not
-            be used for business or investment decisions.
+            {copy(
+              "This invented record is not evidence of buyer demand and should not be used for business or investment decisions.",
+            )}
           </p>
         </DialogContent>
       </Dialog>

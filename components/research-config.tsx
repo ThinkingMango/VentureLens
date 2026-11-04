@@ -1,4 +1,7 @@
 "use client";
+import { useCopy } from "@/i18n/use-copy";
+import { feedbackSource } from "@/i18n/errors";
+
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "@/components/workspace-link";
@@ -21,6 +24,7 @@ import {
   FieldError,
 } from "@/components/ui/field";
 export function ResearchConfig() {
+  const copy = useCopy();
   const { run, setRun, profile, isDemo, href, busy, refresh } = useDemo();
   const [draft, setDraft] = useState(run);
   const [submitting, setSubmitting] = useState(false);
@@ -34,14 +38,16 @@ export function ResearchConfig() {
         className="flex w-fit items-center gap-2 text-muted-foreground hover:text-primary"
       >
         <ArrowLeft className="size-4" />
-        My research
+        {copy("My research")}
       </Link>
       <PageHeader
-        title="What would you like to explore?"
+        title={copy("What would you like to explore?")}
         description={
           isDemo
-            ? "Configure a research brief and preview a clearly labeled demonstration report."
-            : "创建证据驱动的研究任务。仅限已授权的开发账号，不连接计费。"
+            ? copy(
+                "Configure a research brief and preview a clearly labeled demonstration report.",
+              )
+            : copy("创建证据驱动的研究任务。仅限已授权的开发账号，不连接计费。")
         }
       />
       <div className="grid gap-6 xl:grid-cols-[1.6fr_1fr]">
@@ -66,29 +72,38 @@ export function ResearchConfig() {
                   router.push(href("/research/results?demo=1"));
                 } else {
                   requestKey.current ??= crypto.randomUUID();
-                  const response = await fetch("/api/research", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "start", brief, requestKey: requestKey.current }) });
+                  const response = await fetch("/api/research", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      action: "start",
+                      brief,
+                      requestKey: requestKey.current,
+                    }),
+                  });
                   const result = await response.json();
-                  if (!response.ok) throw new Error(result.error ?? "研究暂时无法启动。");
+                  if (!response.ok)
+                    throw new Error(feedbackSource(result.code));
                   await refresh().catch(() => undefined);
                   router.push(`/research/${result.id}`);
                 }
                 router.refresh();
               } catch (error) {
                 setNameError(
-                  error instanceof Error
-                    ? error.message
-                    : "研究暂时无法启动。",
+                  error instanceof Error ? error.message : "研究暂时无法启动。",
                 );
               } finally {
                 setSubmitting(false);
               }
             }}
           >
-            <h2 className="text-lg font-semibold">Set your research focus</h2>
+            <h2 className="text-lg font-semibold">
+              {copy("Set your research focus")}
+            </h2>
             <FieldGroup>
               <Field data-invalid={!!nameError}>
                 <FieldLabel htmlFor="research-name">
-                  Research name (required)
+                  {copy("Research name (required)")}
                 </FieldLabel>
                 <Input
                   id="research-name"
@@ -105,25 +120,53 @@ export function ResearchConfig() {
                   }}
                 />
                 {nameError ? (
-                  <FieldError id="research-name-error">{nameError}</FieldError>
+                  <FieldError id="research-name-error">
+                    {copy(nameError)}
+                  </FieldError>
                 ) : (
                   <FieldDescription id="research-name-help">
-                    Use a descriptive name so you can find this brief later. Up
-                    to 100 characters.
+                    {copy(
+                      "Use a descriptive name so you can find this brief later. Up to 100 characters.",
+                    )}
                   </FieldDescription>
                 )}
               </Field>
               <Field>
-                <FieldLabel htmlFor="discovery-mode">发现模式</FieldLabel>
-                <select id="discovery-mode" className="field-select" value={draft.discovery_mode ?? "combined"} onChange={(e) => setDraft({ ...draft, discovery_mode: e.target.value as "founder" | "market" | "combined" })}>
-                  <option value="combined">综合发现 · Combined Discovery</option>
-                  <option value="founder">创始人优势 · Founder Advantage</option>
-                  <option value="market">市场优先 · Market-First</option>
+                <FieldLabel htmlFor="discovery-mode">
+                  {copy("发现模式")}
+                </FieldLabel>
+                <select
+                  id="discovery-mode"
+                  className="field-select"
+                  value={draft.discovery_mode ?? "combined"}
+                  onChange={(e) =>
+                    setDraft({
+                      ...draft,
+                      discovery_mode: e.target.value as
+                        "founder" | "market" | "combined",
+                    })
+                  }
+                >
+                  <option value="combined">
+                    {copy("综合发现 · Combined Discovery")}
+                  </option>
+                  <option value="founder">
+                    {copy("创始人优势 · Founder Advantage")}
+                  </option>
+                  <option value="market">
+                    {copy("市场优先 · Market-First")}
+                  </option>
                 </select>
-                <FieldDescription>市场优先不使用个人背景进行机会发现或评分；其余模式结合你的技能和资源。</FieldDescription>
+                <FieldDescription>
+                  {copy(
+                    "市场优先不使用个人背景进行机会发现或评分；其余模式结合你的技能和资源。",
+                  )}
+                </FieldDescription>
               </Field>
               <Field>
-                <FieldLabel htmlFor="sector">Industry or market</FieldLabel>
+                <FieldLabel htmlFor="sector">
+                  {copy("Industry or market")}
+                </FieldLabel>
                 <select
                   id="sector"
                   className="field-select"
@@ -142,12 +185,16 @@ export function ResearchConfig() {
                     "Education",
                     "Healthcare",
                   ].map((v) => (
-                    <option key={v}>{v}</option>
+                    <option key={v} value={v}>
+                      {copy(v)}
+                    </option>
                   ))}
                 </select>
               </Field>
               <Field>
-                <FieldLabel htmlFor="model">Business model</FieldLabel>
+                <FieldLabel htmlFor="model">
+                  {copy("Business model")}
+                </FieldLabel>
                 <select
                   id="model"
                   className="field-select"
@@ -165,12 +212,16 @@ export function ResearchConfig() {
                     "Usage-based software",
                     "Open to possibilities",
                   ].map((v) => (
-                    <option key={v}>{v}</option>
+                    <option key={v} value={v}>
+                      {copy(v)}
+                    </option>
                   ))}
                 </select>
               </Field>
               <Field>
-                <FieldLabel htmlFor="geography">Target market</FieldLabel>
+                <FieldLabel htmlFor="geography">
+                  {copy("Target market")}
+                </FieldLabel>
                 <select
                   id="geography"
                   className="field-select"
@@ -188,14 +239,18 @@ export function ResearchConfig() {
                     "European Union",
                     "Global / English-speaking",
                   ].map((v) => (
-                    <option key={v}>{v}</option>
+                    <option key={v} value={v}>
+                      {copy(v)}
+                    </option>
                   ))}
                 </select>
               </Field>
               <Field>
                 <FieldLabel htmlFor="context">
-                  Anything else to keep in mind?{" "}
-                  <span className="text-muted-foreground">(optional)</span>
+                  {copy("Anything else to keep in mind?")}{" "}
+                  <span className="text-muted-foreground">
+                    {copy("(optional)")}
+                  </span>
                 </FieldLabel>
                 <textarea
                   id="context"
@@ -206,27 +261,39 @@ export function ResearchConfig() {
                   aria-describedby="context-help"
                   maxLength={1000}
                   className="field-select min-h-24"
-                  placeholder="A buyer group, a problem you’ve noticed, or a niche you know well…"
+                  placeholder={copy(
+                    "A buyer group, a problem you’ve noticed, or a niche you know well…",
+                  )}
                 />
                 <FieldDescription id="context-help">
                   {isDemo
-                    ? "Up to 1,000 characters. Demo notes stay in memory; results remain fixed synthetic examples."
-                    : "最多 1,000 字符。研究配置会保存；必要的市场背景会发送至 Qwen 和外部检索服务，请勿包含敏感信息。"}
+                    ? copy(
+                        "Up to 1,000 characters. Demo notes stay in memory; results remain fixed synthetic examples.",
+                      )
+                    : copy(
+                        "最多 1,000 字符。研究配置会保存；必要的市场背景会发送至 Qwen 和外部检索服务，请勿包含敏感信息。",
+                      )}
                 </FieldDescription>
               </Field>
             </FieldGroup>
             <div className="flex flex-wrap items-center justify-between gap-4 border-t pt-5">
               <span className="text-sm text-muted-foreground">
                 {isDemo
-                  ? "0 credits used in demo mode"
-                  : "开发白名单 · 最多 3 次任务 · 每次估算预算上限 US$0.25"}
+                  ? copy("0 credits used in demo mode")
+                  : copy(
+                      "开发白名单 · 最多 3 次任务 · 每次估算预算上限 US$0.25",
+                    )}
               </span>
-              <Button type="submit" disabled={busy || submitting} aria-busy={busy || submitting}>
+              <Button
+                type="submit"
+                disabled={busy || submitting}
+                aria-busy={busy || submitting}
+              >
                 {busy || submitting
-                  ? "提交中…"
+                  ? copy("提交中…")
                   : isDemo
-                    ? "Preview research results"
-                    : "启动证据研究"}
+                    ? copy("Preview research results")
+                    : copy("启动证据研究")}
                 <ArrowRight />
               </Button>
             </div>
@@ -236,34 +303,41 @@ export function ResearchConfig() {
           <section className="surface flex flex-col gap-4 p-6">
             <div className="flex items-center gap-2">
               <UserRound className="size-5 text-primary" />
-              <h2 className="font-semibold">Your founder context</h2>
+              <h2 className="font-semibold">{copy("Your founder context")}</h2>
             </div>
             <p className="text-sm text-muted-foreground">
               {isDemo
-                ? "Reference your experience while exploring. Profile changes do not personalize demo results."
-                : "研究会保存此刻的画像快照。创始人优势和综合发现模式使用这些信息；市场优先模式不使用。"}
+                ? copy(
+                    "Reference your experience while exploring. Profile changes do not personalize demo results.",
+                  )
+                : copy(
+                    "研究会保存此刻的画像快照。创始人优势和综合发现模式使用这些信息；市场优先模式不使用。",
+                  )}
             </p>
             <dl className="flex flex-col gap-4">
               {[
                 ["Experience", profile.industry],
-                ["Time available", `${profile.hours} / week`],
+                [
+                  "Time available",
+                  copy("{hours} / week", { hours: copy(profile.hours) }),
+                ],
                 ["Starting budget", profile.budget],
               ].map(([k, v]) => (
                 <div key={k}>
-                  <dt className="text-sm text-muted-foreground">{k}</dt>
-                  <dd className="mt-1 font-medium">{v}</dd>
+                  <dt className="text-sm text-muted-foreground">{copy(k)}</dt>
+                  <dd className="mt-1 font-medium">{copy(v)}</dd>
                 </div>
               ))}
             </dl>
             <Link href="/profile" className="text-sm font-medium text-primary">
-              Edit founder profile
+              {copy("Edit founder profile")}
               <ArrowRight className="ml-1 inline size-4" />
             </Link>
           </section>
           <section className="flex flex-col gap-4 rounded-xl bg-secondary p-6 text-foreground">
             <Telescope className="size-6 text-primary" />
             <h2 className="font-semibold">
-              A structured view of the possibilities
+              {copy("A structured view of the possibilities")}
             </h2>
             <ul className="flex flex-col gap-3">
               {[
@@ -278,7 +352,7 @@ export function ResearchConfig() {
                   className="flex items-center gap-2 text-sm text-muted-foreground"
                 >
                   <Check className="size-4 shrink-0 text-primary" />
-                  {t}
+                  {copy(t)}
                 </li>
               ))}
             </ul>

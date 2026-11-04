@@ -1,4 +1,6 @@
 "use client";
+import { useCopy } from "@/i18n/use-copy";
+
 import Link from "@/components/workspace-link";
 import {
   Aperture,
@@ -16,10 +18,11 @@ import { cn } from "@/lib/utils";
 import { demoNotice } from "@/lib/demo-data";
 import { useOptionalWorkspace } from "@/components/demo-provider";
 export function Brand({ compact = false }: { compact?: boolean }) {
+  const copy = useCopy();
   return (
     <Link
       href="/"
-      aria-label="VentureLens AI home"
+      aria-label={copy("VentureLens AI home")}
       className="inline-flex shrink-0 items-center gap-2.5"
     >
       <span className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
@@ -27,7 +30,8 @@ export function Brand({ compact = false }: { compact?: boolean }) {
       </span>
       {!compact && (
         <span className="text-xl font-semibold tracking-tight">
-          VentureLens<span className="ml-1 text-primary">AI</span>
+          {copy("VentureLens")}
+          <span className="ml-1 text-primary">AI</span>
         </span>
       )}
     </Link>
@@ -40,6 +44,7 @@ export function DemoNote({
   className?: string;
   short?: boolean;
 }) {
+  const copy = useCopy();
   const workspace = useOptionalWorkspace();
   if (workspace && !workspace.isDemo) return null;
   return (
@@ -52,8 +57,10 @@ export function DemoNote({
       <Info className="mt-0.5 size-4 shrink-0" />
       <p>
         {short
-          ? "Demo workspace · All research and financial data is synthetic."
-          : demoNotice}
+          ? copy(
+              "Demo workspace · All research and financial data is synthetic.",
+            )
+          : copy(demoNotice)}
       </p>
     </div>
   );
@@ -69,7 +76,7 @@ export function PageHeader({
 }) {
   return (
     <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
-      <div className="flex flex-col gap-2">
+      <div className="flex min-w-0 flex-col gap-2">
         <h1 className="page-heading text-balance">{title}</h1>
         <p className="text-muted-foreground text-pretty">{description}</p>
       </div>
@@ -88,12 +95,15 @@ export function SectionTitle({
   href?: string;
   label?: string;
 }) {
+  const copy = useCopy();
   return (
     <div className="flex items-center justify-between gap-4">
       <div>
-        <h2 className="text-lg font-semibold">{title}</h2>
+        <h2 className="text-lg font-semibold">{copy(title)}</h2>
         {description && (
-          <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {copy(description)}
+          </p>
         )}
       </div>
       {href && (
@@ -101,7 +111,7 @@ export function SectionTitle({
           href={href}
           className="flex shrink-0 items-center gap-1 text-sm font-medium text-primary hover:underline"
         >
-          {label}
+          {copy(label)}
           <ArrowRight className="size-4" />
         </Link>
       )}
@@ -115,10 +125,13 @@ export const opportunityIcons = {
   workflow: Workflow,
 };
 export function Confidence({ level }: { level: string }) {
+  const copy = useCopy();
   return (
     <Badge variant="secondary" className="gap-1.5 rounded-md font-medium">
       <span className="demo-dot" />
-      {level} confidence
+      {["Higher", "Medium", "Lower"].includes(level)
+        ? copy("{level} confidence", { level: copy(level) })
+        : copy(level)}
     </Badge>
   );
 }
@@ -129,6 +142,7 @@ export function TextLink({
   href: string;
   children: React.ReactNode;
 }) {
+  const copy = useCopy();
   return (
     <Button asChild variant="link" className="h-auto p-0">
       <Link href={href}>

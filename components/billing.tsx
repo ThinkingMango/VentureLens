@@ -1,4 +1,6 @@
 "use client";
+import { useCopy } from "@/i18n/use-copy";
+
 import Link from "@/components/workspace-link";
 import { ArrowUpRight, CreditCard, Telescope } from "lucide-react";
 import { toast } from "sonner";
@@ -8,26 +10,29 @@ import { Badge } from "@/components/ui/badge";
 import { PricingCards } from "@/components/pricing";
 import { useDemo } from "@/components/demo-provider";
 export function Billing() {
+  const copy = useCopy();
   const { isDemo } = useDemo();
   if (!isDemo)
     return (
       <>
         <PageHeader
-          title="Credits & billing"
-          description="Payments and research credits are not enabled yet."
+          title={copy("Credits & billing")}
+          description={copy(
+            "Payments and research credits are not enabled yet.",
+          )}
         />
         <section className="surface flex flex-col gap-4 p-6">
           <h2 className="text-xl font-semibold">
-            No billing service connected
+            {copy("No billing service connected")}
           </h2>
           <p className="leading-relaxed text-muted-foreground">
-            No credits, charges, subscriptions, or payment methods have been
-            provisioned for this account. You can save research briefs without
-            making a payment.
+            {copy(
+              "No credits, charges, subscriptions, or payment methods have been provisioned for this account. You can save research briefs without making a payment.",
+            )}
           </p>
           <Button asChild variant="outline" className="w-fit">
             <Link href="/research/new">
-              Create a research brief
+              {copy("Create a research brief")}
               <ArrowUpRight />
             </Link>
           </Button>
@@ -35,73 +40,81 @@ export function Billing() {
       </>
     );
   const disconnected = () =>
-    toast.info("Live billing is not connected", {
-      description:
+    toast.info(copy("Live billing is not connected"), {
+      description: copy(
         "Stripe is not configured. No payment details, invoices, charges, or subscriptions are available.",
+      ),
     });
   return (
     <>
       <PageHeader
-        title="A clear view of your credits."
-        description="Your research capacity, plan, and billing—all in one place."
+        title={copy("A clear view of your credits.")}
+        description={copy(
+          "Your research capacity, plan, and billing—all in one place.",
+        )}
       />
       <div className="grid gap-5 md:grid-cols-2">
         <section className="surface flex flex-col gap-5 p-6">
           <div className="flex justify-between">
-            <h2 className="font-semibold">Research credits</h2>
+            <h2 className="font-semibold">{copy("Research credits")}</h2>
             <Telescope className="size-5 text-primary" />
           </div>
           <p>
             <span className="text-4xl font-semibold tracking-tight">8</span>
             <span className="ml-2 text-muted-foreground">
-              of 10 demo credits available
+              {copy("of 10 demo credits available")}
             </span>
           </p>
           <div className="progress-track">
             <div className="progress-fill w-4/5" />
           </div>
           <p className="text-sm text-muted-foreground">
-            2 used · Fixed synthetic balance. Demo research runs do not consume
-            credits.
+            {copy(
+              "2 used · Fixed synthetic balance. Demo research runs do not consume credits.",
+            )}
           </p>
           <Button asChild variant="outline" className="w-fit">
             <Link href="/research/new">
-              Start a demo exploration
+              {copy("Start a demo exploration")}
               <ArrowUpRight />
             </Link>
           </Button>
         </section>
         <section className="surface flex flex-col gap-5 p-6">
           <div className="flex justify-between">
-            <h2 className="font-semibold">Current plan</h2>
-            <Badge variant="secondary">Demo account</Badge>
+            <h2 className="font-semibold">{copy("Current plan")}</h2>
+            <Badge variant="secondary">{copy("Demo account")}</Badge>
           </div>
-          <h3 className="text-2xl font-semibold">Explorer preview</h3>
+          <h3 className="text-2xl font-semibold">{copy("Explorer preview")}</h3>
           <p className="text-muted-foreground">
-            No active subscription. No payment method on file. No upcoming
-            charges.
+            {copy(
+              "No active subscription. No payment method on file. No upcoming charges.",
+            )}
           </p>
           <div className="mt-auto">
             <Button variant="outline" onClick={disconnected}>
               <CreditCard />
-              About billing management
+              {copy("About billing management")}
             </Button>
           </div>
         </section>
       </div>
       <section className="flex flex-col gap-5">
         <div>
-          <h2 className="text-xl font-semibold">Choose your research pace</h2>
+          <h2 className="text-xl font-semibold">
+            {copy("Choose your research pace")}
+          </h2>
           <p className="mt-2 text-muted-foreground">
-            Illustrative packages in USD. Checkout and subscriptions are not
-            connected.
+            {copy(
+              "Illustrative packages in USD. Checkout and subscriptions are not connected.",
+            )}
           </p>
         </div>
         <PricingCards />
       </section>
       <section className="surface overflow-hidden">
         <h2 className="border-b px-6 py-5 text-lg font-semibold">
-          Example credit activity
+          {copy("Example credit activity")}
         </h2>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[560px] text-left">
@@ -109,7 +122,7 @@ export function Billing() {
               <tr>
                 {["Activity", "Type", "Credits", "Status"].map((t) => (
                   <th key={t} className="px-6 py-3 font-medium">
-                    {t}
+                    {copy(t)}
                   </th>
                 ))}
               </tr>
@@ -121,11 +134,11 @@ export function Billing() {
                 ["Small team software research", "Sample research", "−1"],
               ].map(([a, t, c]) => (
                 <tr className="border-t" key={a}>
-                  <td className="px-6 py-4 font-medium">{a}</td>
-                  <td className="px-6 py-4 text-muted-foreground">{t}</td>
+                  <td className="px-6 py-4 font-medium">{copy(a)}</td>
+                  <td className="px-6 py-4 text-muted-foreground">{copy(t)}</td>
                   <td className="px-6 py-4 tabular-nums">{c}</td>
                   <td className="px-6 py-4">
-                    <Badge variant="outline">Synthetic</Badge>
+                    <Badge variant="outline">{copy("Synthetic")}</Badge>
                   </td>
                 </tr>
               ))}
@@ -135,13 +148,17 @@ export function Billing() {
       </section>
       <section className="flex flex-col items-start justify-between gap-4 rounded-xl border p-6 sm:flex-row sm:items-center">
         <div>
-          <h2 className="font-semibold">Invoices & payment methods</h2>
+          <h2 className="font-semibold">
+            {copy("Invoices & payment methods")}
+          </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            There are no real invoices or payment details in this demonstration.
+            {copy(
+              "There are no real invoices or payment details in this demonstration.",
+            )}
           </p>
         </div>
         <Button variant="outline" onClick={disconnected}>
-          Billing service status
+          {copy("Billing service status")}
           <ArrowUpRight />
         </Button>
       </section>

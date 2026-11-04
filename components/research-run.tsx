@@ -9,53 +9,232 @@ import { useDemo } from "@/components/demo-provider";
 import { ResearchReportView } from "@/components/research-report";
 import { researchErrors, stageLabels } from "@/lib/research-core";
 import type { ResearchDetail } from "@/lib/research-types";
-const stages = ["discovery", "retrieval", "classification", "evaluation", "scoring", "review", "finalizing"];
+import { useCopy, useFormats } from "@/i18n/use-copy";
+import { feedbackSource } from "@/i18n/errors";
+const stages = [
+  "discovery",
+  "retrieval",
+  "classification",
+  "evaluation",
+  "scoring",
+  "review",
+  "finalizing",
+];
 async function fetchRun(url: string): Promise<ResearchDetail> {
   const response = await fetch(url, { cache: "no-store" });
   const data = await response.json();
-  if (!response.ok) throw new Error(data.error ?? "无法读取研究任务。");
+  if (!response.ok)
+    throw new Error(feedbackSource(data.code, "STATUS_UNAVAILABLE"));
   return data;
 }
-export function ResearchRunView({ initialData }: { initialData: ResearchDetail }) {
+export function ResearchRunView({
+  initialData,
+}: {
+  initialData: ResearchDetail;
+}) {
+  const copy = useCopy();
+  const format = useFormats();
   const { refresh } = useDemo();
   const [retrying, setRetrying] = useState(false);
   const [retryError, setRetryError] = useState("");
-  const { data = initialData, error, mutate } = useSWR(`/api/research/${initialData.id}`, fetchRun, {
+  const {
+    data = initialData,
+    error,
+    mutate,
+  } = useSWR(`/api/research/${initialData.id}`, fetchRun, {
     fallbackData: initialData,
-    refreshInterval: (latest) => latest && ["pending", "running"].includes(latest.status) ? 3000 : 0,
-    onSuccess: (latest) => { if (["completed", "failed"].includes(latest.status)) void refresh(); },
+    refreshInterval: (latest) =>
+      latest && ["pending", "running"].includes(latest.status) ? 3000 : 0,
+    onSuccess: (latest) => {
+      if (["completed", "failed"].includes(latest.status)) void refresh();
+    },
   });
   const active = ["pending", "running"].includes(data.status);
   const index = stages.indexOf(data.stage);
-  const retryable = data.status === "failed" && data.retry_count < 1 && ["TRANSIENT_PROVIDER", "WORKFLOW_INTERRUPTED", "DISPATCH_FAILED"].includes(data.error_code ?? "");
-  return <>
-    <Link href="/research" className="flex w-fit items-center gap-2 text-sm text-muted-foreground"><ArrowLeft className="size-4" />研究历史</Link>
-    <PageHeader title={data.configuration.brief.name} description={data.status === "completed" ? "已保存的真实研究报告，可随时从历史记录重新打开。" : "进度来自服务器记录；离开页面不会中止工作流。"} />
-    {error && <p role="alert" className="text-sm text-muted-foreground">{error.message} 正在显示最后一次记录。<button className="ml-2 underline" onClick={() => void mutate()}>重新读取</button></p>}
-    <section className="surface flex flex-col gap-5 p-6" aria-label="研究进度">
-      <div className="flex items-center gap-3" role="status" aria-live="polite">{active && <LoaderCircle className="size-5 animate-spin text-primary" />}<h2 className="text-lg font-semibold">{data.status === "failed" ? "研究未完成" : stageLabels[data.stage] ?? "等待处理"}</h2></div>
-      <ol className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{stages.map((stage, i) => {
-        const done = data.status === "completed" || data.steps.some(s => s.stage_key === stage) || (stage === "retrieval" && index > i);
-        const current = active && data.stage === stage;
-        const Icon = done ? Check : current ? LoaderCircle : Circle;
-        return <li key={stage} aria-current={current ? "step" : undefined} className="flex items-center gap-2 text-sm"><Icon className={`size-4 shrink-0 ${done || current ? "text-primary" : "text-muted-foreground"}`} /><span>{stageLabels[stage]}{stage === "retrieval" && active && ` · ${data.steps.filter(s => s.stage_key.startsWith("retrieval:")).length} 个候选已检索`}</span></li>;
-      })}</ol>
-      {data.status === "failed" && <div className="flex flex-col gap-4" role="alert">
-        <p className="leading-relaxed">{researchErrors[data.error_code ?? ""] ?? "任务已中止，未生成报告。"}</p>
-        {retryable && <Button variant="outline" className="w-fit" disabled={retrying} onClick={async () => {
-          setRetrying(true); setRetryError("");
-          try {
-            const response = await fetch("/api/research", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "retry", id: data.id }) });
-            const result = await response.json();
-            if (!response.ok) throw new Error(result.error ?? "重试失败。");
-            await mutate();
-          } catch (error) { setRetryError(error instanceof Error ? error.message : "重试失败。"); }
-          finally { setRetrying(false); }
-        }}>{retrying ? "提交中…" : "从已保存阶段重试一次"}</Button>}
-        {retryError && <p>{retryError}</p>}
-      </div>}
-      <p className="text-sm leading-relaxed text-muted-foreground">已知估算费用 US${data.usage.estimated_usd.toFixed(4)} · 已占用预算 US${data.usage.committed_usd.toFixed(4)} / US${data.usage.budget_usd.toFixed(2)} · {data.usage.search_requests} 次检索 · {data.usage.input_tokens + data.usage.output_tokens} tokens{data.usage.uncertain_calls ? ` · ${data.usage.uncertain_calls} 次调用费用未确认，保留预算预留` : ""}。不包含托管及 Workflow 费用，不扣用户余额。</p>
-    </section>
-    {data.status === "completed" && data.report && <ResearchReportView report={data.report} />}
-  </>;
+  const retryable =
+    data.status === "failed" &&
+    data.retry_count < 1 &&
+    ["TRANSIENT_PROVIDER", "WORKFLOW_INTERRUPTED", "DISPATCH_FAILED"].includes(
+      data.error_code ?? "",
+    );
+  async function retry() {
+    setRetrying(true);
+    setRetryError("");
+    try {
+      const response = await fetch("/api/research", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "retry", id: data.id }),
+      });
+      const result = await response.json();
+      if (!response.ok)
+        throw new Error(feedbackSource(result.code, "RETRY_UNAVAILABLE"));
+      await mutate();
+    } catch (error) {
+      setRetryError(
+        error instanceof Error
+          ? error.message
+          : feedbackSource(null, "RETRY_UNAVAILABLE"),
+      );
+    } finally {
+      setRetrying(false);
+    }
+  }
+  return (
+    <>
+      <Link
+        href="/research"
+        className="flex w-fit items-center gap-2 text-sm text-muted-foreground"
+      >
+        <ArrowLeft className="size-4" />
+        {copy("Research history")}
+      </Link>
+      <PageHeader
+        title={data.configuration.brief.name}
+        description={copy(
+          data.status === "completed"
+            ? "Your saved research report can be reopened from history at any time."
+            : "Progress reflects server records. Leaving this page does not stop the workflow.",
+        )}
+      />
+      {error && (
+        <p role="alert" className="text-sm text-muted-foreground">
+          {copy(
+            "Research status could not refresh. Showing the last server record.",
+          )}{" "}
+          <button
+            className="ml-2 min-h-11 underline"
+            onClick={() => void mutate()}
+          >
+            {copy("Refresh status")}
+          </button>
+        </p>
+      )}
+      <section
+        className="surface flex flex-col gap-5 p-6"
+        aria-label={copy("Research progress")}
+      >
+        <div
+          className="flex items-center gap-3"
+          role="status"
+          aria-live="polite"
+        >
+          {active && (
+            <LoaderCircle className="size-5 animate-spin text-primary" />
+          )}
+          <h2 className="text-lg font-semibold">
+            {copy(
+              data.status === "failed"
+                ? "Research incomplete"
+                : (stageLabels[data.stage] ?? "等待处理"),
+            )}
+          </h2>
+        </div>
+        <ol className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {stages.map((stage, i) => {
+            const done =
+              data.status === "completed" ||
+              data.steps.some((s) => s.stage_key === stage) ||
+              (stage === "retrieval" && index > i);
+            const current = active && data.stage === stage;
+            const Icon = done ? Check : current ? LoaderCircle : Circle;
+            return (
+              <li
+                key={stage}
+                aria-current={current ? "step" : undefined}
+                className="flex items-center gap-2 text-sm"
+              >
+                <Icon
+                  className={`size-4 shrink-0 ${done || current ? "text-primary" : "text-muted-foreground"}`}
+                />
+                <span>
+                  {copy(stageLabels[stage])}
+                  {stage === "retrieval" && active && (
+                    <span className="block text-muted-foreground">
+                      {copy(
+                        "{count, plural, one {# candidate retrieved} other {# candidates retrieved}}",
+                        {
+                          count: data.steps.filter((s) =>
+                            s.stage_key.startsWith("retrieval:"),
+                          ).length,
+                        },
+                      )}
+                    </span>
+                  )}
+                </span>
+              </li>
+            );
+          })}
+        </ol>
+        {data.status === "failed" && (
+          <div className="flex flex-col gap-4" role="alert">
+            <p className="leading-relaxed">
+              {copy(
+                researchErrors[data.error_code ?? ""] ??
+                  "The task stopped without generating a report.",
+              )}
+            </p>
+            {retryable && (
+              <Button
+                variant="outline"
+                className="w-fit"
+                disabled={retrying}
+                onClick={retry}
+              >
+                {copy(
+                  retrying ? "Submitting…" : "Retry once from saved progress",
+                )}
+              </Button>
+            )}
+            {retryError && <p>{copy(retryError)}</p>}
+          </div>
+        )}
+        <dl className="grid gap-4 border-t pt-4 text-sm sm:grid-cols-2">
+          <div>
+            <dt className="text-muted-foreground">
+              {copy("Estimated known cost")}
+            </dt>
+            <dd>{format.usd(data.usage.estimated_usd, 4)}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">
+              {copy("Committed budget / limit")}
+            </dt>
+            <dd>
+              {format.usd(data.usage.committed_usd, 4)} /{" "}
+              {format.usd(data.usage.budget_usd)}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">{copy("Search requests")}</dt>
+            <dd>{format.number(data.usage.search_requests)}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">{copy("Tokens")}</dt>
+            <dd>
+              {format.number(
+                data.usage.input_tokens + data.usage.output_tokens,
+              )}
+            </dd>
+          </div>
+        </dl>
+        {!!data.usage.uncertain_calls && (
+          <p className="text-sm text-muted-foreground">
+            {copy(
+              "Costs for {count} calls are unconfirmed; their budget remains reserved.",
+              { count: data.usage.uncertain_calls },
+            )}
+          </p>
+        )}
+        <p className="text-sm text-muted-foreground">
+          {copy(
+            "Excludes hosting and Workflow costs. No user balance is charged.",
+          )}
+        </p>
+      </section>
+      {data.status === "completed" && data.report && (
+        <ResearchReportView report={data.report} />
+      )}
+    </>
+  );
 }

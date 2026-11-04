@@ -1,8 +1,12 @@
+import { getCopy } from "@/i18n/server";
 import { PasswordScreen } from "@/components/password-screen";
-export const metadata = {
-  title: "Verify your email",
-  robots: { index: false, follow: false },
-};
+export async function generateMetadata() {
+  const copy = await getCopy();
+  return {
+    title: copy("Verify your email"),
+    robots: { index: false, follow: false },
+  };
+}
 export default function Page() {
   return <PasswordScreen mode="verify" />;
 }

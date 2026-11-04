@@ -1,6 +1,6 @@
 @import "tailwindcss";
 @theme inline {
-  --font-sans: var(--font-geist), Arial, sans-serif;
+  --font-sans: var(--font-geist), "PingFang SC", "PingFang TC", "Microsoft YaHei", "Microsoft JhengHei", "Noto Sans CJK SC", "Noto Sans CJK TC", var(--font-cjk), sans-serif;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -83,6 +83,18 @@ h4 {
   letter-spacing: -0.025em;
   text-wrap: pretty;
 }
+html:lang(zh-Hans) h1,
+html:lang(zh-Hans) h2,
+html:lang(zh-Hans) h3,
+html:lang(zh-Hant) h1,
+html:lang(zh-Hant) h2,
+html:lang(zh-Hant) h3 {
+  letter-spacing: 0;
+  line-height: 1.45;
+}
+main, section, article, header, nav { min-width: 0; }
+h1, h2, h3, p, dd, label { overflow-wrap: anywhere; }
+button { white-space: normal; }
 a,
 button {
   transition:

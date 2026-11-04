@@ -1,4 +1,6 @@
 "use client";
+import { useCopy } from "@/i18n/use-copy";
+
 import { useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Bookmark, Plus, Telescope } from "lucide-react";
@@ -14,51 +16,68 @@ import { OpportunityEvidence } from "@/components/opportunity-evidence";
 export function WorkspaceEmpty({
   title,
   description,
+  actionHref = "/research/new",
+  actionLabel = "Create research brief",
+  onAction,
 }: {
   title: string;
   description: string;
+  actionHref?: string;
+  actionLabel?: string;
+  onAction?: () => void;
 }) {
+  const copy = useCopy();
   return (
     <section className="surface flex flex-col items-start gap-4 p-6 md:p-8">
       <Telescope className="size-6 text-primary" />
-      <h2 className="text-xl font-semibold">{title}</h2>
+      <h2 className="text-xl font-semibold">{copy(title)}</h2>
       <p className="max-w-2xl leading-relaxed text-muted-foreground">
-        {description}
+        {copy(description)}
       </p>
-      <Button asChild>
-        <Link href="/research/new">
-          Create research brief
-          <Plus />
-        </Link>
-      </Button>
+      {onAction ? (
+        <Button variant="outline" onClick={onAction}>
+          {copy(actionLabel)}
+        </Button>
+      ) : (
+        <Button asChild>
+          <Link href={actionHref}>
+            {copy(actionLabel)}
+            <ArrowRight />
+          </Link>
+        </Button>
+      )}
       <Link
         href="/demo/research/results"
         className="text-sm font-medium text-primary"
       >
-        See an example report in the separate demo
+        {copy("See an example report in the separate demo")}
         <ArrowRight className="ml-1 inline size-4" />
       </Link>
     </section>
   );
 }
 export function LiveDashboard() {
+  const copy = useCopy();
   const { data, profile } = useDemo();
   if (!data) return null;
   return (
     <>
       <PageHeader
-        title="A little clarity. A lot of possibility."
-        description={`Welcome back, ${profile.name}. Your research workspace is ready.`}
+        title={copy("A little clarity. A lot of possibility.")}
+        description={copy(
+          "Welcome back, {name}. Your research workspace is ready.",
+          { name: profile.name },
+        )}
       >
         <Button asChild>
           <Link href="/research/new">
             <Plus />
-            New research
+            {copy("New research")}
           </Link>
         </Button>
       </PageHeader>
       <section
-        aria-label="Workspace statistics"
+        aria-label={copy("Workspace statistics")}
         className="grid grid-cols-2 gap-4 xl:grid-cols-4"
       >
         {[
@@ -68,29 +87,43 @@ export function LiveDashboard() {
           ["Saved opportunities", data.saved.length],
         ].map(([label, value]) => (
           <div key={label} className="surface flex flex-col gap-4 p-5">
-            <p className="text-sm text-muted-foreground">{label}</p>
+            <p className="text-sm text-muted-foreground">
+              {copy(String(label))}
+            </p>
             <p className="stat-value">{value}</p>
           </div>
         ))}
       </section>
       {data.projects.length === 0 ? (
         <WorkspaceEmpty
-          title="Start with a question worth exploring."
-          description="创建第一份研究简报。获授权的开发账号可启动 Qwen 与真实外部检索；研究配置、证据及报告私有保存，绝不添加演示结果。"
+          title={copy("Start with a question worth exploring.")}
+          description={copy(
+            "创建第一份研究简报。获授权的开发账号可启动 Qwen 与真实外部检索；研究配置、证据及报告私有保存，绝不添加演示结果。",
+          )}
         />
       ) : (
         <section className="surface flex flex-col gap-5 p-6">
-          <SectionTitle title="Your latest research" href="/research" />
+          <SectionTitle title={copy("Your latest research")} href="/research" />
           <h2 className="font-semibold">{data.projects[0].name}</h2>
           <p className="text-muted-foreground">
-            {data.projects[0].sector} · {data.projects[0].geography}
+            {copy(data.projects[0].sector)} · {copy(data.projects[0].geography)}
           </p>
           <p className="text-sm text-muted-foreground">
-            {data.runs[0] ? `任务状态：${data.runs[0].status === "failed" ? "研究中止" : stageLabels[data.runs[0].stage] ?? data.runs[0].status}` : "简报已保存，可创建新的研究任务。"}
+            {data.runs[0]
+              ? copy("Task status: {status}", {
+                  status: copy(
+                    data.runs[0].status === "failed"
+                      ? "研究中止"
+                      : (stageLabels[data.runs[0].stage] ?? "等待处理"),
+                  ),
+                })
+              : copy("简报已保存，可创建新的研究任务。")}
           </p>
           <Button variant="outline" asChild className="w-fit">
-            <Link href={data.runs[0] ? `/research/${data.runs[0].id}` : "/research"}>
-              查看研究任务
+            <Link
+              href={data.runs[0] ? `/research/${data.runs[0].id}` : "/research"}
+            >
+              {copy("查看研究任务")}
               <ArrowRight />
             </Link>
           </Button>
@@ -98,7 +131,10 @@ export function LiveDashboard() {
       )}
       {data.opportunities.length > 0 && (
         <section className="flex flex-col gap-5">
-          <SectionTitle title="Your opportunities" href="/research/results" />
+          <SectionTitle
+            title={copy("Your opportunities")}
+            href="/research/results"
+          />
           <div className="grid gap-5 md:grid-cols-2">
             {data.opportunities.slice(0, 2).map((opportunity) => (
               <OpportunityCard key={opportunity.id} opportunity={opportunity} />
@@ -107,9 +143,9 @@ export function LiveDashboard() {
         </section>
       )}
       <p className="text-sm text-muted-foreground">
-        Only records owned by your account appear here.{" "}
+        {copy("Only records owned by your account appear here.")}{" "}
         <Link href="/profile" className="font-medium text-primary">
-          Update founder profile
+          {copy("Update founder profile")}
         </Link>
       </p>
     </>
@@ -120,6 +156,7 @@ export function LiveResearchResults({
 }: {
   savedOnly?: boolean;
 }) {
+  const copy = useCopy();
   const { data, saved } = useDemo();
   const [query, setQuery] = useState("");
   const list = (data?.opportunities ?? []).filter(
@@ -132,17 +169,21 @@ export function LiveResearchResults({
   return (
     <>
       <PageHeader
-        title={savedOnly ? "Saved opportunities" : "Your research results"}
+        title={
+          savedOnly
+            ? copy("Saved opportunities")
+            : copy("Your research results")
+        }
         description={
           savedOnly
-            ? "Your private shortlist, synced to your account."
-            : "Only completed research from your account appears here."
+            ? copy("Your private shortlist, synced to your account.")
+            : copy("Only completed research from your account appears here.")
         }
       />
       <Input
         type="search"
-        aria-label="Search opportunities"
-        placeholder="Search by idea, buyer, or industry"
+        aria-label={copy("Search opportunities")}
+        placeholder={copy("Search by idea, buyer, or industry")}
         value={query}
         onChange={(event) => setQuery(event.target.value)}
       />
@@ -154,19 +195,32 @@ export function LiveResearchResults({
         </div>
       ) : (
         <WorkspaceEmpty
+          actionHref={savedOnly ? "/research/results" : "/research"}
+          actionLabel={
+            query
+              ? "Clear search"
+              : savedOnly
+                ? "Browse research results"
+                : "Open research history"
+          }
+          onAction={query ? () => setQuery("") : undefined}
           title={
             query
-              ? "No matching opportunities"
+              ? copy("No matching opportunities")
               : savedOnly
-                ? "Your shortlist starts here."
-                : "No research results yet."
+                ? copy("Your shortlist starts here.")
+                : copy("No research results yet.")
           }
           description={
             query
-              ? "Try another search term."
+              ? copy("Try another search term.")
               : savedOnly
-                ? "Save an opportunity from your completed research to add it here. Demonstration opportunities remain in the demo and are never copied into your account."
-                : "尚无通过证据核验的报告。可从研究历史查看任务进度或失败原因；检索不可用或证据不足时不会生成虚构结果。"
+                ? copy(
+                    "Save an opportunity from your completed research to add it here. Demonstration opportunities remain in the demo and are never copied into your account.",
+                  )
+                : copy(
+                    "尚无通过证据核验的报告。可从研究历史查看任务进度或失败原因；检索不可用或证据不足时不会生成虚构结果。",
+                  )
           }
         />
       )}
@@ -178,6 +232,7 @@ export function LiveOpportunityDetail({
 }: {
   opportunity: WorkspaceOpportunity;
 }) {
+  const copy = useCopy();
   const { saved, toggleSave, completed, toggleTask, busy } = useDemo();
   const tasks = [
     "Write down the riskiest assumption",
@@ -195,11 +250,15 @@ export function LiveOpportunityDetail({
           onClick={() => toggleSave(item.id)}
         >
           <Bookmark />
-          {saved.includes(item.id) ? "Saved opportunity" : "Save opportunity"}
+          {saved.includes(item.id)
+            ? copy("Saved opportunity")
+            : copy("Save opportunity")}
         </Button>
       </PageHeader>
       <section className="surface flex flex-col gap-5 p-6">
-        <h2 className="text-xl font-semibold">Opportunity overview</h2>
+        <h2 className="text-xl font-semibold">
+          {copy("Opportunity overview")}
+        </h2>
         <dl className="flex flex-col gap-4">
           {[
             ["Buyer", item.buyer],
@@ -210,7 +269,9 @@ export function LiveOpportunityDetail({
             ["Assessment score", `${item.score}/100`],
           ].map(([label, value]) => (
             <div key={label}>
-              <dt className="text-sm text-muted-foreground">{label}</dt>
+              <dt className="text-sm text-muted-foreground">
+                {copy(String(label))}
+              </dt>
               <dd className="mt-1 leading-relaxed">{value}</dd>
             </div>
           ))}
@@ -218,10 +279,13 @@ export function LiveOpportunityDetail({
       </section>
       <OpportunityEvidence opportunity={item} />
       <section className="surface flex flex-col gap-4 p-6">
-        <h2 className="text-xl font-semibold">Your first validation sprint</h2>
+        <h2 className="text-xl font-semibold">
+          {copy("Your first validation sprint")}
+        </h2>
         <p className="text-sm text-muted-foreground">
-          Checklist progress is saved with this opportunity. No messages or
-          meeting invitations are sent.
+          {copy(
+            "Checklist progress is saved with this opportunity. No messages or meeting invitations are sent.",
+          )}
         </p>
         {tasks.map((task, index) => (
           <label key={task} className="flex items-center gap-3 border-t py-4">
@@ -232,7 +296,7 @@ export function LiveOpportunityDetail({
               checked={completed.includes(`${item.id}-${index}`)}
               onChange={() => toggleTask(`${item.id}-${index}`)}
             />
-            {task}
+            {copy(task)}
           </label>
         ))}
       </section>
