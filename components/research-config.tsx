@@ -13,10 +13,17 @@ import { useDemo } from "@/components/demo-provider";
 import { PageHeader, DemoNote } from "@/components/shared";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Field, FieldLabel, FieldGroup } from "@/components/ui/field";
+import {
+  Field,
+  FieldLabel,
+  FieldGroup,
+  FieldDescription,
+  FieldError,
+} from "@/components/ui/field";
 export function ResearchConfig() {
   const { run, setRun, profile } = useDemo();
   const [draft, setDraft] = useState(run);
+  const [nameError, setNameError] = useState("");
   const router = useRouter();
   return (
     <>
@@ -29,7 +36,7 @@ export function ResearchConfig() {
       </Link>
       <PageHeader
         title="What would you like to explore?"
-        description="Give your research a little direction. We’ll help connect the dots."
+        description="Configure a research brief and preview a clearly labeled demonstration report."
       />
       <div className="grid gap-6 xl:grid-cols-[1.6fr_1fr]">
         <section className="surface p-6 md:p-8">
@@ -37,21 +44,45 @@ export function ResearchConfig() {
             className="flex flex-col gap-7"
             onSubmit={(e) => {
               e.preventDefault();
-              setRun(draft);
+              if (!draft.name.trim()) {
+                setNameError(
+                  "Enter a research name, such as Agency workflow research.",
+                );
+                document.getElementById("research-name")?.focus();
+                return;
+              }
+              setRun({ ...draft, name: draft.name.trim() });
               router.push("/research/results?demo=1");
             }}
           >
             <h2 className="text-lg font-semibold">Set your research focus</h2>
             <FieldGroup>
-              <Field>
-                <FieldLabel htmlFor="research-name">Research name</FieldLabel>
+              <Field data-invalid={!!nameError}>
+                <FieldLabel htmlFor="research-name">
+                  Research name (required)
+                </FieldLabel>
                 <Input
                   id="research-name"
                   value={draft.name}
                   maxLength={100}
                   required
-                  onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+                  aria-invalid={!!nameError}
+                  aria-describedby={
+                    nameError ? "research-name-error" : "research-name-help"
+                  }
+                  onChange={(e) => {
+                    setDraft({ ...draft, name: e.target.value });
+                    setNameError("");
+                  }}
                 />
+                {nameError ? (
+                  <FieldError id="research-name-error">{nameError}</FieldError>
+                ) : (
+                  <FieldDescription id="research-name-help">
+                    Use a descriptive name so you can find this brief later. Up
+                    to 100 characters.
+                  </FieldDescription>
+                )}
               </Field>
               <Field>
                 <FieldLabel htmlFor="sector">Industry or market</FieldLabel>
@@ -121,15 +152,16 @@ export function ResearchConfig() {
                 </FieldLabel>
                 <textarea
                   id="context"
+                  aria-describedby="context-help"
                   maxLength={1000}
                   className="field-select min-h-24"
                   placeholder="A buyer group, a problem you’ve noticed, or a niche you know well…"
                 />
-                <p className="text-sm text-muted-foreground">
-                  Demo note: configuration is shown in your research brief.
-                  Results use the same synthetic fixture, not tailored AI
-                  output.
-                </p>
+                <FieldDescription id="context-help">
+                  Up to 1,000 characters. This demo does not save or process
+                  these notes. Configuration appears in the brief, but results
+                  remain the same synthetic examples.
+                </FieldDescription>
               </Field>
             </FieldGroup>
             <div className="flex flex-wrap items-center justify-between gap-4 border-t pt-5">
@@ -147,8 +179,12 @@ export function ResearchConfig() {
           <section className="surface flex flex-col gap-4 p-6">
             <div className="flex items-center gap-2">
               <UserRound className="size-5 text-primary" />
-              <h2 className="font-semibold">Built around your profile</h2>
+              <h2 className="font-semibold">Your founder context</h2>
             </div>
+            <p className="text-sm text-muted-foreground">
+              Reference your experience while exploring. Profile changes do not
+              personalize demo results.
+            </p>
             <dl className="flex flex-col gap-4">
               {[
                 ["Experience", profile.industry],

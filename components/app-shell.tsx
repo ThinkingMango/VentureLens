@@ -85,7 +85,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               href={n.href}
               onClick={() => setOpen(false)}
               aria-current={path === n.href ? "page" : undefined}
-              className={cn("nav-link", path === n.href && "active")}
+              className={cn(
+                "nav-link",
+                (path === n.href ||
+                  (n.href === "/research" &&
+                    (path.startsWith("/research/") ||
+                      path.startsWith("/opportunities/")))) &&
+                  "active",
+              )}
             >
               <n.icon className="size-[18px]" />
               {n.title}
@@ -183,11 +190,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </Dialog>
       <div className="lg:pl-64">
         <header className="flex h-[72px] items-center justify-between gap-3 border-b bg-card px-5 md:px-8">
-          <div className="flex items-center gap-3">
+          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             <Button
               variant="ghost"
               size="icon"
-              className="lg:hidden"
+              className="shrink-0 lg:hidden"
               onClick={() => setOpen(true)}
               aria-label="Open navigation"
             >
@@ -197,19 +204,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               Workspace
             </span>
             <span className="hidden text-muted-foreground sm:inline">/</span>
-            <span className="font-medium">{title}</span>
+            <span className="truncate font-medium">{title}</span>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex shrink-0 items-center gap-1 sm:gap-3">
             <Badge
               variant="secondary"
               className="gap-1.5 rounded-md font-normal"
             >
               <FlaskConical className="size-3.5" />
-              Demo mode
+              <span>
+                Demo<span className="hidden sm:inline"> mode</span>
+              </span>
             </Badge>
             <button
               aria-label="Notifications"
-              className="text-muted-foreground"
+              className="flex size-11 items-center justify-center rounded-md text-muted-foreground hover:bg-secondary"
               onClick={() => setHelp(true)}
             >
               <Bell className="size-[18px]" />
@@ -221,7 +230,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </header>
         <main
           id="main-content"
-          className="mx-auto flex max-w-[1600px] flex-col gap-8 p-5 md:p-8 xl:p-10"
+          className="mx-auto flex min-w-0 max-w-[1600px] flex-col gap-6 p-5 md:gap-8 md:p-8 xl:p-10"
         >
           {children}
           <footer className="flex flex-wrap items-center justify-between gap-2 border-t pt-5 text-sm text-muted-foreground">

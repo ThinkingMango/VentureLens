@@ -5,22 +5,18 @@ import {
   ArrowLeft,
   ArrowRight,
   Bookmark,
-  Users,
-  Target,
-  TriangleAlert,
   FileText,
-  MessageSquare,
   ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";
-import { type Opportunity, scoreLabels, sources } from "@/lib/demo-data";
-import { useDemo } from "@/components/demo-provider";
 import {
-  DemoNote,
-  Confidence,
-  SectionTitle,
-  opportunityIcons,
-} from "@/components/shared";
+  type Opportunity,
+  type DemoSource,
+  scoreLabels,
+  researchReports,
+} from "@/lib/demo-data";
+import { useDemo } from "@/components/demo-provider";
+import { DemoNote, Confidence, SectionTitle } from "@/components/shared";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -31,6 +27,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+
 const tabs = ["Overview", "Evidence", "Economics", "Validation"] as const;
 export function OpportunityDetail({
   opportunity: o,
@@ -44,8 +41,8 @@ export function OpportunityDetail({
       "Overview",
   );
   const { saved, toggleSave, completed, toggleTask } = useDemo();
-  const [source, setSource] = useState<(typeof sources)[number] | null>(null);
-  const Icon = opportunityIcons[o.icon];
+  const [source, setSource] = useState<DemoSource | null>(null);
+  const report = researchReports[o.id];
   const tasks = [
     {
       title: "Write down your riskiest assumption",
@@ -59,216 +56,259 @@ export function OpportunityDetail({
       title: "Run problem-discovery conversations",
       text: "Ask about the last time this happened, their existing workaround, and what it costs them. Avoid pitching.",
     },
-    {
-      title: "Test a small, paid manual pilot",
-      text: "Offer a clearly scoped concierge version. Test willingness to pay before automating the work.",
-    },
+    { title: "Test a small, paid manual pilot", text: report.firstTest },
   ];
+  const taskCount = tasks.filter((_, i) =>
+    completed.includes(`${o.id}-${i}`),
+  ).length;
   return (
     <>
       <Link
         href="/research/results"
-        className="flex w-fit items-center gap-2 text-muted-foreground hover:text-primary"
+        className="flex w-fit items-center gap-2 text-sm text-muted-foreground hover:text-primary"
       >
         <ArrowLeft className="size-4" />
         Research results
       </Link>
-      <div className="flex flex-col items-start justify-between gap-5 sm:flex-row">
-        <div className="flex items-start gap-4">
-          <span className="flex size-12 shrink-0 items-center justify-center rounded-xl border bg-card text-primary">
-            <Icon className="size-6" />
-          </span>
-          <div className="flex flex-col gap-2">
+      <header className="flex flex-col gap-5">
+        <div className="flex flex-col items-start justify-between gap-4 xl:flex-row">
+          <div className="flex max-w-3xl flex-col gap-3">
+            <h1 className="page-heading text-balance">{o.title}</h1>
+            <p className="text-base leading-relaxed text-muted-foreground">
+              {o.description}
+            </p>
             <p className="text-sm text-muted-foreground">
               {o.category} · Opportunity hypothesis
             </p>
-            <h1 className="page-heading">{o.title}</h1>
-            <p className="max-w-2xl text-muted-foreground">{o.description}</p>
           </div>
+          <Button
+            variant="outline"
+            className="shrink-0"
+            onClick={() => toggleSave(o.id)}
+            aria-pressed={saved.includes(o.id)}
+          >
+            <Bookmark
+              className={
+                saved.includes(o.id) ? "fill-primary/15 text-primary" : ""
+              }
+            />
+            {saved.includes(o.id) ? "Saved opportunity" : "Save opportunity"}
+          </Button>
         </div>
-        <Button
-          variant="outline"
-          onClick={() => toggleSave(o.id)}
-          aria-pressed={saved.includes(o.id)}
-        >
-          <Bookmark
-            className={
-              saved.includes(o.id) ? "fill-primary/15 text-primary" : ""
-            }
-          />
-          {saved.includes(o.id) ? "Saved" : "Save opportunity"}
-        </Button>
-      </div>
-      <DemoNote className="rounded-lg border border-primary/15 bg-secondary p-4" />
-      <nav
+        <div className="border-y py-4">
+          <DemoNote />
+        </div>
+        <dl className="grid grid-cols-2 gap-4 sm:grid-cols-[1.4fr_1fr_1fr]">
+          <div className="col-span-2 flex flex-col gap-1 sm:col-span-1">
+            <dt className="text-sm text-muted-foreground">Likely buyer</dt>
+            <dd className="font-medium">{o.buyer}</dd>
+          </div>
+          <div className="flex flex-col gap-1">
+            <dt className="text-sm text-muted-foreground">
+              Price hypothesis / month
+            </dt>
+            <dd className="font-semibold tabular-nums">
+              {o.revenue}{" "}
+              <span className="text-sm font-normal text-muted-foreground">
+                USD / customer
+              </span>
+            </dd>
+          </div>
+          <div className="flex flex-col gap-1">
+            <dt className="text-sm text-muted-foreground">Demo assessment</dt>
+            <dd className="font-semibold tabular-nums">
+              {o.score}/100{" "}
+              <span className="text-sm font-normal text-muted-foreground">
+                · {o.confidence} confidence
+              </span>
+            </dd>
+          </div>
+        </dl>
+      </header>
+      <div
+        role="tablist"
         aria-label="Opportunity sections"
-        className="flex gap-6 overflow-x-auto border-b"
+        className="flex overflow-x-auto border-b"
       >
         {tabs.map((t) => (
           <button
             key={t}
+            id={`tab-${t}`}
+            role="tab"
+            aria-selected={tab === t}
+            aria-controls="report-panel"
+            tabIndex={tab === t ? 0 : -1}
             onClick={() => setTab(t)}
-            aria-pressed={tab === t}
+            onKeyDown={(event) => {
+              let index = tabs.indexOf(t);
+              if (event.key === "ArrowRight") index = (index + 1) % tabs.length;
+              else if (event.key === "ArrowLeft")
+                index = (index + tabs.length - 1) % tabs.length;
+              else if (event.key === "Home") index = 0;
+              else if (event.key === "End") index = tabs.length - 1;
+              else return;
+              event.preventDefault();
+              setTab(tabs[index]);
+              document.getElementById(`tab-${tabs[index]}`)?.focus();
+            }}
             className={cn(
-              "shrink-0 border-b-2 border-transparent pb-4 font-medium text-muted-foreground",
+              "min-h-12 flex-1 shrink-0 border-b-2 border-transparent px-0 py-3 text-sm font-medium text-muted-foreground hover:text-foreground sm:flex-none sm:px-5",
               tab === t && "border-primary text-primary",
             )}
           >
             {t}
           </button>
         ))}
-      </nav>
-      <div className="grid gap-6 xl:grid-cols-[1.7fr_1fr]">
-        <div className="flex min-w-0 flex-col gap-6">
+      </div>
+      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_300px]">
+        <div
+          id="report-panel"
+          role="tabpanel"
+          aria-labelledby={`tab-${tab}`}
+          tabIndex={0}
+          className="surface min-w-0 overflow-hidden"
+        >
           {tab === "Overview" && (
             <>
-              <section className="surface flex flex-col gap-6 p-6">
-                <div className="flex items-center gap-2">
-                  <Target className="size-5 text-primary" />
-                  <h2 className="text-lg font-semibold">
-                    The problem worth solving
-                  </h2>
-                </div>
-                <p className="text-base leading-relaxed">{o.pain}</p>
-                <div className="border-t pt-5">
+              <section className="report-section">
+                <h2 className="text-xl font-semibold">
+                  The problem worth solving
+                </h2>
+                <p className="max-w-prose text-lg leading-relaxed">{o.pain}</p>
+                <div className="flex flex-col gap-3 border-t pt-5">
                   <h3 className="font-semibold">The GenAI-enabled approach</h3>
-                  <p className="mt-2 text-muted-foreground">
-                    Combine relevant business context with guided drafting and
-                    synthesis. Start with a narrow workflow, keep a human in
-                    control of final decisions, and make the outcome easier to
-                    review than a blank chatbot response.
+                  <p className="max-w-prose leading-relaxed text-muted-foreground">
+                    {report.approach}
                   </p>
                 </div>
               </section>
-              <section className="surface flex flex-col gap-5 p-6">
-                <div className="flex items-center gap-2">
-                  <Users className="size-5 text-primary" />
-                  <h2 className="text-lg font-semibold">
-                    Meet the likely buyer
-                  </h2>
-                </div>
-                <h3 className="text-xl font-semibold">{o.buyer}</h3>
-                <dl className="grid gap-5 sm:grid-cols-2">
+              <section className="report-section">
+                <h2 className="text-xl font-semibold">
+                  Buyer and buying context
+                </h2>
+                <p className="font-medium">{o.buyer}</p>
+                <dl className="grid gap-6 sm:grid-cols-2">
                   {[
-                    [
-                      "Job to be done",
-                      "Deliver high-quality work without adding headcount.",
-                    ],
-                    [
-                      "Current alternative",
-                      "Manual work, templates, and disconnected general-purpose tools.",
-                    ],
-                    [
-                      "Potential buying trigger",
-                      "Growing workload, a missed deadline, or a team capacity constraint.",
-                    ],
+                    ["Job to be done", report.buyerJob],
+                    ["Current alternative", report.alternative],
+                    ["Potential buying trigger", report.trigger],
                     [
                       "Where to start",
                       "Warm introductions and niche professional communities.",
                     ],
                   ].map(([k, v]) => (
-                    <div key={k}>
+                    <div key={k} className="flex flex-col gap-2">
                       <dt className="text-sm font-medium">{k}</dt>
-                      <dd className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                      <dd className="text-sm leading-relaxed text-muted-foreground">
                         {v}
                       </dd>
                     </div>
                   ))}
                 </dl>
                 <p className="text-sm text-muted-foreground">
-                  Buyer characteristics are illustrative hypotheses to test, not
-                  interview findings.
+                  Illustrative buyer hypotheses, not interview findings.
                 </p>
               </section>
-              <section className="surface p-6">
-                <div className="mb-3 flex items-center gap-2">
-                  <TriangleAlert className="size-5 text-muted-foreground" />
-                  <h2 className="text-lg font-semibold">
-                    What could make this difficult
-                  </h2>
-                </div>
-                <p className="leading-relaxed text-muted-foreground">
-                  {o.risk}
-                </p>
+              <section className="report-section">
+                <h2 className="text-xl font-semibold">Key risk to validate</h2>
+                <p className="max-w-prose leading-relaxed">{o.risk}</p>
                 <Button
                   variant="link"
-                  className="mt-4 h-auto p-0"
+                  className="h-auto justify-start whitespace-normal p-0 text-left"
                   onClick={() => setTab("Validation")}
                 >
                   Turn assumptions into a validation plan
-                  <ArrowRight />
+                  <ArrowRight data-icon="inline-end" />
                 </Button>
               </section>
             </>
           )}
           {tab === "Evidence" && (
-            <section className="surface flex flex-col gap-6 p-6">
-              <SectionTitle
-                title="Look beneath the score"
-                description="Example evidence structure—not genuine market research."
-              />
-              <p className="text-muted-foreground">
-                These fabricated source records show how future research could
-                be organized. There are no verified external citations, live
-                source links, or genuine interview participants in this
-                demonstration.
-              </p>
-              {sources.map((s, i) => (
-                <button
-                  key={s.title}
-                  className="flex items-start gap-4 rounded-lg border p-4 text-left hover:border-primary/40"
-                  onClick={() => setSource(s)}
-                >
-                  <FileText className="mt-1 size-5 shrink-0 text-primary" />
-                  <div className="flex flex-1 flex-col gap-1">
+            <>
+              <section className="report-section">
+                <SectionTitle
+                  title="Evidence and limitations"
+                  description="Three synthetic source records · No verified citations"
+                />
+                <p className="max-w-prose text-muted-foreground">
+                  These invented records demonstrate how a research report
+                  separates observations, interpretations, and remaining
+                  uncertainty. No interviews or external research were
+                  conducted.
+                </p>
+              </section>
+              {report.sources.map((s) => (
+                <section key={s.title} className="report-section">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="outline">{s.type}</Badge>
                     <span className="text-sm text-muted-foreground">
-                      Sample source {i + 1} · {s.type}
-                    </span>
-                    <span className="font-medium">{s.title}</span>
-                    <span className="text-sm text-muted-foreground">
-                      {s.detail}
-                    </span>
-                    <span className="mt-2 text-sm font-medium text-primary">
                       Synthetic · Not verified
                     </span>
                   </div>
-                  <ChevronRight className="mt-1 size-4 shrink-0 text-muted-foreground" />
-                </button>
+                  <h3 className="text-lg font-semibold">{s.title}</h3>
+                  <p className="text-sm text-muted-foreground">{s.detail}</p>
+                  <dl className="flex flex-col gap-4">
+                    <div className="flex flex-col gap-1">
+                      <dt className="text-sm font-medium">
+                        Example observation
+                      </dt>
+                      <dd className="leading-relaxed">{s.observation}</dd>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <dt className="text-sm font-medium">
+                        Working interpretation
+                      </dt>
+                      <dd className="text-sm leading-relaxed text-muted-foreground">
+                        {s.implication}
+                      </dd>
+                    </div>
+                  </dl>
+                  <Button
+                    variant="link"
+                    className="h-auto justify-start p-0"
+                    onClick={() => setSource(s)}
+                  >
+                    <FileText data-icon="inline-start" />
+                    Review source limitations
+                    <ChevronRight data-icon="inline-end" />
+                  </Button>
+                </section>
               ))}
-              <div className="rounded-lg bg-background p-4">
-                <h3 className="font-medium">What real evidence would need</h3>
-                <p className="mt-2 text-sm text-muted-foreground">
+              <section className="report-section">
+                <h3 className="font-semibold">What real evidence would need</h3>
+                <p className="text-sm text-muted-foreground">
                   A traceable source URL or interview record, collection date,
                   methodology, relevant quotation, and a clear separation
                   between observation and inference.
                 </p>
-              </div>
-            </section>
+              </section>
+            </>
           )}
           {tab === "Economics" && (
-            <section className="surface flex flex-col gap-6 p-6">
+            <section className="report-section">
               <SectionTitle
                 title="A scenario, not a forecast"
                 description="Illustrative monthly unit economics · USD"
               />
-              <p className="text-muted-foreground">
-                Use this to reason about a possible business model. These
-                amounts are assumptions, not market-tested prices or revenue
-                promises.
+              <p className="max-w-prose text-muted-foreground">
+                These amounts are assumptions, not market-tested prices. Compare
+                the cost of delivering an outcome with what a buyer might pay.
               </p>
-              <dl className="flex flex-col gap-0">
+              <dl className="flex flex-col">
                 {[
-                  ["Assumed monthly price / customer", o.revenue],
-                  ["Assumed monthly delivery cost / customer", o.cost],
+                  ["Price / customer / month", o.revenue],
+                  ["Delivery cost / customer / month", o.cost],
                   ["Example paying customers", "20"],
                   ["Setup, acquisition, and founder time", "Not included"],
                 ].map(([k, v]) => (
                   <div
                     key={k}
-                    className="flex justify-between gap-6 border-b py-4"
+                    className="flex flex-col justify-between gap-2 border-b py-4 sm:flex-row sm:gap-6"
                   >
-                    <dt className="text-muted-foreground">{k}</dt>
-                    <dd className="shrink-0 text-right font-medium">{v}</dd>
+                    <dt className="text-sm text-muted-foreground">{k}</dt>
+                    <dd className="shrink-0 font-semibold tabular-nums sm:text-right">
+                      {v}
+                    </dd>
                   </div>
                 ))}
               </dl>
@@ -290,55 +330,59 @@ export function OpportunityDetail({
               <Button variant="outline" asChild>
                 <Link href="/research/results">
                   Compare opportunity scenarios
-                  <ArrowRight />
+                  <ArrowRight data-icon="inline-end" />
                 </Link>
               </Button>
             </section>
           )}
           {tab === "Validation" && (
-            <section className="surface flex flex-col gap-6 p-6">
+            <section className="report-section">
               <SectionTitle
-                title="Build conviction, one conversation at a time"
-                description="Your first validation sprint · Demo checklist"
+                title="Your first validation sprint"
+                description="Test the problem before building the product."
               />
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">
-                  {
-                    tasks.filter((_, i) => completed.includes(`${o.id}-${i}`))
-                      .length
-                  }{" "}
-                  of {tasks.length} steps complete
-                </span>
-                <Badge variant="secondary">Resets on refresh</Badge>
+              <p className="text-sm text-muted-foreground">
+                Demo checklist · Changes reset on refresh. No interviews are
+                scheduled or messages sent.
+              </p>
+              <div className="flex flex-col gap-3">
+                <p className="text-sm text-muted-foreground" aria-live="polite">
+                  {taskCount} of {tasks.length} steps complete
+                </p>
+                <progress
+                  className="h-2 w-full accent-primary"
+                  value={taskCount}
+                  max={tasks.length}
+                  aria-label="Validation steps complete"
+                />
               </div>
-              {tasks.map((t, i) => (
-                <label
-                  key={t.title}
-                  className="flex cursor-pointer items-start gap-4 rounded-lg border p-4"
-                >
-                  <input
-                    type="checkbox"
-                    checked={completed.includes(`${o.id}-${i}`)}
-                    onChange={() => toggleTask(`${o.id}-${i}`)}
-                    className="mt-1 size-4 shrink-0 accent-primary"
-                  />
-                  <span>
-                    <span className="font-medium">{t.title}</span>
-                    <span className="mt-2 block text-sm leading-relaxed text-muted-foreground">
-                      {t.text}
+              <div className="flex flex-col">
+                {tasks.map((t, i) => (
+                  <label
+                    key={t.title}
+                    className="flex cursor-pointer items-start gap-4 border-b py-5 last:border-0"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={completed.includes(`${o.id}-${i}`)}
+                      onChange={() => toggleTask(`${o.id}-${i}`)}
+                      className="mt-1 size-5 shrink-0"
+                    />
+                    <span className="flex flex-col gap-2">
+                      <span className="font-medium">{t.title}</span>
+                      <span className="text-sm leading-relaxed text-muted-foreground">
+                        {t.text}
+                      </span>
                     </span>
-                  </span>
-                </label>
-              ))}
-              <div className="rounded-lg bg-secondary p-5">
-                <h3 className="flex items-center gap-2 font-semibold">
-                  <MessageSquare className="size-4 text-primary" />A better
-                  first question
-                </h3>
-                <p className="mt-3 text-muted-foreground">
+                  </label>
+                ))}
+              </div>
+              <div className="flex flex-col gap-3 border-t pt-5">
+                <h3 className="font-semibold">A better first question</h3>
+                <blockquote className="max-w-prose text-base leading-relaxed">
                   “Walk me through the last time you dealt with this. What did
                   you do, and what happened next?”
-                </p>
+                </blockquote>
               </div>
               <Button
                 variant="outline"
@@ -350,34 +394,40 @@ export function OpportunityDetail({
                 }
               >
                 About scheduling interviews
-                <ArrowUpRightIcon />
+                <ChevronRight data-icon="inline-end" />
               </Button>
             </section>
           )}
         </div>
-        <aside className="flex flex-col gap-6">
-          <section className="surface flex flex-col gap-5 p-6">
-            <div className="flex items-start justify-between">
-              <h2 className="font-semibold">Opportunity score</h2>
+        <aside className="flex min-w-0 flex-col gap-5 xl:sticky xl:top-6">
+          <section
+            className="surface flex flex-col gap-5 p-6"
+            aria-labelledby="score-title"
+          >
+            <div className="flex items-center justify-between gap-3">
+              <h2 id="score-title" className="font-semibold">
+                Score breakdown
+              </h2>
               <Badge variant="outline">Demo</Badge>
             </div>
             <div className="flex items-baseline gap-2">
-              <span className="text-5xl font-semibold tracking-tight text-primary">
+              <span className="text-4xl font-semibold tabular-nums tracking-tight">
                 {o.score}
               </span>
-              <span className="text-muted-foreground">/ 100</span>
+              <span className="text-sm text-muted-foreground">/ 100</span>
             </div>
             <Confidence level={o.confidence} />
-            <div className="flex flex-col gap-4 border-t pt-5">
+            <dl className="flex flex-col gap-4 border-t pt-5">
               {scoreLabels.map((s, i) => (
-                <div className="flex flex-col gap-2" key={s}>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">{s}</span>
-                    <span className="font-medium tabular-nums">
+                <div key={s} className="flex flex-col gap-2">
+                  <div className="flex justify-between gap-3 text-sm">
+                    <dt className="text-muted-foreground">{s}</dt>
+                    <dd className="font-medium tabular-nums">
                       {o.scores[i]}
-                    </span>
+                      <span className="sr-only"> out of 100</span>
+                    </dd>
                   </div>
-                  <div className="progress-track">
+                  <div className="progress-track" aria-hidden="true">
                     <div
                       className="progress-fill"
                       style={{ width: `${o.scores[i]}%` }}
@@ -385,52 +435,51 @@ export function OpportunityDetail({
                   </div>
                 </div>
               ))}
-            </div>
+            </dl>
             <p className="text-sm text-muted-foreground">
-              Illustrative composite assessment. Not a probability of success,
-              verified rating, or investment recommendation.
+              Illustrative composite assessment, not a probability of success or
+              an investment recommendation. Confidence is relative within this
+              demo.
             </p>
           </section>
-          <section className="flex flex-col gap-4 rounded-xl border border-primary/15 bg-secondary p-6">
-            <Target className="size-6 text-primary" />
-            <h2 className="text-lg font-semibold">
-              The next step isn’t building.
-            </h2>
+          <section className="flex flex-col gap-3 px-1">
+            <h2 className="font-semibold">What to test first</h2>
             <p className="text-sm leading-relaxed text-muted-foreground">
-              It’s finding out whether this problem matters enough to the people
-              who experience it.
+              {report.firstTest}
             </p>
             <Button
+              variant="outline"
               onClick={() => {
                 setTab("Validation");
-                window.scrollTo({ top: 0, behavior: "smooth" });
+                document.getElementById("tab-Validation")?.focus();
+                document
+                  .getElementById("tab-Validation")
+                  ?.scrollIntoView({ block: "start", behavior: "smooth" });
               }}
             >
               Plan your validation
-              <ArrowRight />
+              <ArrowRight data-icon="inline-end" />
             </Button>
           </section>
         </aside>
       </div>
       <Dialog open={!!source} onOpenChange={(v) => !v && setSource(null)}>
-        <DialogContent>
+        <DialogContent className="max-h-[85dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{source?.title}</DialogTitle>
             <DialogDescription>
               Synthetic source record · No verified external source
             </DialogDescription>
           </DialogHeader>
-          <p>{source?.detail}</p>
-          <p className="text-muted-foreground">
-            This is invented content for the interface demonstration. It is not
-            evidence of buyer demand and should not be used to make business or
-            investment decisions.
+          <p className="text-sm text-muted-foreground">{source?.detail}</p>
+          <h3 className="font-semibold">Limitations</h3>
+          <p className="leading-relaxed">{source?.limitation}</p>
+          <p className="text-sm text-muted-foreground">
+            This invented record is not evidence of buyer demand and should not
+            be used for business or investment decisions.
           </p>
         </DialogContent>
       </Dialog>
     </>
   );
-}
-function ArrowUpRightIcon() {
-  return <ChevronRight />;
 }

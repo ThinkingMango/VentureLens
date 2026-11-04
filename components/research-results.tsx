@@ -14,6 +14,7 @@ import { OpportunityCard } from "@/components/opportunity-card";
 import { PageHeader, DemoNote } from "@/components/shared";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Badge } from "@/components/ui/badge";
 import { useDemo } from "@/components/demo-provider";
 import { opportunities, demoNotice } from "@/lib/demo-data";
@@ -73,15 +74,11 @@ export function ResearchResults({
         </Link>
       )}
       <PageHeader
-        title={
-          savedOnly
-            ? "Your shortlist, taking shape."
-            : "Possibilities worth investigating."
-        }
+        title={savedOnly ? "Saved opportunities" : run.name}
         description={
           savedOnly
-            ? "Keep the ideas that resonate. Compare them before you commit."
-            : run.name
+            ? "Review your shortlist and compare the assumptions behind each idea."
+            : "Research results · Compare buyer needs, economics, and validation priorities."
         }
       >
         <Button variant="outline" onClick={download}>
@@ -89,11 +86,9 @@ export function ResearchResults({
           Export demo brief
         </Button>
       </PageHeader>
-      <div className="flex flex-col gap-4 rounded-xl border border-primary/15 bg-secondary p-5">
+      <div className="flex flex-col gap-3 border-y py-4">
         <div className="flex flex-wrap items-center gap-3">
-          <Badge variant="outline" className="border-primary/20 text-primary">
-            Synthetic research
-          </Badge>
+          <Badge variant="secondary">Demonstration report</Badge>
           {!savedOnly && (
             <p className="text-sm text-muted-foreground">
               {run.sector} · {run.model} · {run.geography}
@@ -101,17 +96,49 @@ export function ResearchResults({
           )}
         </div>
         <DemoNote />
-        <p className="text-sm text-muted-foreground">
-          Higher confidence is a relative demo label, not independently verified
-          evidence. Configuration changes do not alter these fixed example
-          results.
-        </p>
+        <details className="text-sm text-muted-foreground">
+          <summary className="w-fit rounded-sm underline-offset-4 hover:text-primary hover:underline">
+            How to interpret this report
+          </summary>
+          <p className="mt-2 max-w-3xl">
+            Scores and confidence labels compare invented scenarios; they do not
+            measure verified demand. These fixed examples do not change with
+            your research configuration. All amounts are monthly USD assumptions
+            per customer, not forecasts.
+          </p>
+        </details>
       </div>
+      {!savedOnly && (
+        <section
+          aria-labelledby="research-summary"
+          className="surface flex flex-col gap-4 p-5 md:p-6"
+        >
+          <h2 id="research-summary" className="text-lg font-semibold">
+            Research summary
+          </h2>
+          <p className="max-w-3xl leading-relaxed">
+            Proposal preparation leads this four-workflow demo. Buyer access,
+            review effort, and willingness to pay remain unvalidated for every
+            opportunity.
+          </p>
+          <div className="flex border-t pt-4">
+            <Button variant="link" asChild className="h-auto justify-start p-0">
+              <Link href="/opportunities/proposal-copilot">
+                Review leading hypothesis
+                <ArrowRight data-icon="inline-end" />
+              </Link>
+            </Button>
+          </div>
+        </section>
+      )}
       <section className="flex flex-col gap-5">
         <div className="flex flex-wrap items-center justify-between gap-4">
-          <h2 className="text-lg font-semibold">
-            {list.length}{" "}
-            {savedOnly ? "saved opportunities" : "opportunity hypotheses"}
+          <h2
+            className="text-lg font-semibold"
+            aria-live="polite"
+            aria-atomic="true"
+          >
+            {`${list.length} ${savedOnly ? "saved opportunities" : "opportunity hypotheses"}`}
           </h2>
           <div
             className="flex rounded-md border bg-card p-1"
@@ -137,60 +164,94 @@ export function ResearchResults({
             </Button>
           </div>
         </div>
-        <div className="flex flex-col gap-3 sm:flex-row">
-          <Input
-            className="min-w-0 flex-1"
-            aria-label="Search opportunities"
-            placeholder="Search by idea, buyer, or industry…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-          <select
-            className="field-select sm:w-52"
-            aria-label="Filter evidence confidence"
-            value={confidence}
-            onChange={(e) => setConfidence(e.target.value)}
-          >
-            {["All confidence levels", "Higher", "Medium", "Lower"].map((v) => (
-              <option key={v}>{v}</option>
-            ))}
-          </select>
-          <select
-            className="field-select sm:w-44"
-            aria-label="Sort opportunities"
-            value={sort}
-            onChange={(e) => setSort(e.target.value)}
-          >
-            <option>Highest score</option>
-            <option>Alphabetical</option>
-          </select>
-        </div>
+        <FieldGroup className="grid grid-cols-2 gap-4 md:flex md:flex-row md:items-end">
+          <Field className="col-span-2 min-w-0 md:flex-1">
+            <FieldLabel htmlFor="opportunity-search">
+              Search opportunities
+            </FieldLabel>
+            <Input
+              id="opportunity-search"
+              type="search"
+              placeholder="Idea, buyer, or industry"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+          </Field>
+          <Field className="md:w-52 md:shrink-0">
+            <FieldLabel htmlFor="confidence-filter">Demo confidence</FieldLabel>
+            <select
+              id="confidence-filter"
+              className="field-select"
+              value={confidence}
+              onChange={(e) => setConfidence(e.target.value)}
+            >
+              {["All confidence levels", "Higher", "Medium", "Lower"].map(
+                (v) => (
+                  <option key={v} value={v}>
+                    {v === "All confidence levels" ? "All levels" : v}
+                  </option>
+                ),
+              )}
+            </select>
+          </Field>
+          <Field className="md:w-44 md:shrink-0">
+            <FieldLabel htmlFor="opportunity-sort">Sort by</FieldLabel>
+            <select
+              id="opportunity-sort"
+              className="field-select"
+              value={sort}
+              onChange={(e) => setSort(e.target.value)}
+            >
+              <option>Highest score</option>
+              <option>Alphabetical</option>
+            </select>
+          </Field>
+        </FieldGroup>
         {list.length === 0 ? (
           <div className="surface flex flex-col items-center gap-4 p-12 text-center">
             <Bookmark className="size-8 text-muted-foreground" />
             <h3 className="text-lg font-semibold">
-              No opportunities here yet.
+              {query || confidence !== "All confidence levels"
+                ? "No matching opportunities"
+                : "No saved opportunities yet"}
             </h3>
             <p className="text-muted-foreground">
               {savedOnly
                 ? "Save an opportunity from your research results to build your shortlist."
                 : "Try a broader search or a different confidence filter."}
             </p>
-            <Button asChild variant="outline">
-              <Link href="/research/results">
-                Explore opportunities
-                <ArrowRight />
-              </Link>
-            </Button>
+            {query || confidence !== "All confidence levels" ? (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setQuery("");
+                  setConfidence("All confidence levels");
+                }}
+              >
+                Clear filters
+              </Button>
+            ) : (
+              <Button asChild variant="outline">
+                <Link href="/research/results">
+                  Explore opportunities
+                  <ArrowRight data-icon="inline-end" />
+                </Link>
+              </Button>
+            )}
           </div>
         ) : view === "cards" ? (
-          <div className="grid gap-5 md:grid-cols-2 2xl:grid-cols-3">
+          <div className="grid gap-5 md:grid-cols-2">
             {list.map((o) => (
               <OpportunityCard key={o.id} opportunity={o} />
             ))}
           </div>
         ) : (
-          <div className="surface overflow-x-auto">
+          <div
+            className="surface overflow-x-auto"
+            tabIndex={0}
+            role="region"
+            aria-label="Opportunity comparison; scroll horizontally to see all columns"
+          >
             <table className="w-full min-w-[780px] text-left">
               <caption className="p-5 text-left text-sm text-muted-foreground">
                 Synthetic comparison · All amounts in USD. Monthly price and
@@ -206,6 +267,7 @@ export function ResearchResults({
                     "Delivery cost / month",
                   ].map((t) => (
                     <th
+                      scope="col"
                       key={t}
                       className="px-5 py-4 text-sm font-medium text-muted-foreground"
                     >

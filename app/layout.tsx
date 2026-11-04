@@ -10,7 +10,7 @@ export const metadata: Metadata = {
     template: "%s · VentureLens AI",
   },
   description:
-    "Explore an evidence-driven approach to finding, comparing, and validating GenAI-enabled business opportunities. Frontend demonstration with synthetic data.",
+    "Compare buyer problems, evidence limitations, business economics, and validation plans for GenAI-enabled opportunities. Explore clearly labeled synthetic demonstration reports.",
 };
 export const viewport: Viewport = {
   themeColor: "#f6f8fb",
