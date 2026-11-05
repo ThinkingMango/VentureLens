@@ -12,6 +12,8 @@ import {
   reportShortlist,
 } from "@/lib/report-presentation";
 import { useCopy, useFormats } from "@/i18n/use-copy";
+import { localeNames } from "@/i18n/config";
+import { reportLanguage } from "@/lib/research-core";
 const dimensions: Record<string, string> = {
   pain: "Buyer pain",
   demand: "Demand",
@@ -81,7 +83,11 @@ export function ResearchReportView({ report }: { report: ResearchReport }) {
           </time>
         </div>
         <p className="text-sm text-muted-foreground">
-          {copy("Report content stays in its original language.")}
+          {copy("Report language: {language}", {
+            language: localeNames[reportLanguage(report.language)],
+          })}
+          {" · "}
+          {copy("Source excerpts are kept in their original language so you can verify them yourself.")}
         </p>
         <details className="border-t pt-4">
           <summary className="rounded-sm text-sm font-medium">
@@ -206,7 +212,7 @@ export function ResearchReportView({ report }: { report: ResearchReport }) {
             <p>{copy("A score is a starting point, not a verdict.")}</p>
             <p>
               {copy(
-                "Saved research stays in its original language. Changing the interface never regenerates or translates reports and original sources.",
+                "Each report is written in the language chosen when the run started. Changing the interface language afterwards does not regenerate or translate a saved report.",
               )}
             </p>
             <p>

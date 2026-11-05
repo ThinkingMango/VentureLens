@@ -275,7 +275,7 @@ test("research dispatches saved models, reasoning controls, usage IDs, and fallb
       "@/lib/provider-settings-core": settingsCore,
       "@/lib/research-models": models,
       "@/lib/workspace-schema": {},
-      "@/lib/research-core": { errorCode, researchErrors: {} },
+      "@/lib/research-core": { errorCode, researchErrors: {}, researchPolicy: researchCore.researchPolicy, reportLanguage: researchCore.reportLanguage },
     }, {}, "\nexport { structured };\n");
     assert.deepEqual(await engine.structured(context, "discovery", z.object({ ok: z.boolean() }), "Research prompt", models.researchModelPricing("qwen3.8-max")), { ok: true });
     const expected = primary === "qwen" ? ["qwen3.8-max", "gemini-4-argon"] : ["gemini-4-argon", "qwen3.8-max"];
@@ -389,16 +389,17 @@ test("full CJK evidence is classified, evaluated, and reviewed in resumable boun
   const fixture = researchFixture({ spent: 0, settings: { primary: "qwen", autoFallback: false, qwenModel: "qwen3.8-flash", geminiModel: "gemini-3.5-flash-lite" }, evidence, checkpoints, generate: async ({ prompt }) => {
     assert.ok(Buffer.byteLength(prompt) < 75000);
     let items;
-    if (prompt.includes("逐条分类")) {
-      const sources = JSON.parse(prompt.split("；来源=")[1]);
+    if (prompt.includes("Classify each piece of external evidence")) {
+      const sources = JSON.parse(prompt.split("; sources=")[1]);
       assert.equal(sources.length, 8);
       items = sources.map(source => ({ source_key: source.source_key, relevant: true, kind: "pain", reliability: "primary", stance: "supports", quote: source.excerpt.slice(0, 100), claim: "真实需求" }));
-    } else if (prompt.includes("只评估")) {
-      const batch = JSON.parse(prompt.split("；候选=")[1].split("；带分类证据=")[0]);
+    } else if (prompt.includes("Evaluate only these")) {
+      const batch = JSON.parse(prompt.split("; candidates=")[1].split("; evidence with classifications=")[0]);
       assert.equal(batch.length, 2);
       items = batch.map(candidate => ({ candidate_id: candidate.key, description: "业务描述", category: "专业服务", revenue: "假设，未验证", cost: "假设，未验证", risk: "需求尚未验证", assumptions: ["尚未验证"], validation: ["访谈买方", "付费试点"], dimensions: { pain: 50, demand: 50, economics: 50, feasibility: 50, advantage: 50 }, rationale: "基于独立来源" }));
     } else {
-      const batch = JSON.parse(prompt.split("评估=")[1].split("；证据分类=")[0]).items;
+      assert.ok(prompt.includes("Independent adversarial review"));
+      const batch = JSON.parse(prompt.split("Evaluations=")[1].split("; evidence classifications=")[0]).items;
       assert.equal(batch.length, 2);
       items = batch.map(item => ({ candidate_id: item.candidate_id, reject: false, critique: "需更多买方证据", penalty: 10, falsification: "付费试点验证" }));
     }

@@ -46,7 +46,7 @@ Apply the migrations in `supabase/migrations/` to your project, then:
 pnpm dev
 ```
 
-> **Known issue:** `20261104000000_venturelens_workspace.sql` and `202611040001_venturelens_workspace.sql` both create the initial schema. Apply only one on a fresh database until the history is reconciled (see `docs/REVIEW.md`, finding B1).
+Migration versions match the live project's history; see [`docs/DATABASE_MIGRATIONS.md`](./docs/DATABASE_MIGRATIONS.md) before adding one.
 
 Email templates for the passwordless flow live in `supabase/templates/` with setup notes in that folder's README.
 
@@ -88,6 +88,8 @@ docs/             reviews and operating documentation
 3. Stages run in order with a checkpoint after each: `discovery` → `retrieval:cN` (one per candidate) → `classification` → `evaluation` → `scoring` → `review` → `finalizing`.
 4. Every model or search call reserves budget through `reserve_research_usage` first; the run stops with `BUDGET_EXCEEDED` if the reservation does not fit.
 5. `finish_research` writes the report and `opportunities` rows only when at least one candidate survives the evidence gate (two independent domains, one non-vendor supporting source) and the review.
+
+The report is written in the language recorded on the run (`configuration.brief.language`, defaulting to the interface language at submission). Source excerpts are always kept verbatim in their original language.
 
 Scoring rules live in `lib/research-core.ts` and are unit-tested in `tests/research.test.mjs`.
 

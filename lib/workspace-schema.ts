@@ -58,6 +58,14 @@ export const projectSchema = z.object({
   discovery_mode: z.enum(["founder", "market", "combined"]).optional(),
 });
 export type ResearchBrief = z.infer<typeof projectSchema>;
+export const reportLanguageSchema = z.enum(["en", "zh-Hans", "zh-Hant"]);
+export type ReportLanguage = z.infer<typeof reportLanguageSchema>;
+// A research request is a brief plus the language the report should be written in.
+// The language travels inside the stored run configuration; it is not a column.
+export const researchRequestSchema = projectSchema.extend({
+  language: reportLanguageSchema.optional(),
+});
+export type ResearchRequest = z.infer<typeof researchRequestSchema>;
 export type Project = ResearchBrief & { id: string; created_at: string };
 export type ResearchRun = {
   id: string;

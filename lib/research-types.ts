@@ -2,6 +2,7 @@ import type { WorkspaceOpportunity, ResearchBrief } from "@/lib/workspace-schema
 import type { Mode } from "@/lib/research-core";
 export type ResearchReport = {
   methodology: string;
+  language?: string;
   model: string;
   mode: Mode;
   generated_at: string;
