@@ -8,6 +8,8 @@ import {
   emailAuthError,
   requestEmailCode,
   verifyEmailCode,
+  parseEmailLink,
+  verifyEmailLink,
 } from "../lib/email-auth.ts";
 import { messageKey, locales } from "../i18n/config.ts";
 
@@ -130,4 +132,62 @@ test("legacy password routes no longer expose password authentication", () => {
   assert.match(screen, /isComposing/);
   assert.match(screen, /keyCode === 229/);
   assert.match(screen, /autoComplete="one-time-code"/);
+});
+
+test("email links accept only a well-formed token hash and sign-in types", () => {
+  const hash = "a".repeat(56);
+  const parse = (query) => parseEmailLink(new URLSearchParams(query));
+  assert.deepEqual(parse(`token_hash=${hash}&type=email`), {
+    token_hash: hash,
+    type: "email",
+  });
+  assert.deepEqual(parse(`token_hash=pkce_${hash}`), {
+    token_hash: `pkce_${hash}`,
+    type: "email",
+  });
+  for (const type of ["magiclink", "signup"])
+    assert.equal(parse(`token_hash=${hash}&type=${type}`)?.type, type);
+  for (const query of [
+    "",
+    "type=email",
+    "token_hash=short&type=email",
+    `token_hash=${hash}%0A&type=email`,
+    `token_hash=${hash}&type=recovery`,
+    `token_hash=${hash}&type=invite`,
+    `token_hash=${hash}&type=email_change`,
+    `token_hash=${"a".repeat(129)}&type=email`,
+  ])
+    assert.equal(parse(query), null, query);
+});
+
+test("email link verification submits only the token hash and type", async () => {
+  let input;
+  const result = { data: { session: null }, error: { code: "otp_expired" } };
+  const client = {
+    auth: {
+      verifyOtp: async (value) => {
+        input = value;
+        return result;
+      },
+    },
+  };
+  const link = { token_hash: "b".repeat(56), type: "email" };
+  assert.equal(await verifyEmailLink(client, link), result);
+  assert.deepEqual(input, link);
+  assert.throws(() =>
+    verifyEmailLink(client, { token_hash: "bad", type: "email" }),
+  );
+});
+
+test("sign-in email template carries both the confirm link and the code", () => {
+  const html = readFileSync("supabase/templates/magic-link.html", "utf8");
+  assert.match(
+    html,
+    /href="\{\{ \.SiteURL \}\}\/auth\/confirm\?token_hash=\{\{ \.TokenHash \}\}&type=email"/,
+  );
+  assert.match(html, /\{\{ \.Token \}\}/);
+  assert.doesNotMatch(html, /\{\{ \.ConfirmationURL \}\}/);
+  const route = readFileSync("app/auth/confirm/route.ts", "utf8");
+  assert.match(route, /verifyEmailLink/);
+  assert.match(route, /safeReturnPath/);
 });

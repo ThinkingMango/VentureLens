@@ -49,3 +49,26 @@ export function verifyEmailCode(
     type: "email",
   });
 }
+
+// Email-link sign-in: the template links to /auth/confirm with {{ .TokenHash }}.
+export const emailLinkTypes = ["email", "magiclink", "signup"] as const;
+export const emailLinkSchema = z.object({
+  token_hash: z.string().regex(/^[A-Za-z0-9_-]{16,128}$/),
+  type: z.enum(emailLinkTypes).default("email"),
+});
+export type EmailLink = z.infer<typeof emailLinkSchema>;
+
+export function parseEmailLink(params: URLSearchParams): EmailLink | null {
+  const parsed = emailLinkSchema.safeParse({
+    token_hash: params.get("token_hash") ?? undefined,
+    type: params.get("type") ?? undefined,
+  });
+  return parsed.success ? parsed.data : null;
+}
+
+export function verifyEmailLink(
+  client: Pick<SupabaseClient, "auth">,
+  link: EmailLink,
+) {
+  return client.auth.verifyOtp(emailLinkSchema.parse(link));
+}
