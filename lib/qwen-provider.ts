@@ -4,8 +4,12 @@ import { QWEN_MODEL, qwenOrigin, parseQwenSearch } from "@/lib/qwen-core";
 
 function credentials() {
   const apiKey = process.env.DASHSCOPE_API_KEY;
-  if (!apiKey) throw new Error("PROVIDER_CONFIGURATION");
-  return { apiKey, origin: qwenOrigin(process.env.DASHSCOPE_WORKSPACE_ID) };
+  if (!apiKey) throw Object.assign(new Error("PROVIDER_CONFIGURATION"), { requestNotSent: true });
+  try {
+    return { apiKey, origin: qwenOrigin(process.env.DASHSCOPE_WORKSPACE_ID) };
+  } catch (error) {
+    throw Object.assign(error instanceof Error ? error : new Error("PROVIDER_CONFIGURATION"), { requestNotSent: true });
+  }
 }
 export function qwenModel() {
   const { apiKey, origin } = credentials();
@@ -26,9 +30,10 @@ export async function verifyQwenModel() {
 async function providerError(response: Response) {
   const body = await response.json().catch(() => ({}));
   const code = String(body.error?.code ?? body.code ?? "");
-  if (/arrearage|insufficient|balance|quotaexhausted/i.test(code) || response.status === 402) return new Error("PROVIDER_CREDITS_REQUIRED");
-  if (response.status === 429 || response.status >= 500) return new Error("TRANSIENT_PROVIDER");
-  return new Error("PROVIDER_CONFIGURATION");
+  const message = /arrearage|insufficient|balance|quotaexhausted/i.test(code) || response.status === 402
+    ? "PROVIDER_CREDITS_REQUIRED"
+    : response.status === 429 || response.status >= 500 ? "TRANSIENT_PROVIDER" : "PROVIDER_CONFIGURATION";
+  return Object.assign(new Error(message), { statusCode: response.status });
 }
 export async function searchQwen(prompt: string) {
   const { apiKey, origin } = credentials();
