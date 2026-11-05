@@ -335,33 +335,56 @@ export function AuthScreen() {
               "One email, one code. The same simple flow for new and returning users.",
             )}
           </p>
+          <p className="rounded-lg bg-secondary p-3 text-center text-sm text-foreground">
+            {copy("Free during beta. No card, no subscription, nothing to cancel.")}
+          </p>
         </div>
         <p className="text-sm text-muted-foreground">
           {copy("Secure authentication · Your workspace stays private.")}
         </p>
       </section>
-      <section className="hidden flex-col justify-center gap-8 bg-secondary p-16 lg:flex">
-        <ShieldCheck className="size-12 text-primary" strokeWidth={1.3} />
-        <h2 className="max-w-md text-4xl font-semibold leading-tight">
-          {copy("The next great business")}
-          <br />
-          {copy("might be the right one")}
-          <br />
-          {copy("for you.")}
-        </h2>
-        <p className="max-w-md text-base text-muted-foreground">
-          {copy(
-            "Start with your experience. Follow the evidence. Build conviction one conversation at a time.",
-          )}
-        </p>
-        <ul className="flex flex-col gap-4">
+      <section className="band-dark relative hidden flex-col justify-center gap-10 overflow-hidden p-16 lg:flex">
+        <div className="grid-bg pointer-events-none absolute inset-0 opacity-40" aria-hidden="true" />
+        <div className="relative flex flex-col gap-6">
+          <ShieldCheck className="size-12 text-[#9fb7ff]" strokeWidth={1.3} />
+          <h2 className="max-w-md text-4xl font-semibold leading-tight">
+            {copy("The next great business")}
+            <br />
+            {copy("might be the right one")}
+            <br />
+            {copy("for you.")}
+          </h2>
+          <p className="muted-on-dark max-w-md text-base">
+            {copy(
+              "Start with your experience. Follow the evidence. Build conviction one conversation at a time.",
+            )}
+          </p>
+        </div>
+        <ol className="relative flex max-w-md flex-col gap-4">
+          {[
+            ["Confirm your email", "One code, no password to remember."],
+            ["Build your founder profile", "Four short questions about your skills, time, budget, and goals."],
+            ["Explore and save opportunities", "Read sample reports, save a shortlist, and plan your first buyer conversations."],
+          ].map(([title, text], index) => (
+            <li key={title} className="flex gap-4 rounded-xl border border-white/10 bg-white/5 p-4">
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-white/10 text-sm font-semibold text-[#9fb7ff]">
+                {index + 1}
+              </span>
+              <span className="flex flex-col gap-1">
+                <span className="font-medium">{copy(title)}</span>
+                <span className="muted-on-dark text-sm">{copy(text)}</span>
+              </span>
+            </li>
+          ))}
+        </ol>
+        <ul className="relative flex flex-col gap-3 text-sm">
           {[
             "Opportunities aligned with your strengths",
             "Structured research, not a wall of chat",
             "A practical path to customer validation",
           ].map((text) => (
             <li className="flex items-center gap-3" key={text}>
-              <Check className="size-4 text-primary" />
+              <Check className="size-4 text-[#9fb7ff]" />
               {copy(text)}
             </li>
           ))}

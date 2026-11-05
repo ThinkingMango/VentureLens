@@ -81,10 +81,10 @@ export const opportunities: Opportunity[] = [
 ];
 export const scoreLabels = [
   "Buyer pain",
-  "Market potential",
-  "Founder fit",
-  "Feasibility",
-  "Revenue quality",
+  "Demand",
+  "Unit economics",
+  "Delivery feasibility",
+  "Founder advantage",
 ];
 export type DemoSource = {
   title: string;

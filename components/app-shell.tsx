@@ -33,6 +33,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { useDemo } from "@/components/demo-provider";
+import { ResearchAccessCard } from "@/components/live-workspace";
 import { cn } from "@/lib/utils";
 const nav = [
   { title: "Overview", href: "/dashboard", icon: LayoutDashboard },
@@ -141,6 +142,7 @@ export function AppShell({ children, isAdmin = false }: { children: React.ReactN
           </Link>
         </Button>
         <div className="mt-auto flex flex-col gap-5 pt-12">
+          {!isDemo && <ResearchAccessCard compact />}
           {isDemo && (
             <div className="rounded-lg border bg-background p-4">
               <div className="flex items-center justify-between">

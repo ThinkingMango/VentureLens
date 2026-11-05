@@ -119,9 +119,14 @@ export function Onboarding({ editing = false }: { editing?: boolean }) {
       </aside>
       <div className="flex flex-col gap-8 p-6 sm:p-10">
         <div className="flex flex-col gap-3">
-          <p className="text-sm text-muted-foreground">
-            {copy("Step {step} of {total}", { step: step + 1, total: 4 })}
-          </p>
+          <div className="flex items-center gap-3">
+            <p className="shrink-0 text-sm text-muted-foreground">
+              {copy("Step {step} of {total}", { step: step + 1, total: 4 })}
+            </p>
+            <div className="progress-track flex-1" aria-hidden="true">
+              <div className="progress-fill" style={{ width: `${((step + 1) / 4) * 100}%` }} />
+            </div>
+          </div>
           <StepHeading ref={stepHeading} tabIndex={-1} className="text-2xl font-semibold">
             {copy(steps[step].title)}
           </StepHeading>
@@ -336,7 +341,7 @@ export function Onboarding({ editing = false }: { editing?: boolean }) {
       </>
     );
   return (
-    <div className="min-h-screen">
+    <div className="hero-bg min-h-screen">
       <header className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-5 py-7">
         <Brand />
         <LanguageSwitcher />
@@ -350,12 +355,14 @@ export function Onboarding({ editing = false }: { editing?: boolean }) {
         </Link>
       </header>
       <main className="mx-auto flex max-w-4xl flex-col gap-6 px-5 py-8">
-        <div className="mb-3 text-center">
-          <h2 className="text-3xl font-semibold">
+        <div className="mb-3 flex flex-col items-center gap-3 text-center">
+          <span className="eyebrow">{copy("About two minutes")}</span>
+          <h2 className="text-3xl font-semibold md:text-4xl">
             {copy("Better opportunities start with you.")}
           </h2>
-          <p className="mt-3 text-muted-foreground">
-            {copy("Let’s build a picture of the founder behind the idea.")}
+          <p className="max-w-xl text-muted-foreground">
+            {copy("Let’s build a picture of the founder behind the idea.")}{" "}
+            {copy("Your answers shape which opportunities are discovered and how they are scored.")}
           </p>
         </div>
         {form}
