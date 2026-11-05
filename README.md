@@ -57,6 +57,15 @@ update public.research_dev_access set max_runs = 3, expires_at = now() + interva
 where user_id = '<auth.users.id>';
 ```
 
+## Administrators and settings
+
+Administrator access is granted only by a server-managed claim, `app_metadata.role = "admin"`, set with the service role or in the Supabase dashboard; no email address is special. Administrators manage the research policy (primary provider, fallback, models, per-run budget cap) at `/admin`, which is stored in the service-role-only `public.app_settings` table under the key `research`.
+
+```sql
+update auth.users set raw_app_meta_data = coalesce(raw_app_meta_data, '{}'::jsonb) || '{"role": "admin"}'
+where id = '<auth.users.id>';
+```
+
 ## Scripts
 
 ```bash

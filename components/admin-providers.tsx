@@ -11,8 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldContent, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Separator } from "@/components/ui/separator";
-import { ADMIN_EMAIL } from "@/lib/admin-access";
-import { providerPlan, type ProviderSettings, type ProviderSettingsResponse, type ResearchProvider } from "@/lib/provider-settings-core";
+import { providerPlan, MIN_RESEARCH_BUDGET_USD, MAX_RESEARCH_BUDGET_USD, type ProviderSettings, type ProviderSettingsResponse, type ResearchProvider } from "@/lib/provider-settings-core";
 import { useFormats } from "@/i18n/use-copy";
 import { ProviderModelField } from "@/components/provider-model-field";
 import { selectedModel, researchModels, qwenModelSchema, geminiModelSchema } from "@/lib/research-models";
@@ -34,12 +33,12 @@ export function AdminProviders({ initialData }: { initialData: ProviderSettingsR
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<"saveFailed" | "notConfigured" | "accessExpired" | null>(null);
   const settings = draft ?? data.settings;
-  const changed = settings.primary !== data.settings.primary || settings.autoFallback !== data.settings.autoFallback || settings.qwenModel !== data.settings.qwenModel || settings.geminiModel !== data.settings.geminiModel;
+  const changed = settings.primary !== data.settings.primary || settings.autoFallback !== data.settings.autoFallback || settings.qwenModel !== data.settings.qwenModel || settings.geminiModel !== data.settings.geminiModel || settings.budgetUsd !== data.settings.budgetUsd;
   const plan = providerPlan(settings);
   const configured = data.providers[plan.primary].configured && (!plan.fallback || data.providers[plan.fallback].configured);
 
   function change(patch: Partial<ProviderSettings>) {
-    setDraft({ primary: settings.primary, autoFallback: settings.autoFallback, qwenModel: settings.qwenModel, geminiModel: settings.geminiModel, ...patch });
+    setDraft({ primary: settings.primary, autoFallback: settings.autoFallback, qwenModel: settings.qwenModel, geminiModel: settings.geminiModel, budgetUsd: settings.budgetUsd, ...patch });
     setSaveError(null);
   }
 
@@ -51,7 +50,7 @@ export function AdminProviders({ initialData }: { initialData: ProviderSettingsR
     try {
       const response = await fetch(endpoint, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ primary: settings.primary, autoFallback: settings.autoFallback, qwenModel: settings.qwenModel, geminiModel: settings.geminiModel }),
+        body: JSON.stringify({ primary: settings.primary, autoFallback: settings.autoFallback, qwenModel: settings.qwenModel, geminiModel: settings.geminiModel, budgetUsd: settings.budgetUsd }),
       });
       if (!response.ok) {
         const body = await response.json().catch(() => ({}));
@@ -98,6 +97,16 @@ export function AdminProviders({ initialData }: { initialData: ProviderSettingsR
                 <ProviderModelField provider="qwen" model={settings.qwenModel} disabled={saving || !!loadError} onChange={model => change({ qwenModel: qwenModelSchema.parse(model) })} />
                 <ProviderModelField provider="gemini" model={settings.geminiModel} disabled={saving || !!loadError} onChange={model => change({ geminiModel: geminiModelSchema.parse(model) })} />
                 <p className="text-sm leading-relaxed text-muted-foreground">{t("modelBudget")}</p>
+                <Field data-disabled={saving}>
+                  <FieldLabel htmlFor="research-budget">{t("budget")}</FieldLabel>
+                  <input
+                    id="research-budget" type="number" inputMode="decimal" step="0.05" min={MIN_RESEARCH_BUDGET_USD} max={MAX_RESEARCH_BUDGET_USD}
+                    value={settings.budgetUsd} disabled={saving || !!loadError} aria-describedby="budget-help"
+                    onChange={event => { const value = Number(event.target.value); if (Number.isFinite(value)) change({ budgetUsd: Math.min(MAX_RESEARCH_BUDGET_USD, Math.max(MIN_RESEARCH_BUDGET_USD, Math.round(value * 100) / 100)) }); }}
+                    className="h-12 w-full rounded-md border bg-card px-3 text-base text-foreground md:max-w-xs"
+                  />
+                  <FieldDescription id="budget-help">{t("budgetHelp", { min: MIN_RESEARCH_BUDGET_USD, max: MAX_RESEARCH_BUDGET_USD })}</FieldDescription>
+                </Field>
                 <Separator />
                 <Field orientation="horizontal" data-disabled={saving}>
                   <input
@@ -157,8 +166,8 @@ export function AdminProviders({ initialData }: { initialData: ProviderSettingsR
           <Separator />
           <section className="flex flex-col gap-2" aria-labelledby="admin-access-title">
             <h2 id="admin-access-title" className="font-semibold">{t("access")}</h2>
-            <p className="break-all text-sm">{ADMIN_EMAIL}</p>
             <p className="text-sm text-muted-foreground">{t("accessHelp")}</p>
+            <p className="break-all font-mono text-xs text-muted-foreground">app_metadata.role = &quot;admin&quot;</p>
           </section>
           <p className="text-sm text-muted-foreground">{t("scope")}</p>
         </aside>

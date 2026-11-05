@@ -1,11 +1,18 @@
 import { z } from "zod";
 import { DEFAULT_QWEN_MODEL, DEFAULT_GEMINI_MODEL, qwenModelSchema, geminiModelSchema } from "./research-models.ts";
 
+// Row key in public.app_settings that holds the research policy below.
+export const RESEARCH_SETTINGS_KEY = "research";
+export const DEFAULT_RESEARCH_BUDGET_USD = 0.25;
+export const MIN_RESEARCH_BUDGET_USD = 0.05;
+export const MAX_RESEARCH_BUDGET_USD = 5;
 export const providerSettingsSchema = z.strictObject({
   primary: z.enum(["qwen", "gemini"]),
   autoFallback: z.boolean(),
   qwenModel: qwenModelSchema.default(DEFAULT_QWEN_MODEL),
   geminiModel: geminiModelSchema.default(DEFAULT_GEMINI_MODEL),
+  // Hard per-run spend cap applied by enqueue_research to new runs.
+  budgetUsd: z.number().min(MIN_RESEARCH_BUDGET_USD).max(MAX_RESEARCH_BUDGET_USD).default(DEFAULT_RESEARCH_BUDGET_USD),
 });
 export type ProviderSettings = z.infer<typeof providerSettingsSchema>;
 export type ResearchProvider = ProviderSettings["primary"];

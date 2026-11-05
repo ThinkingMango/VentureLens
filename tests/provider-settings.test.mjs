@@ -5,19 +5,19 @@ import { createRequire } from "node:module";
 import ts from "typescript";
 import { createElement, cloneElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { ADMIN_EMAIL, isAdministrator } from "../lib/admin-access.ts";
+import { isAdministrator } from "../lib/admin-access.ts";
 import { providerSettingsSchema, readStoredProviderSettings, providerPlan, assertProvidersConfigured } from "../lib/provider-settings-core.ts";
 import * as settingsCore from "../lib/provider-settings-core.ts";
 import { withResearchFallback } from "../lib/research-fallback-core.ts";
 import { z } from "zod";
 import * as models from "../lib/research-models.ts";
-const modelDefaults = { qwenModel: models.DEFAULT_QWEN_MODEL, geminiModel: models.DEFAULT_GEMINI_MODEL };
+const modelDefaults = { qwenModel: models.DEFAULT_QWEN_MODEL, geminiModel: models.DEFAULT_GEMINI_MODEL, budgetUsd: 0.25 };
 import { errorCode } from "../lib/research-core.ts";
 import * as researchCore from "../lib/research-core.ts";
 import * as workspaceSchema from "../lib/workspace-schema.ts";
 import * as fallbackCore from "../lib/research-fallback-core.ts";
 
-const verified = { id: "admin-test-id", email: ADMIN_EMAIL, email_confirmed_at: "2026-11-05T00:00:00.000Z", app_metadata: {} };
+const verified = { id: "admin-test-id", email: "owner@example.org", email_confirmed_at: "2026-11-05T00:00:00.000Z", app_metadata: { role: "admin" } };
 const require = createRequire(import.meta.url);
 function loadModule(file, dependencies, env = {}, suffix = "") {
   const source = readFileSync(new URL(file, import.meta.url), "utf8") + suffix;
@@ -27,11 +27,24 @@ function loadModule(file, dependencies, env = {}, suffix = "") {
   new Function("require", "exports", "module", "process", outputText)(dependency, module.exports, module, { env });
   return module.exports;
 }
-function storage(admin) {
+// Fake app_settings table: `rows` is keyed by setting key; `writes` collects upserts.
+function settingsTable(rows = {}, writes = [], fail = false) {
+  return () => {
+    const filters = {};
+    const query = {
+      select: () => query,
+      eq: (key, value) => { filters[key] = value; return query; },
+      maybeSingle: async () => fail ? { data: null, error: new Error("database offline") } : { data: filters.key in rows ? { value: rows[filters.key] } : null, error: null },
+      upsert: async (row, options) => { writes.push({ row, options }); rows[row.key] = row.value; return { error: null }; },
+    };
+    return query;
+  };
+}
+function storage({ admin = {}, rows = {}, writes = [], fail = false } = {}) {
   return loadModule("../lib/provider-settings.ts", {
     "server-only": {},
-    "@/lib/supabase/admin": { createAdminClient: () => ({ auth: { admin } }) },
-    "@/lib/admin-access": { ADMIN_EMAIL, isAdministrator },
+    "@/lib/supabase/admin": { createAdminClient: () => ({ auth: { admin }, from: settingsTable(rows, writes, fail) }) },
+    "@/lib/admin-access": { isAdministrator },
     "@/lib/qwen-core": { QWEN_MODEL: "qwen-test" },
     "@/lib/research-fallback-core": { GEMINI_MODEL: "gemini-test" },
     "@/lib/provider-settings-core": settingsCore,
@@ -50,20 +63,21 @@ function patch(body, origin = "https://venturelens.test") {
   return new Request("https://venturelens.test/api/admin/providers", { method: "PATCH", headers: { Origin: origin, Host: "venturelens.test", "Content-Type": "application/json" }, body: typeof body === "string" ? body : JSON.stringify(body) });
 }
 
-test("verified administrator email and server-managed administrator roles are authorized", () => {
-  assert.equal(isAdministrator(verified), true);
-  assert.equal(isAdministrator({ ...verified, email: ADMIN_EMAIL.toUpperCase() }), true);
+test("only server-managed administrator roles are authorized; email addresses never are", () => {
   for (const app_metadata of [{ role: "admin" }, { is_admin: true }]) {
-    const admin = { ...verified, email: "administrator@example.org", app_metadata };
-    assert.equal(isAdministrator(admin), true);
-    assert.equal(isAdministrator({ ...admin, email_confirmed_at: null }), false);
+    for (const email of ["owner@example.org", "ventures@smartmango.ai", "VENTURES@SMARTMANGO.AI"]) {
+      const admin = { ...verified, email, app_metadata };
+      assert.equal(isAdministrator(admin), true);
+      assert.equal(isAdministrator({ ...admin, email_confirmed_at: null }), false);
+    }
   }
-  for (const user of [null, undefined, {}, { email: ADMIN_EMAIL }, { ...verified, email_confirmed_at: null }, { ...verified, email: "smart@smartmango.ai" }, { ...verified, email: "ventures+admin@smartmango.ai" }, { ...verified, email: "ventures@smartmango.ai.example.org" }, { ...verified, email: " ventures@smartmango.ai" }, { email: "other@example.org", email_confirmed_at: verified.email_confirmed_at, user_metadata: { is_admin: true, role: "admin", email: ADMIN_EMAIL }, app_metadata: {} }]) assert.equal(isAdministrator(user), false);
+  for (const user of [null, undefined, {}, { email: "ventures@smartmango.ai" }, { ...verified, app_metadata: {} }, { ...verified, email: "ventures@smartmango.ai", app_metadata: {} }, { email: "other@example.org", email_confirmed_at: verified.email_confirmed_at, user_metadata: { is_admin: true, role: "admin" }, app_metadata: {} }]) assert.equal(isAdministrator(user), false);
   for (const app_metadata of [{ role: "user" }, { role: "ADMIN" }, { is_admin: "true" }, { is_admin: 1 }]) {
-    assert.equal(isAdministrator({ ...verified, email: "other@example.org", app_metadata }), false);
+    assert.equal(isAdministrator({ ...verified, app_metadata }), false);
   }
+  const source = readFileSync(new URL("../lib/admin-access.ts", import.meta.url), "utf8");
+  assert.doesNotMatch(source, /@/, "no email address may be hard-coded into administrator access");
 });
-
 test("server-managed administrators can access the protected provider API", async () => {
   for (const app_metadata of [{ role: "admin" }, { is_admin: true }]) {
     const user = { ...verified, email: "administrator@example.org", app_metadata };
@@ -116,7 +130,7 @@ test("manual Gemini choice and fallback-off policy control actual provider attem
 });
 
 test("unauthenticated, unverified, and non-admin sessions cannot read or modify settings", async () => {
-  for (const user of [null, { ...verified, email_confirmed_at: null }, { ...verified, email: "other@example.org", user_metadata: { is_admin: true } }]) {
+  for (const user of [null, { ...verified, email_confirmed_at: null }, { ...verified, app_metadata: {}, user_metadata: { is_admin: true, role: "admin" } }]) {
     const api = route(user);
     for (const response of [await api.GET(), await api.PATCH(patch({ primary: "gemini", autoFallback: false }))]) {
       assert.equal(response.status, user ? 403 : 401);
@@ -124,7 +138,6 @@ test("unauthenticated, unverified, and non-admin sessions cannot read or modify 
     }
   }
 });
-
 test("admin updates enforce origin, JSON validation, request limits, and the session actor", async () => {
   const calls = [];
   const api = route(verified, async (id, settings) => { calls.push({ id, settings }); return { settings }; });
@@ -137,76 +150,64 @@ test("admin updates enforce origin, JSON validation, request limits, and the ses
   assert.deepEqual(calls, [{ id: verified.id, settings: { primary: "gemini", autoFallback: false, ...modelDefaults } }]);
 });
 
-test("server persistence revalidates identity and writes only server-owned settings metadata", async () => {
+test("server persistence revalidates identity and writes only the app_settings row", async () => {
   const writes = [];
-  const service = storage({
-    getUserById: async id => { assert.equal(id, verified.id); return { data: { user: verified }, error: null }; },
-    updateUserById: async (id, attributes) => { writes.push({ id, attributes }); return { error: null }; },
-  });
+  const service = storage({ writes, admin: { getUserById: async id => { assert.equal(id, verified.id); return { data: { user: verified }, error: null }; } } });
   const saved = await service.saveProviderSettings(verified.id, { primary: "gemini", autoFallback: false });
   assert.equal(writes.length, 1);
-  assert.deepEqual(Object.keys(writes[0].attributes), ["app_metadata"]);
-  assert.deepEqual(readStoredProviderSettings(writes[0].attributes.app_metadata.research_provider_settings), saved.settings);
+  assert.equal(writes[0].row.key, "research");
+  assert.equal(writes[0].row.updated_by, verified.id);
+  assert.deepEqual(writes[0].options, { onConflict: "key" });
+  assert.deepEqual(readStoredProviderSettings(writes[0].row.value), saved.settings);
   assert.equal(saved.settings.primary, "gemini");
-  const denied = storage({ getUserById: async () => ({ data: { user: { ...verified, email: "other@example.org" } }, error: null }) });
+  assert.equal(saved.settings.budgetUsd, 0.25);
+  const denied = storage({ admin: { getUserById: async () => ({ data: { user: { ...verified, app_metadata: {} } }, error: null }) } });
   await assert.rejects(denied.saveProviderSettings(verified.id, { primary: "qwen", autoFallback: true }), /ADMIN_REQUIRED/);
+  const offline = storage({ admin: { getUserById: async () => ({ data: null, error: new Error("offline") }) } });
+  await assert.rejects(offline.saveProviderSettings(verified.id, { primary: "qwen", autoFallback: true }), /SETTINGS_UNAVAILABLE/);
 });
-
-test("role administrators read and update the canonical global policy rather than creating competing policies", async () => {
+test("role administrators read and update the single app_settings policy", async () => {
   const admin = { ...verified, id: "role-admin", email: "administrator@example.org", app_metadata: { role: "admin" } };
-  const ownerSettings = { primary: "gemini", autoFallback: false, updatedAt: verified.email_confirmed_at };
-  const owner = { ...verified, app_metadata: { research_provider_settings: ownerSettings } };
+  const stored = { primary: "gemini", autoFallback: false, budgetUsd: 0.5, updatedAt: verified.email_confirmed_at };
+  const rows = { research: stored };
   const writes = [];
-  const service = storage({
-    getUserById: async () => ({ data: { user: admin }, error: null }),
-    listUsers: async () => ({ data: { users: [admin, owner], nextPage: null }, error: null }),
-    updateUserById: async (id, attributes) => { writes.push({ id, attributes }); return { error: null }; },
-  });
-  assert.deepEqual((await service.administratorSettings(admin)).settings, { ...ownerSettings, ...modelDefaults });
-  assert.deepEqual(await service.researchProviderSettings(), { ...ownerSettings, ...modelDefaults });
-  await service.saveProviderSettings(admin.id, { primary: "qwen", autoFallback: true });
-  assert.equal(writes[0].id, owner.id);
-  assert.deepEqual(Object.keys(writes[0].attributes), ["app_metadata"]);
-  assert.equal(writes[0].attributes.app_metadata.research_provider_settings.primary, "qwen");
+  const service = storage({ rows, writes, admin: { getUserById: async () => ({ data: { user: admin }, error: null }) } });
+  assert.deepEqual((await service.administratorSettings(admin)).settings, { ...stored, qwenModel: models.DEFAULT_QWEN_MODEL, geminiModel: models.DEFAULT_GEMINI_MODEL });
+  assert.deepEqual(await service.researchProviderSettings(), { ...stored, qwenModel: models.DEFAULT_QWEN_MODEL, geminiModel: models.DEFAULT_GEMINI_MODEL });
+  await service.saveProviderSettings(admin.id, { primary: "qwen", autoFallback: true, budgetUsd: 1 });
+  assert.equal(writes.length, 1);
+  assert.equal(writes[0].row.key, "research");
+  assert.equal(rows.research.primary, "qwen");
+  assert.equal(rows.research.budgetUsd, 1);
   await assert.rejects(service.administratorSettings({ ...admin, email_confirmed_at: null }), /ADMIN_REQUIRED/);
+  await assert.rejects(service.administratorSettings({ ...admin, app_metadata: {} }), /ADMIN_REQUIRED/);
 });
-
-test("new runs read paginated admin settings, ignore spoofed metadata, and preserve safe defaults", async () => {
+test("new runs read the app_settings policy, fall back to defaults, and surface storage failures", async () => {
   const saved = { primary: "gemini", autoFallback: false, updatedAt: verified.email_confirmed_at };
-  const pages = [];
-  const service = storage({ listUsers: async ({ page }) => {
-    pages.push(page);
-    return { data: { users: page === 1 ? [{ ...verified, email: "other@example.org", app_metadata: { research_provider_settings: saved } }] : [{ ...verified, app_metadata: { research_provider_settings: saved } }], nextPage: page === 1 ? 2 : null }, error: null };
-  } });
-  assert.deepEqual(await service.researchProviderSettings(), { ...saved, ...modelDefaults });
-  assert.deepEqual(pages, [1, 2]);
-  assert.deepEqual(await storage({ listUsers: async () => ({ data: { users: [], nextPage: null }, error: null }) }).researchProviderSettings(), readStoredProviderSettings(undefined));
-  await assert.rejects(storage({ listUsers: async () => ({ data: null, error: new Error("database offline") }) }).researchProviderSettings(), /WORKFLOW_INTERRUPTED/);
+  assert.deepEqual(await storage({ rows: { research: saved } }).researchProviderSettings(), { ...saved, ...modelDefaults });
+  assert.deepEqual(await storage().researchProviderSettings(), readStoredProviderSettings(undefined));
+  await assert.rejects(storage({ fail: true }).researchProviderSettings(), /WORKFLOW_INTERRUPTED/);
+  await assert.rejects(storage({ rows: { research: { primary: "other" } } }).researchProviderSettings(), /PROVIDER_CONFIGURATION/);
 });
-
 test("verified model choices persist and unknown or cross-provider IDs are rejected", async () => {
   for (const qwenModel of models.qwenModelIds) for (const geminiModel of models.geminiModelIds) {
-    const input = { primary: "gemini", autoFallback: true, qwenModel, geminiModel };
+    const input = { primary: "gemini", autoFallback: true, qwenModel, geminiModel, budgetUsd: 0.25 };
     assert.deepEqual(providerSettingsSchema.parse(input), input);
     const stored = { ...input, updatedAt: verified.email_confirmed_at };
     assert.deepEqual(readStoredProviderSettings(stored), stored);
-    let written;
-    const service = storage({
-      getUserById: async () => ({ data: { user: verified }, error: null }),
-      updateUserById: async (_id, value) => { written = value.app_metadata.research_provider_settings; return { error: null }; },
-    });
+    const writes = [];
+    const service = storage({ writes, admin: { getUserById: async () => ({ data: { user: verified }, error: null }) } });
     const result = await service.saveProviderSettings(verified.id, input);
-    assert.deepEqual(result.settings, written);
+    assert.deepEqual(result.settings, writes[0].row.value);
     assert.equal(result.settings.qwenModel, qwenModel);
     assert.equal(result.settings.geminiModel, geminiModel);
   }
-  for (const invalidChoice of [{ qwenModel: "qwen3.8-unverified" }, { qwenModel: "gemini-4-argon" }, { geminiModel: "qwen3.8-max" }, { geminiModel: "gemini-latest" }, { geminiModel: "https://attacker.test" }, { qwenModel: null }]) {
+  for (const invalidChoice of [{ qwenModel: "qwen3.8-unverified" }, { qwenModel: "gemini-4-argon" }, { geminiModel: "qwen3.8-max" }, { geminiModel: "gemini-latest" }, { geminiModel: "https://attacker.test" }, { qwenModel: null }, { budgetUsd: 0 }, { budgetUsd: 50 }, { budgetUsd: "0.25" }]) {
     const input = { primary: "qwen", autoFallback: true, ...invalidChoice };
     assert.equal(providerSettingsSchema.safeParse(input).success, false);
     assert.equal((await route(verified).PATCH(patch(input))).status, 400);
   }
 });
-
 test("selected models use compatible reasoning levels and preserve legacy defaults", () => {
   assert.equal(models.selectedModel("qwen", {}), "qwen3.8-flash");
   assert.equal(models.selectedModel("gemini", {}), "gemini-3.5-flash-lite");
@@ -423,6 +424,7 @@ test("concurrent dispatches share a durable hook and manual retries get a new id
   const hooks = new Map(), requests = [], updates = [];
   const service = loadModule("../lib/research-service.ts", {
     "server-only": {},
+    "@/lib/provider-settings": { researchProviderSettings: async () => ({ primary: "qwen", autoFallback: true }) }, "@/lib/provider-settings-core": settingsCore, "@/lib/research-models": models, "@/lib/qwen-core": { QWEN_PROVIDER: "dashscope-beijing" }, "@/lib/research-fallback-core": fallbackCore,
     "workflow/api": { start: async (_workflow, args, options) => {
       assert.deepEqual(args, ["run", "owner"]);
       requests.push(options.hook.token);
@@ -479,7 +481,7 @@ test("research detail explains blocked reservations without adding them to spent
     };
     return query;
   }
-  const service = loadModule("../lib/research-service.ts", { "server-only": {}, "workflow/api": {}, "workflow/errors": {}, "@/workflows/research": {}, "@/lib/supabase/admin": {} });
+  const service = loadModule("../lib/research-service.ts", { "server-only": {}, "workflow/api": {}, "workflow/errors": {}, "@/workflows/research": {}, "@/lib/provider-settings": { researchProviderSettings: async () => ({ primary: "qwen", autoFallback: true }) }, "@/lib/provider-settings-core": settingsCore, "@/lib/research-models": models, "@/lib/qwen-core": { QWEN_PROVIDER: "dashscope-beijing" }, "@/lib/research-fallback-core": fallbackCore, "@/lib/supabase/admin": {} });
   const detail = await service.researchDetail({ from }, "owner", "run");
   assert.equal(detail.usage.committed_usd, 0.051042);
   assert.equal(detail.usage.search_requests, 0);
@@ -489,7 +491,7 @@ test("research detail explains blocked reservations without adding them to spent
 });
 
 test("the actual progress view renders blocked-request costs and a usable recovery link", () => {
-  const data = { id: "run", status: "failed", stage: "retrieval", error_code: "BUDGET_EXCEEDED", retry_count: 0, configuration: { brief: { name: "Test 1" } }, report: null, steps: [{ stage_key: "discovery" }, { stage_key: "retrieval:c1" }], usage: { estimated_usd: 0.051042, committed_usd: 0.051042, budget_usd: 0.25, uncertain_calls: 0, input_tokens: 756, output_tokens: 4953, search_requests: 0 }, budget_block: { model: "gemini-4-argon", required_usd: 0.20448, remaining_usd: 0.198958 } };
+  const data = { id: "run", status: "failed", stage: "retrieval", error_code: "BUDGET_EXCEEDED", retry_count: 0, model: { provider: "google-gemini", model: "gemini-4-argon", planned: false, used: ["gemini-4-argon"] }, configuration: { brief: { name: "Test 1" } }, report: null, steps: [{ stage_key: "discovery" }, { stage_key: "retrieval:c1" }], usage: { estimated_usd: 0.051042, committed_usd: 0.051042, budget_usd: 0.25, uncertain_calls: 0, input_tokens: 756, output_tokens: 4953, search_requests: 0 }, budget_block: { model: "gemini-4-argon", required_usd: 0.20448, remaining_usd: 0.198958 } };
   const { ResearchRunView } = loadModule("../components/research-run.tsx", {
     "next/link": { default: ({ children, ...props }) => createElement("a", props, children) },
     "swr": { default: () => ({ data, mutate: async () => undefined }) },
@@ -498,6 +500,8 @@ test("the actual progress view renders blocked-request costs and a usable recove
     "@/components/demo-provider": { useDemo: () => ({ refresh: async () => undefined }) },
     "@/components/research-report": { ResearchReportView: () => null },
     "@/lib/research-core": researchCore,
+    "@/lib/research-models": models,
+    "@/components/ui/badge": { Badge: ({ children, ...props }) => createElement("span", props, children) },
     "@/i18n/use-copy": { useCopy: () => (text, values = {}) => text.replace(/\{(\w+)\}/g, (_match, key) => values[key] ?? key), useFormats: () => ({ usd: (value, digits = 2) => `$${value.toFixed(digits)}`, number: value => String(value) }) },
     "@/i18n/errors": { feedbackSource: (_code, fallback) => fallback },
   });
@@ -509,4 +513,6 @@ test("the actual progress view renders blocked-request costs and a usable recove
   assert.match(html, /href="\/research\/new"/);
   assert.doesNotMatch(html, /Retry once from saved progress/);
   assert.match(html, /Existing progress and costs remain saved/);
+  assert.match(html, /Model: Gemini 4 Argon/);
+  assert.match(html, /Gemini via Google/);
 });

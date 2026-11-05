@@ -13,6 +13,7 @@ Read from `supabase_migrations.schema_migrations` on the live project:
 | `20261104142513` | `research_quota_ledger` | `supabase/migrations/20261104142513_research_quota_ledger.sql` | identical |
 | `20261105131043` | `smartmango_research_development_access` | `supabase/migrations/20261105131043_smartmango_research_development_access.sql` | identical (file recovered from the live history) |
 | `20261105155412` | `signup_free_run_and_quota_release` | `supabase/migrations/20261105155412_signup_free_run_and_quota_release.sql` | identical (applied with `apply_migration`, file renamed to the assigned version) |
+| `20261105161832` | `app_settings_and_role_admin` | `supabase/migrations/20261105161832_app_settings_and_role_admin.sql` | identical (applied with `apply_migration`, file renamed to the assigned version) |
 
 "Identical" means the MD5 of the SQL with all whitespace removed matches between the repository file and the `statements` column of the applied migration.
 
@@ -38,7 +39,14 @@ After this change `supabase migration list` shows local and remote in sync, and 
 2. **Never edit an applied file.** Write a new migration instead. If a file must be renamed to match history, keep its content byte-identical.
 3. **Verify before merging.** Compare `md5(regexp_replace(array_to_string(statements, E'\n'), '\s+', '', 'g'))` on the project against the local file.
 4. **Keep RLS invariants.** New tables use `enable` + `force row level security`, composite `(id, user_id)` foreign keys, `revoke all … from anon, authenticated`, and explicit `grant` statements, as in the existing files.
-5. **Business parameters do not belong in check constraints.** `research_runs.budget_usd <= 0.25` and `research_dev_access.max_runs <= 3` are known hard-coded limits (see `docs/REVIEW.md` B8); loosen them in a new migration when the entitlement ledger lands.
+5. **Business parameters live in `public.app_settings`, not in check constraints.** The per-run budget is read by `public.research_budget_usd()` from the `research` row (bounded 0.05–5 USD). `research_dev_access.max_runs <= 3` is still a hard-coded limit to revisit with the entitlement ledger.
+
+## Notes on `20261105161832_app_settings_and_role_admin`
+
+- Creates `public.app_settings (key, value jsonb, updated_by, updated_at)`; RLS enabled and forced, no grants to `anon`/`authenticated`, full access for `service_role`.
+- Seeds the `research` row from the legacy `app_metadata.research_provider_settings` on the owner account (then removes that legacy key), adds `budgetUsd` (0.25) if missing.
+- Grants `app_metadata.role = "admin"` to the account that held the hard-coded administrator email; `isAdministrator` now checks only that claim.
+- `public.research_budget_usd()` returns the configured cap; `enqueue_research` writes it to `research_runs.budget_usd`; the check constraint is loosened to `<= 5`.
 
 ## Notes on `20261105155412_signup_free_run_and_quota_release`
 

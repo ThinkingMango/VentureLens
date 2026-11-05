@@ -14,6 +14,7 @@ import {
 import { useCopy, useFormats } from "@/i18n/use-copy";
 import { localeNames } from "@/i18n/config";
 import { reportLanguage } from "@/lib/research-core";
+import { ModelTag } from "@/components/research-run";
 const dimensions: Record<string, string> = {
   pain: "Buyer pain",
   demand: "Demand",
@@ -52,7 +53,10 @@ export function ResearchReportView({ report }: { report: ResearchReport }) {
             <CheckCircle2 className="size-5 shrink-0" aria-hidden="true" />
             <span className="font-medium">{copy("Research complete")}</span>
           </div>
-          <Badge variant="outline">{copy(modes[report.mode])}</Badge>
+          <div className="flex flex-wrap items-center gap-2">
+            <ModelTag model={report.model} provider={report.provider} />
+            <Badge variant="outline">{copy(modes[report.mode])}</Badge>
+          </div>
         </div>
         <div className="flex flex-col gap-3">
           <h2 id="report-summary" className="text-xl font-semibold">

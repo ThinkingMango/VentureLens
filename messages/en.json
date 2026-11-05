@@ -31,8 +31,8 @@
     "configured": "Configured",
     "missing": "Not configured",
     "access": "Administrator access",
-    "accessHelp": "Verified administrators and this verified email can change provider settings. Administrator roles must be assigned on the server; other workspace members cannot access this page.",
-    "scope": "Initialized research keeps its saved model choices. Evidence requirements, development access, and spending limits are unchanged.",
+    "accessHelp": "Administrators are identified by a server-managed role claim set with the service role or in the Supabase dashboard. Email addresses and user-editable metadata never grant access.",
+    "scope": "Initialized research keeps its saved model choices and budget. Evidence requirements and development access are unchanged.",
     "modelLabel": "{provider} model",
     "fast": "Fast and cost-effective",
     "complex": "Complex reasoning and coding",
@@ -48,7 +48,9 @@
     "documentation": "Official documentation",
     "catalogChecked": "Checked {date}",
     "workspaceEndpoint": "The server replaces {WorkspaceId} with the configured Beijing workspace ID. Keys never reach the browser.",
-    "modelBudget": "Max and Argon use more of the same research budget and may hit the existing limit sooner. Native search context and query costs are estimates, not provider-enforced caps. Google Search requires paid-tier access."
+    "modelBudget": "Max and Argon use more of the same research budget and may hit the existing limit sooner. Native search context and query costs are estimates, not provider-enforced caps. Google Search requires paid-tier access.",
+    "budget": "Per-run budget (USD)",
+    "budgetHelp": "Hard cap on model and search spend for each new research run, between {min} and {max} USD. Existing runs keep the cap they started with."
   },
   "ui": {
     "m1pbhrck": "Admin",
@@ -1021,7 +1023,13 @@
     "m4ftuob": "Your first run is free",
     "mwiuq77": "Every confirmed account receives one free research run, and the complete demo workspace needs no account or card.",
     "m1gq8blr": "Create a free account and confirm your email. One research run is granted automatically and shown on the New research page; complete your founder profile and start a brief to use it.",
-    "m1gfib96": "One free research run on sign-up. No card, no subscription, nothing to cancel."
+    "m1gfib96": "One free research run on sign-up. No card, no subscription, nothing to cancel.",
+    "m1sljvwx": "Model: {model}",
+    "md58fwr": "Planned model: {model}",
+    "mobgmq": "Mixed models",
+    "m1i4fog0": "Models used: {models}",
+    "m5sb60y": "Qwen via DashScope",
+    "mble3nh": "Gemini via Google"
   },
   "language": {
     "label": "Interface language",

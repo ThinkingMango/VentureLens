@@ -4,6 +4,7 @@ export type ResearchReport = {
   methodology: string;
   language?: string;
   model: string;
+  provider?: string;
   mode: Mode;
   generated_at: string;
   summary: string;
@@ -11,10 +12,18 @@ export type ResearchReport = {
   weights: Record<string, number>;
   opportunities: WorkspaceOpportunity[];
 };
+export type ResearchModelInfo = {
+  provider: string | null;
+  model: string | null;
+  // true when the run has not initialized yet and this is the configured primary, not a recorded choice
+  planned: boolean;
+  used: string[];
+};
 export type ResearchDetail = {
   id: string;
   status: string;
   stage: string;
+  model: ResearchModelInfo;
   error_code: string | null;
   budget_block?: { model: string; required_usd: number; remaining_usd: number };
   retry_count: number;
