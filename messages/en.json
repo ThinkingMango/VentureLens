@@ -997,7 +997,13 @@
     "m1g1054m": "Applying the weighted scorecard and evidence caps.",
     "m1piyv0i": "Running an adversarial critique that can reject ideas or deduct points.",
     "m9qylrj": "Saving the report and linked sources to your workspace.",
-    "m1ewvcau": "A full run usually takes 5–10 minutes. You can leave this page; progress is saved on the server."
+    "m1ewvcau": "A full run usually takes 5–10 minutes. You can leave this page; progress is saved on the server.",
+    "mu3oyjq": "Moderate: primary validation still needed",
+    "m1k3acoz": "Limited: few independent sources",
+    "ms1crlb": "Report language: {language}",
+    "mh3gddv": "Source excerpts are kept in their original language so you can verify them yourself.",
+    "m1rw81e5": "Each report is written in the language chosen when the run started. Changing the interface language afterwards does not regenerate or translate a saved report.",
+    "m7tiggc": "Report in {language}"
   },
   "language": {
     "label": "Interface language",

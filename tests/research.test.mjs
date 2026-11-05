@@ -119,3 +119,36 @@ test('failures expose stable codes rather than provider details',()=>{
   assert.equal(errorCode(new Error('fetch failed')),'TRANSIENT_PROVIDER');
   assert.equal(errorCode({statusCode:401}),'PROVIDER_CONFIGURATION');
 });
+
+import { researchPolicy, reportLanguage, reportNarrative, confidenceLevel, LEGACY_REPORT_LANGUAGE } from '../lib/research-core.ts';
+import { researchRequestSchema } from '../lib/workspace-schema.ts';
+test('report language follows the request and falls back to the legacy language for old runs', () => {
+  assert.equal(reportLanguage('en'), 'en');
+  assert.equal(reportLanguage('zh-Hant'), 'zh-Hant');
+  assert.equal(reportLanguage(undefined), LEGACY_REPORT_LANGUAGE);
+  assert.equal(reportLanguage('fr'), LEGACY_REPORT_LANGUAGE);
+  assert.equal(researchRequestSchema.parse({ ...emptyBrief, name: 'Research', language: 'en' }).language, 'en');
+  assert.equal(researchRequestSchema.safeParse({ ...emptyBrief, name: 'Research', language: 'de' }).success, false);
+});
+test('the research policy names the output language and keeps quotes verbatim', () => {
+  for (const [language, name] of [['en', 'English'], ['zh-Hans', '简体中文'], ['zh-Hant', '繁體中文']]) {
+    const policy = researchPolicy(language);
+    assert.ok(policy.includes(name), `${language} policy must name the language`);
+    assert.match(policy, /verbatim/);
+    assert.match(policy, /untrusted data/);
+  }
+});
+test('report narratives are localized, count correctly, and flag short lists', () => {
+  const full = reportNarrative('en', { candidates: 8, evidence: 20, opportunities: 6 });
+  assert.match(full.summary, /8 candidates/);
+  assert.match(full.summary, /6 opportunities/);
+  assert.doesNotMatch(full.summary, /not padded/);
+  assert.equal(full.limitations.length, 4);
+  const short = reportNarrative('en', { candidates: 8, evidence: 9, opportunities: 1 });
+  assert.match(short.summary, /1 opportunity /);
+  assert.match(short.summary, /not padded/);
+  assert.match(reportNarrative('zh-Hans', { candidates: 8, evidence: 9, opportunities: 2 }).summary, /没有凑数/);
+  assert.match(reportNarrative('zh-Hant', { candidates: 8, evidence: 9, opportunities: 2 }).summary, /沒有湊數/);
+  assert.equal(confidenceLevel(2), 'limited');
+  assert.equal(confidenceLevel(3), 'moderate');
+});

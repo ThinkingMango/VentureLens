@@ -2,7 +2,9 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { projectSchema, profileSchema } from "@/lib/workspace-schema";
+import { getLocale } from "next-intl/server";
+import { researchRequestSchema, profileSchema } from "@/lib/workspace-schema";
+import { reportLanguage } from "@/lib/research-core";
 import { researchErrors, errorCode } from "@/lib/research-core";
 import { dispatchResearch, researchDetail } from "@/lib/research-service";
 export const runtime = "nodejs";
@@ -11,7 +13,7 @@ export const dynamic = "force-dynamic";
 const inputSchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("start"),
-    brief: projectSchema,
+    brief: researchRequestSchema,
     requestKey: z.uuid(),
   }),
   z.object({ action: z.literal("retry"), id: z.uuid() }),
@@ -70,6 +72,10 @@ export async function POST(request: NextRequest) {
         p_brief: {
           ...parsed.data.brief,
           discovery_mode: parsed.data.brief.discovery_mode ?? "combined",
+          // The report is written in the language the founder chose; default to the interface language.
+          language: reportLanguage(
+            parsed.data.brief.language ?? (await getLocale().catch(() => "en")),
+          ),
         },
         p_profile: validatedProfile.data,
         p_request: parsed.data.requestKey,

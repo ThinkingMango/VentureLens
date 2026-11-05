@@ -4,6 +4,8 @@ import { feedbackSource } from "@/i18n/errors";
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useLocale } from "next-intl";
+import { localeNames, type Locale } from "@/i18n/config";
 import Link from "@/components/workspace-link";
 import {
   ArrowLeft,
@@ -42,6 +44,7 @@ export function ResearchConfig() {
   const [nameError, setNameError] = useState("");
   const [formError, setFormError] = useState("");
   const router = useRouter();
+  const locale = useLocale() as Locale;
   const accessBlocked = !isDemo && !data?.access.enabled;
   return (
     <>
@@ -120,7 +123,7 @@ export function ResearchConfig() {
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
                       action: "start",
-                      brief,
+                      brief: { ...brief, language: locale },
                       requestKey: requestKey.current,
                     }),
                   });
@@ -335,6 +338,8 @@ export function ResearchConfig() {
                   <>
                     <Clock3 className="size-4" />
                     {copy("Usually 5–10 minutes · Uses one beta research run")}
+                    {" · "}
+                    {copy("Report in {language}", { language: localeNames[locale] })}
                   </>
                 )}
               </span>

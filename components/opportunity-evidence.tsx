@@ -22,9 +22,7 @@ export function OpportunityEvidence({
           )}
         </p>
         <p className="text-sm text-muted-foreground">
-          {copy(
-            "Saved research stays in its original language. Changing the interface never regenerates or translates reports and original sources.",
-          )}
+          {copy("Source excerpts are kept in their original language so you can verify them yourself.")}
         </p>
         {item.evidence.map((source) => {
           const url = safeSourceUrl(source.url);

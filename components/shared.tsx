@@ -124,6 +124,10 @@ export const opportunityIcons = {
   chart: ChartNoAxesCombined,
   workflow: Workflow,
 };
+const confidenceLabels: Record<string, string> = {
+  moderate: "Moderate: primary validation still needed",
+  limited: "Limited: few independent sources",
+};
 export function Confidence({ level }: { level: string }) {
   const copy = useCopy();
   return (
@@ -131,7 +135,7 @@ export function Confidence({ level }: { level: string }) {
       <span className="demo-dot" />
       {["Higher", "Medium", "Lower"].includes(level)
         ? copy("{level} confidence", { level: copy(level) })
-        : copy(level)}
+        : copy(confidenceLabels[level] ?? level)}
     </Badge>
   );
 }
