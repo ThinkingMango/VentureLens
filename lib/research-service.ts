@@ -24,6 +24,9 @@ export async function dispatchResearch(id: string, userId: string) {
     if (HookConflictError.is(error) && error.conflictingRunId) {
       workflowId = error.conflictingRunId;
     } else {
+      // Surface the SDK's reason in runtime logs; the run itself only records DISPATCH_FAILED.
+      const failure = error as { name?: string; message?: string; code?: string; cause?: { message?: string } };
+      console.error("[research] workflow dispatch failed", { run: id, retry: data.retry_count, name: failure?.name, code: failure?.code, message: failure?.message, cause: failure?.cause?.message });
       const { error: updateError } = await client.from("research_runs").update({ status: "failed", error_code: "DISPATCH_FAILED", completed_at: new Date().toISOString() }).eq("id", id).eq("user_id", userId).eq("status", "pending").is("workflow_id", null);
       if (updateError) throw new Error("WORKFLOW_INTERRUPTED");
       throw new Error("DISPATCH_FAILED");
