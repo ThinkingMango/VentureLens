@@ -4,6 +4,10 @@ import { existsSync, readFileSync } from "node:fs";
 import {
   emailSchema,
   emailCodeSchema,
+  emailCodeMinLength,
+  emailCodeMaxLength,
+  emailCodeInputPattern,
+  normalizeEmailCode,
   emailCodeResendSeconds,
   emailAuthError,
   requestEmailCode,
@@ -20,16 +24,29 @@ test("email and code input are normalized and validated", () => {
   );
   for (const email of ["", "not-an-email", "a".repeat(255) + "@company.com"])
     assert.equal(emailSchema.safeParse(email).success, false);
-  assert.equal(emailCodeSchema.parse(" 012345 "), "012345");
-  for (const code of [
-    "",
-    "12345",
-    "1234567",
-    "abcdef",
-    "１２３４５６",
-    "123 456",
-  ])
-    assert.equal(emailCodeSchema.safeParse(code).success, false);
+  assert.equal(emailCodeMinLength, 6);
+  assert.equal(emailCodeMaxLength, 10);
+  const inputPattern = new RegExp(`^${emailCodeInputPattern}$`);
+  for (const code of ["012345", "0123456", "01234567", "012345678", "0123456789"]) {
+    assert.equal(emailCodeSchema.parse(code), code);
+    assert.equal(inputPattern.test(code), true);
+  }
+  for (const [input, expected] of [
+    [" 012345 ", "012345"],
+    ["0123 4567", "01234567"],
+    ["0123-4567", "01234567"],
+    ["\u20090123\u00a04567\n", "01234567"],
+    ["０１２３４５６７", "01234567"],
+  ]) {
+    assert.equal(normalizeEmailCode(input), expected);
+    assert.equal(emailCodeSchema.parse(input), expected);
+  }
+  for (const code of ["", "12345", "12345678901", "abcdef", "1234a5678", "1234.5678"]) {
+    assert.equal(emailCodeSchema.safeParse(code).success, false, code);
+    assert.equal(inputPattern.test(normalizeEmailCode(code)), false, code);
+  }
+  assert.equal(normalizeEmailCode("12345678901"), "12345678901", "Never truncate an overlong code into a different valid code");
+  assert.equal(normalizeEmailCode("1234a5678"), "1234a5678", "Never discard letters and accidentally verify a different code");
   assert.equal(emailCodeResendSeconds, 60);
 });
 
@@ -75,16 +92,21 @@ test("verification submits only the email, code, and email OTP type", async () =
       },
     },
   };
-  assert.equal(
-    await verifyEmailCode(client, "founder@company.com", "012345"),
-    result,
-  );
-  assert.deepEqual(input, {
-    email: "founder@company.com",
-    token: "012345",
-    type: "email",
-  });
-  assert.throws(() => verifyEmailCode(client, "founder@company.com", "bad"));
+  for (const code of ["012345", "0123456", "01234567", "012345678", "0123456789", "０１２３ ４５６７"]) {
+    assert.equal(
+      await verifyEmailCode(client, " founder@company.com ", code),
+      result,
+    );
+    assert.deepEqual(input, {
+      email: "founder@company.com",
+      token: normalizeEmailCode(code),
+      type: "email",
+    });
+  }
+  input = undefined;
+  for (const code of ["bad", "12345", "12345678901", "1234a5678"])
+    assert.throws(() => verifyEmailCode(client, "founder@company.com", code));
+  assert.equal(input, undefined, "Malformed codes never reach the provider");
 });
 
 test("provider errors give safe, translated recovery guidance", () => {
@@ -132,6 +154,10 @@ test("legacy password routes no longer expose password authentication", () => {
   assert.match(screen, /isComposing/);
   assert.match(screen, /keyCode === 229/);
   assert.match(screen, /autoComplete="one-time-code"/);
+  assert.match(screen, /pattern=\{emailCodeInputPattern\}/);
+  assert.match(screen, /minLength=\{emailCodeMinLength\}/);
+  assert.match(screen, /normalizeEmailCode\(event\.target\.value\)/);
+  assert.doesNotMatch(screen, /6-digit|maxLength=\{6\}|slice\(0,\s*6\)/);
 });
 
 test("email links accept only a well-formed token hash and sign-in types", () => {

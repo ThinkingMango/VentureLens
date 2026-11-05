@@ -2,10 +2,18 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
 export const emailSchema = z.string().trim().max(254).pipe(z.email());
+export const emailCodeMinLength = 6;
+export const emailCodeMaxLength = 10;
+export const emailCodeInputPattern = `[0-9]{${emailCodeMinLength},${emailCodeMaxLength}}`;
+
+export function normalizeEmailCode(value: string) {
+  return value.normalize("NFKC").replace(/[\s-]/g, "");
+}
+
 export const emailCodeSchema = z
   .string()
-  .trim()
-  .regex(/^\d{6}$/);
+  .transform(normalizeEmailCode)
+  .pipe(z.string().regex(new RegExp(`^${emailCodeInputPattern}$`)));
 export const emailCodeResendSeconds = 60;
 
 export function emailAuthError(error: { code?: string; status?: number }) {

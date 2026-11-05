@@ -5,8 +5,8 @@ equivalent ways in, and both come from the same one-time token:
 
 | In the email | Template variable | Handled by |
 | --- | --- | --- |
-| Button | `{{ .TokenHash }}` | `app/auth/confirm/route.ts` |
-| 6-digit code | `{{ .Token }}` | the code step in `components/auth-screen.tsx` |
+| Button | `{{ .TokenHash }}` | `app/auth/confirm/page.tsx` and its confirmation action |
+| Provider-issued code (6–10 digits) | `{{ .Token }}` | the code step in `components/auth-screen.tsx` |
 
 Using either one consumes the token, so the other stops working.
 
@@ -37,9 +37,10 @@ that group.
    from the table above, paste in `magic-link.html` and save.
 4. Open **Confirm signup** on the same page. Set its subject, paste in
    `confirm-signup.html` and save.
-5. Open **Authentication → Providers → Email** and confirm the email OTP length
-   is **6** and the expiry is **3600** seconds. The login screen only accepts
-   6 digits, and both emails promise a 1-hour expiry.
+5. The login screen and shared verifier accept **6–10 digits**, including
+   Supabase's eight-digit codes. Do not shorten provider-issued codes or change
+   the provider length just to match the UI. Both email templates promise a
+   1-hour expiry, so their copy must match the configured OTP expiry (3600 seconds).
 
 ## Local development with the Supabase CLI
 

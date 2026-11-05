@@ -7,6 +7,9 @@ import { ArrowRight, ShieldCheck, Check, LoaderCircle } from "lucide-react";
 import {
   emailSchema,
   emailCodeSchema,
+  emailCodeMinLength,
+  emailCodeInputPattern,
+  normalizeEmailCode,
   emailCodeResendSeconds,
   emailAuthError,
   requestEmailCode,
@@ -113,7 +116,7 @@ export function AuthScreen() {
   async function verifyCode() {
     if (busy.current) return;
     if (!emailCodeSchema.safeParse(code).success) {
-      setError("Enter the 6-digit code from your email.");
+      setError("Enter the complete code from your email (6–10 digits).");
       return;
     }
     busy.current = true;
@@ -172,6 +175,7 @@ export function AuthScreen() {
           <form
             className="flex flex-col gap-6"
             data-ready={ready}
+            noValidate
             aria-describedby={error || message ? feedbackId : undefined}
             onKeyDown={(event) => {
               if (
@@ -223,15 +227,14 @@ export function AuthScreen() {
                     type="text"
                     inputMode="numeric"
                     autoComplete="one-time-code"
-                    pattern="[0-9]{6}"
-                    minLength={6}
-                    maxLength={6}
+                    pattern={emailCodeInputPattern}
+                    minLength={emailCodeMinLength}
+                    autoCapitalize="none"
+                    spellCheck={false}
                     required
                     value={code}
                     onChange={(event) => {
-                      setCode(
-                        event.target.value.replace(/\D/g, "").slice(0, 6),
-                      );
+                      setCode(normalizeEmailCode(event.target.value));
                       setError("");
                     }}
                     disabled={pending}
@@ -242,7 +245,7 @@ export function AuthScreen() {
                   />
                   <FieldDescription id={helpId}>
                     {copy(
-                      "Codes expire and can only be used once. Never share your code.",
+                      "Enter every digit shown in your email. Codes expire and can only be used once. Never share your code.",
                     )}
                   </FieldDescription>
                 </Field>
