@@ -19,6 +19,7 @@ import {
   X,
   ArrowRight,
   FlaskConical,
+  ShieldCheck,
 } from "lucide-react";
 import { Brand } from "@/components/shared";
 import { LanguageSwitcher } from "@/components/language-switcher";
@@ -39,7 +40,7 @@ const nav = [
   { title: "Saved opportunities", href: "/saved", icon: Bookmark },
   { title: "Founder profile", href: "/profile", icon: UserRound },
 ];
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({ children, isAdmin = false }: { children: React.ReactNode; isAdmin?: boolean }) {
   const copy = useCopy();
   const pathname = usePathname();
   const path = pathname.startsWith("/demo/") ? pathname.slice(5) : pathname;
@@ -60,7 +61,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       setSigningOut(false);
     }
   }
-  const title = path.startsWith("/opportunities")
+  const title = path === "/admin" ? "AI providers" : path.startsWith("/opportunities")
     ? "Opportunity detail"
     : path === "/research/new"
       ? "New research"
@@ -126,6 +127,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               )}
             </Link>
           ))}
+          {isAdmin && !isDemo && (
+            <Link href="/admin" onClick={() => setOpen(false)} aria-current={path === "/admin" ? "page" : undefined} className={cn("nav-link", path === "/admin" && "active")}>
+              <ShieldCheck className="size-[18px]" aria-hidden="true" />
+              {copy("AI providers")}
+            </Link>
+          )}
         </nav>
         <Button asChild className="mt-6">
           <Link href="/research/new" onClick={() => setOpen(false)}>

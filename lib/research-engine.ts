@@ -7,6 +7,8 @@ import { GEMINI_MODEL, GEMINI_PROVIDER, GEMINI_SEARCH_INPUT_ALLOWANCE, GEMINI_SE
 import { fetchResearchSource } from "@/lib/research-source";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { researchProviderSettings } from "@/lib/provider-settings";
+import { defaultProviderSettings, providerPlan, type ProviderSettings } from "@/lib/provider-settings-core";
 import { projectSchema, profileSchema, opportunitySchema } from "@/lib/workspace-schema";
 import {
   RESEARCH_MODEL, methodology, discoverySchema, classificationSchema, evaluationSchema, reviewSchema,
@@ -47,14 +49,21 @@ export async function initializeResearch(ctx: Context) {
   const configuration = z.object({ brief: projectSchema, profile: profileSchema }).parse(row.configuration);
   const cached = checked(await client.from("research_stages").select("output").eq("run_id", ctx.runId).eq("user_id", ctx.userId).eq("stage_key", "setup").maybeSingle());
   if (!cached) {
+    const saved = await researchProviderSettings();
+    const providerSettings = { primary: saved.primary, autoFallback: saved.autoFallback };
+    const plan = providerPlan(providerSettings);
+    const verify = async (provider: ProviderSettings["primary"]) => {
+      if (provider === "gemini") { await verifyGeminiModel(); return GEMINI_PROVIDER; }
+      await verifyQwenModel(); return QWEN_PROVIDER;
+    };
     const activeProvider = await withResearchFallback(
-      async () => { await verifyQwenModel(); return QWEN_PROVIDER; },
-      process.env.GOOGLE_GENERATIVE_AI_API_KEY ? async () => { await verifyGeminiModel(); return GEMINI_PROVIDER; } : undefined,
+      () => verify(plan.primary),
+      plan.fallback ? () => verify(plan.fallback!) : undefined,
       errorCode,
     );
     const pricing = pricingSchema.parse(qwenPricing);
-    await checkpoint(ctx, "setup", { ...configuration, pricing, fallback_pricing: geminiPricing, active_provider: activeProvider, model: RESEARCH_MODEL, provider: QWEN_PROVIDER, methodology });
-  } else if ((cached.output as { provider?: string }).provider !== QWEN_PROVIDER) {
+    await checkpoint(ctx, "setup", { ...configuration, pricing, fallback_pricing: geminiPricing, active_provider: activeProvider, provider_settings: providerSettings, model: plan.primary === "gemini" ? GEMINI_MODEL : RESEARCH_MODEL, provider: plan.primary === "gemini" ? GEMINI_PROVIDER : QWEN_PROVIDER, methodology });
+  } else if (![QWEN_PROVIDER, GEMINI_PROVIDER].includes((cached.output as { provider?: string }).provider ?? "")) {
     throw new Error("PROVIDER_CONFIGURATION");
   }
   return true;
@@ -74,8 +83,9 @@ async function usage(ctx: Context, id: string, pricing: Pricing, tokens?: { inpu
   checked(await db().from("research_usage").update({ status: known ? "completed" : "unknown", input_tokens: tokens?.inputTokens ?? 0, output_tokens: tokens?.outputTokens ?? 0, search_requests: searchRequests, estimated_usd: known ? (tokens!.inputTokens! * pricing.input + tokens!.outputTokens! * pricing.output + searchRequests * pricing.search) : null }).eq("id", id).eq("run_id", ctx.runId).eq("user_id", ctx.userId));
 }
 async function providerCall<T>(ctx: Context, stage: string, prompt: string, primaryPricing: Pricing, maxOutputTokens: number, search: boolean, schemaBytes: number, execute: (provider: string) => Promise<{ value: T; tokens?: { inputTokens?: number | null; outputTokens?: number | null }; searchRequests?: number }>) {
-  const setup = await previous<Record<string, unknown> & { active_provider?: string; fallback_pricing?: Pricing }>(ctx, "setup");
-  const primary = setup.active_provider === GEMINI_PROVIDER ? GEMINI_PROVIDER : QWEN_PROVIDER;
+  const setup = await previous<Record<string, unknown> & { active_provider?: string; fallback_pricing?: Pricing; provider_settings?: ProviderSettings }>(ctx, "setup");
+  const plan = providerPlan(setup.provider_settings ?? defaultProviderSettings, setup.active_provider === GEMINI_PROVIDER ? "gemini" : "qwen");
+  const primary = plan.primary === "gemini" ? GEMINI_PROVIDER : QWEN_PROVIDER;
   const attempt = async (provider: string) => {
     const pricing = provider === GEMINI_PROVIDER ? pricingSchema.parse(setup.fallback_pricing ?? geminiPricing) : primaryPricing;
     const allowance = search ? (provider === GEMINI_PROVIDER ? GEMINI_SEARCH_QUERY_ALLOWANCE : 32) : 0;
@@ -84,7 +94,7 @@ async function providerCall<T>(ctx: Context, stage: string, prompt: string, prim
       const result = await execute(provider);
       await usage(ctx, id, pricing, result.tokens, result.searchRequests ?? 0);
       if ((result.searchRequests ?? 0) > allowance) throw new Error("BUDGET_EXCEEDED");
-      if (provider !== primary) await checkpoint(ctx, "setup", { ...setup, active_provider: provider, fallback_pricing: pricing });
+      if (provider !== primary) await checkpoint(ctx, "setup", { ...setup, active_provider: provider });
       return result.value;
     } catch (error) {
       // Only explicit pre-generation rejection releases a reservation; transport failures may have been billed.
@@ -95,7 +105,7 @@ async function providerCall<T>(ctx: Context, stage: string, prompt: string, prim
   };
   return withResearchFallback(
     () => attempt(primary),
-    primary === QWEN_PROVIDER && process.env.GOOGLE_GENERATIVE_AI_API_KEY ? () => attempt(GEMINI_PROVIDER) : undefined,
+    plan.fallback ? () => attempt(plan.fallback === "gemini" ? GEMINI_PROVIDER : QWEN_PROVIDER) : undefined,
     errorCode,
   );
 }
@@ -174,7 +184,7 @@ export async function executeResearchStage(ctx: Context, key: string): Promise<s
   const eligible = discovery.candidates.filter(c => eligibleEvidence(c.key, evidence, classes).length > 0);
   if (!eligible.length) throw new Error("INSUFFICIENT_EVIDENCE");
   if (key === "evaluation") {
-    const output = await structured(ctx, key, evaluationSchema, `只评估这 ${eligible.length} 个候选，candidate_id 一一对应且不增加候选。评估明确买方、痛点、交付方式、竞争/法规、每月价格与成本假设及验证计划。revenue 和 cost 必须明确写“假设，未验证”，无证据时不编造市场规模。0–100 维度：pain 痛点强度、demand 付费需求、economics 单位经济、feasibility 小团队交付可行性、advantage 创始人独特优势。缺证据应降低分数。market 模式 advantage=0。rationale 说明维度理由并引用 source_key。模式=${mode}；背景=${JSON.stringify(profile)}；候选=${JSON.stringify(eligible)}；带分类证据=${JSON.stringify(evidence.filter(e => eligible.some(c => c.key === e.candidate_id)).map(e => ({ ...e, classification: classes.find(c => c.source_key === e.source_key) })))}`, pricing);
+    const output = await structured(ctx, key, evaluationSchema, `只评估这 ${eligible.length} 个候选，candidate_id 一一对应且不增加候选。评估明确买方、痛点、交付方式、竞争/法规、每月价格与成本假设及验证计划。revenue 和 cost 必须明确写“假设，未验证”，无证据时不编造市���规模。0–100 维度：pain 痛点强度、demand 付费需求、economics 单位经济、feasibility 小团队交付可行性、advantage 创始人独特优势。缺证据应降低分数。market 模式 advantage=0。rationale 说明维度理由并引用 source_key。模式=${mode}；背景=${JSON.stringify(profile)}；候选=${JSON.stringify(eligible)}；带分类证据=${JSON.stringify(evidence.filter(e => eligible.some(c => c.key === e.candidate_id)).map(e => ({ ...e, classification: classes.find(c => c.source_key === e.source_key) })))}`, pricing);
     requireExactIds(eligible.map(c => c.key), output.items.map(e => e.candidate_id));
     await checkpoint(ctx, key, output);
   } else if (key === "scoring") {
