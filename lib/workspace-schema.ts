@@ -92,11 +92,24 @@ export const opportunitySchema = z.object({
   penalty: z.number().optional(),
 });
 export type WorkspaceOpportunity = z.infer<typeof opportunitySchema>;
+export type ResearchAccess = {
+  enabled: boolean;
+  remaining: number;
+  maxRuns: number;
+  expiresAt: string | null;
+};
+export const noResearchAccess: ResearchAccess = {
+  enabled: false,
+  remaining: 0,
+  maxRuns: 0,
+  expiresAt: null,
+};
 export type WorkspaceData = {
   userId: string;
   email: string;
   profile: Profile;
   onboarded: boolean;
+  access: ResearchAccess;
   projects: Project[];
   runs: ResearchRun[];
   opportunities: WorkspaceOpportunity[];

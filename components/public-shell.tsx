@@ -7,6 +7,13 @@ import { Menu, X, ArrowUpRight } from "lucide-react";
 import { Brand } from "@/components/shared";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { Button } from "@/components/ui/button";
+const links = [
+  { href: "/#whats-inside", label: "What you get" },
+  { href: "/#how-it-works", label: "How it works" },
+  { href: "/demo/dashboard", label: "Live demo" },
+  { href: "/pricing", label: "Pricing" },
+  { href: "/#faq", label: "FAQ" },
+];
 export function PublicShell({ children }: { children: React.ReactNode }) {
   const copy = useCopy();
   const [open, setOpen] = useState(false);
@@ -14,7 +21,7 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-card text-foreground">
       <header
-        className="border-b"
+        className="sticky top-0 z-40 border-b bg-card/85 backdrop-blur"
         onKeyDown={(event) => {
           if (event.key === "Escape" && open) {
             setOpen(false);
@@ -22,33 +29,24 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
           }
         }}
       >
-        <div className="mx-auto flex min-h-20 max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3 md:px-8">
+        <div className="mx-auto flex min-h-[4.5rem] max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3 md:px-8">
           <Brand />
           <nav
-            className="hidden items-center gap-8 lg:flex"
+            className="hidden items-center gap-7 lg:flex"
             aria-label={copy("Main navigation")}
           >
-            <Link
-              href="/#how-it-works"
-              className="text-muted-foreground hover:text-primary"
-            >
-              {copy("How it works")}
-            </Link>
-            <Link
-              href="/demo/dashboard"
-              className="text-muted-foreground hover:text-primary"
-            >
-              {copy("Explore the platform")}
-            </Link>
-            <Link
-              href="/pricing"
-              className="text-muted-foreground hover:text-primary"
-            >
-              {copy("Pricing")}
-            </Link>
+            {links.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="text-sm font-medium text-muted-foreground hover:text-primary"
+              >
+                {copy(link.label)}
+              </Link>
+            ))}
           </nav>
-          <div className="hidden items-center gap-5 lg:flex">
-            <Link href="/login" className="font-medium">
+          <div className="hidden items-center gap-4 lg:flex">
+            <Link href="/login" className="text-sm font-medium">
               {copy("Log in")}
             </Link>
             <Button asChild>
@@ -77,38 +75,67 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
         {open && (
           <nav
             id="public-mobile-menu"
-            className="flex flex-col gap-1 border-t p-5 lg:hidden [&>a]:flex [&>a]:min-h-11 [&>a]:items-center"
+            className="flex flex-col gap-1 border-t bg-card p-5 lg:hidden [&>a]:flex [&>a]:min-h-11 [&>a]:items-center [&>a]:rounded-md [&>a]:px-3 [&>a]:font-medium"
             aria-label={copy("Mobile main navigation")}
             onClick={(event) => {
               if ((event.target as HTMLElement).closest("a")) setOpen(false);
             }}
           >
-            <Link href="/#how-it-works">{copy("How it works")}</Link>
-            <Link href="/demo/dashboard">{copy("Explore the platform")}</Link>
-            <Link href="/pricing">{copy("Pricing")}</Link>
+            {links.map((link) => (
+              <Link key={link.href} href={link.href}>
+                {copy(link.label)}
+              </Link>
+            ))}
             <Link href="/login">{copy("Log in")}</Link>
-            <Link href="/signup">{copy("Get started")}</Link>
+            <Link href="/signup" className="text-primary">
+              {copy("Get started")}
+            </Link>
           </nav>
         )}
       </header>
       {children}
-      <footer className="border-t">
-        <div className="mx-auto flex max-w-7xl flex-col justify-between gap-6 px-5 py-8 md:flex-row md:items-center md:px-8">
-          <div className="flex flex-col gap-2">
+      <footer className="border-t bg-background">
+        <div className="mx-auto grid max-w-7xl gap-10 px-5 py-12 md:grid-cols-[1.4fr_1fr_1fr] md:px-8">
+          <div className="flex flex-col gap-3">
             <Brand />
-            <p className="text-sm text-muted-foreground">
-              {copy("A clearer lens on your next business.")}
+            <p className="max-w-sm text-sm text-muted-foreground">
+              {copy(
+                "Evidence-first research for founders exploring GenAI-enabled, recurring-revenue businesses. Private accounts, saved briefs, and a synthetic demo you can explore without signing up.",
+              )}
             </p>
           </div>
-          <p className="max-w-sm text-sm text-muted-foreground">
-            {copy(
-              "Private accounts and saved research briefs. Sample reports and illustrative prices are available in the separate demo.",
-            )}
-          </p>
-          <div className="flex gap-6">
-            <Link href="/pricing">{copy("Pricing")}</Link>
-            <Link href="/demo/dashboard">{copy("Explore demo")}</Link>
+          <div className="flex flex-col gap-2 text-sm">
+            <p className="font-semibold">{copy("Product")}</p>
+            <Link href="/#whats-inside" className="text-muted-foreground hover:text-primary">
+              {copy("What you get")}
+            </Link>
+            <Link href="/#how-it-works" className="text-muted-foreground hover:text-primary">
+              {copy("How it works")}
+            </Link>
+            <Link href="/pricing" className="text-muted-foreground hover:text-primary">
+              {copy("Pricing")}
+            </Link>
+            <Link href="/demo/dashboard" className="text-muted-foreground hover:text-primary">
+              {copy("Explore demo")}
+            </Link>
           </div>
+          <div className="flex flex-col gap-2 text-sm">
+            <p className="font-semibold">{copy("Account")}</p>
+            <Link href="/login" className="text-muted-foreground hover:text-primary">
+              {copy("Log in")}
+            </Link>
+            <Link href="/signup" className="text-muted-foreground hover:text-primary">
+              {copy("Create a free account")}
+            </Link>
+            <p className="mt-2 text-muted-foreground">
+              {copy("Live research is in private beta. Pricing shown is planned, and no payments are collected yet.")}
+            </p>
+          </div>
+        </div>
+        <div className="border-t">
+          <p className="mx-auto max-w-7xl px-5 py-5 text-xs text-muted-foreground md:px-8">
+            {copy("VentureLens AI · Research output is a starting point for your own validation, not financial or investment advice.")}
+          </p>
         </div>
       </footer>
     </div>

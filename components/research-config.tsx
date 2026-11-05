@@ -11,9 +11,12 @@ import {
   Telescope,
   Check,
   UserRound,
+  Clock3,
+  Lock,
 } from "lucide-react";
 import { useDemo } from "@/components/demo-provider";
 import { PageHeader, DemoNote } from "@/components/shared";
+import { ResearchAccessCard } from "@/components/live-workspace";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -23,15 +26,23 @@ import {
   FieldDescription,
   FieldError,
 } from "@/components/ui/field";
+const pipeline = [
+  ["Discover", "Up to eight narrow hypotheses from your brief and profile."],
+  ["Retrieve", "Live web search for buyer pain, spending, competitors, and counter-evidence."],
+  ["Classify", "Every excerpt is tagged by kind, reliability, and stance."],
+  ["Score & review", "Weighted scoring, then an adversarial pass that can only deduct."],
+  ["Save", "A private report with linked sources you can reopen any time."],
+];
 export function ResearchConfig() {
   const copy = useCopy();
-  const { run, setRun, profile, isDemo, href, busy, refresh } = useDemo();
+  const { run, setRun, profile, isDemo, href, busy, refresh, data } = useDemo();
   const [draft, setDraft] = useState(run);
   const [submitting, setSubmitting] = useState(false);
   const requestKey = useRef<string | null>(null);
   const [nameError, setNameError] = useState("");
   const [formError, setFormError] = useState("");
   const router = useRouter();
+  const accessBlocked = !isDemo && !data?.access.enabled;
   return (
     <>
       <Link
@@ -48,9 +59,35 @@ export function ResearchConfig() {
             ? copy(
                 "Configure a research brief and preview a clearly labeled demonstration report.",
               )
-            : copy("创建证据驱动的研究任务。仅限已授权的开发账号，不连接计费。")
+            : copy(
+                "Describe the market you want to explore. Live research retrieves real sources, scores each hypothesis, and saves a private report.",
+              )
         }
       />
+      {accessBlocked && (
+        <div
+          role="status"
+          className="flex flex-col gap-3 rounded-xl border border-warm/40 bg-warm-soft p-5 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <div className="flex items-start gap-3">
+            <Lock className="mt-0.5 size-5 shrink-0 text-warm" />
+            <div className="flex flex-col gap-1">
+              <p className="font-medium">{copy("Live research is in private beta")}</p>
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                {copy(
+                  "Your brief will be saved to your workspace, but a live run cannot start on this account yet. Explore a complete sample report in the demo while access expands.",
+                )}
+              </p>
+            </div>
+          </div>
+          <Button asChild variant="outline" className="shrink-0">
+            <Link href="/demo/research/results">
+              {copy("Read a sample report")}
+              <ArrowRight />
+            </Link>
+          </Button>
+        </div>
+      )}
       <div className="grid gap-6 xl:grid-cols-[1.6fr_1fr]">
         <section className="surface p-6 md:p-8">
           <form
@@ -73,6 +110,9 @@ export function ResearchConfig() {
                 if (isDemo) {
                   await setRun(brief);
                   router.push(href("/research/results?demo=1"));
+                } else if (accessBlocked) {
+                  await setRun(brief);
+                  router.push("/research");
                 } else {
                   requestKey.current ??= crypto.randomUUID();
                   const response = await fetch("/api/research", {
@@ -93,7 +133,7 @@ export function ResearchConfig() {
                 router.refresh();
               } catch (error) {
                 setFormError(
-                  error instanceof Error ? error.message : "研究暂时无法启动。",
+                  error instanceof Error ? error.message : "Research could not start right now.",
                 );
               } finally {
                 setSubmitting(false);
@@ -113,6 +153,7 @@ export function ResearchConfig() {
                   value={draft.name}
                   maxLength={100}
                   required
+                  placeholder={copy("e.g. GenAI tools for boutique agencies")}
                   aria-invalid={!!nameError}
                   aria-describedby={
                     nameError ? "research-name-error" : "research-name-help"
@@ -274,7 +315,7 @@ export function ResearchConfig() {
                         "Up to 1,000 characters. Demo notes stay in memory; results remain fixed synthetic examples.",
                       )
                     : copy(
-                        "最多 1,000 字符。研究配置会保存；必要的市场背景会发送至 Qwen 和外部检索服务，请勿包含敏感信息。",
+                        "Up to 1,000 characters. Your brief is saved privately; the market context is sent to the research model and web retrieval, so leave out sensitive details.",
                       )}
                 </FieldDescription>
               </Field>
@@ -285,12 +326,17 @@ export function ResearchConfig() {
               </p>
             )}
             <div className="flex flex-wrap items-center justify-between gap-4 border-t pt-5">
-              <span className="text-sm text-muted-foreground">
-                {isDemo
-                  ? copy("0 credits used in demo mode")
-                  : copy(
-                      "开发白名单 · 最多 3 次任务 · 每次估算预算上限 US$0.25",
-                    )}
+              <span className="flex items-center gap-2 text-sm text-muted-foreground">
+                {isDemo ? (
+                  copy("0 credits used in demo mode")
+                ) : accessBlocked ? (
+                  copy("Saves the brief only · No live run on this account yet")
+                ) : (
+                  <>
+                    <Clock3 className="size-4" />
+                    {copy("Usually 5–10 minutes · Uses one beta research run")}
+                  </>
+                )}
               </span>
               <Button
                 type="submit"
@@ -298,16 +344,19 @@ export function ResearchConfig() {
                 aria-busy={busy || submitting}
               >
                 {busy || submitting
-                  ? copy("提交中…")
+                  ? copy("Submitting…")
                   : isDemo
                     ? copy("Preview research results")
-                    : copy("启动证据研究")}
+                    : accessBlocked
+                      ? copy("Save brief")
+                      : copy("Start evidence research")}
                 <ArrowRight />
               </Button>
             </div>
           </form>
         </section>
         <aside className="flex flex-col gap-5">
+          {!isDemo && <ResearchAccessCard compact />}
           <section className="surface flex flex-col gap-4 p-6">
             <div className="flex items-center gap-2">
               <UserRound className="size-5 text-primary" />
@@ -319,7 +368,7 @@ export function ResearchConfig() {
                     "Reference your experience while exploring. Profile changes do not personalize demo results.",
                   )
                 : copy(
-                    "研究会保存此刻的画像快照。创始人优势和综合发现模式使用这些信息；市场优先模式不使用。",
+                    "A snapshot of your profile is saved with each run. Founder-advantage and combined modes use it; market-first does not.",
                   )}
             </p>
             <dl className="flex flex-col gap-4">
@@ -345,25 +394,43 @@ export function ResearchConfig() {
           <section className="flex flex-col gap-4 rounded-xl bg-secondary p-6 text-foreground">
             <Telescope className="size-6 text-primary" />
             <h2 className="font-semibold">
-              {copy("A structured view of the possibilities")}
+              {isDemo
+                ? copy("A structured view of the possibilities")
+                : copy("What happens when you start")}
             </h2>
-            <ul className="flex flex-col gap-3">
-              {[
-                "Ranked opportunity hypotheses",
-                "Clear buyer and pain profiles",
-                "Evidence quality and key risks",
-                "Illustrative business economics",
-                "Practical validation next steps",
-              ].map((t) => (
-                <li
-                  key={t}
-                  className="flex items-center gap-2 text-sm text-muted-foreground"
-                >
-                  <Check className="size-4 shrink-0 text-primary" />
-                  {copy(t)}
-                </li>
-              ))}
-            </ul>
+            {isDemo ? (
+              <ul className="flex flex-col gap-3">
+                {[
+                  "Ranked opportunity hypotheses",
+                  "Clear buyer and pain profiles",
+                  "Evidence quality and key risks",
+                  "Illustrative business economics",
+                  "Practical validation next steps",
+                ].map((t) => (
+                  <li
+                    key={t}
+                    className="flex items-center gap-2 text-sm text-muted-foreground"
+                  >
+                    <Check className="size-4 shrink-0 text-primary" />
+                    {copy(t)}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <ol className="flex flex-col gap-3">
+                {pipeline.map(([title, text], index) => (
+                  <li key={title} className="flex gap-3 text-sm">
+                    <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-card text-xs font-semibold text-primary">
+                      {index + 1}
+                    </span>
+                    <span>
+                      <span className="font-medium">{copy(title)}</span>
+                      <span className="block text-muted-foreground">{copy(text)}</span>
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            )}
           </section>
           <DemoNote />
         </aside>

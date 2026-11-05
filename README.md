@@ -1,1 +1,102 @@
-# VentureLens
+# VentureLens AI
+
+Evidence-first opportunity research for founders exploring GenAI-enabled, recurring-revenue businesses.
+
+A founder describes their experience, constraints and goals; VentureLens discovers narrow opportunity hypotheses, retrieves real web evidence for each one, classifies and scores it, runs an adversarial review, and saves a private report with linked sources and a validation plan. Candidates without independent evidence are dropped rather than dressed up.
+
+- **Live app routes:** `/`, `/pricing`, `/login`, `/signup`, `/onboarding`, `/dashboard`, `/research`, `/research/new`, `/research/[id]`, `/research/results`, `/opportunities/[id]`, `/saved`, `/profile`, `/billing`, `/admin`
+- **Synthetic demo:** everything under `/demo/*` runs on fixed fixtures with no account and no AI calls.
+- **Languages:** English, Simplified Chinese, Traditional Chinese (interface). Source excerpts are kept in their original language.
+- **Status:** private beta. Live research requires a `research_dev_access` grant; payments are not connected. See [`plan.md`](./plan.md) for the roadmap and [`docs/REVIEW.md`](./docs/REVIEW.md) for the current holistic review.
+
+## Stack
+
+| Layer | Choice |
+| --- | --- |
+| Framework | Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS 4, shadcn-style primitives |
+| Data & auth | Supabase (Postgres, RLS, passwordless email OTP / magic link) |
+| Research job | Vercel Workflow (`workflows/research.ts`) with checkpointed stages |
+| Models | Qwen via DashScope (primary) and Gemini (fallback) through the Vercel AI SDK; native web search on both |
+| i18n | `next-intl`; messages keyed by a hash of the English source string (`i18n/config.ts` → `messageKey`) |
+| Tests | `node:test` unit tests, a Supabase integration test, and a research E2E test |
+
+## Local setup
+
+Prerequisites: Node 22, pnpm 10, a Supabase project (or the Supabase CLI), and optionally DashScope / Google AI keys.
+
+```bash
+pnpm install --frozen-lockfile
+```
+
+Create `.env.development.local`:
+
+```bash
+NEXT_PUBLIC_SUPABASE_URL=https://<project>.supabase.co
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<publishable key>
+SUPABASE_SECRET_KEY=<service role / secret key>      # server only
+# Live research (optional; the demo works without these)
+DASHSCOPE_API_KEY=<key>
+DASHSCOPE_WORKSPACE_ID=<beijing workspace id>
+GOOGLE_GENERATIVE_AI_API_KEY=<key>
+```
+
+Apply the migrations in `supabase/migrations/` to your project, then:
+
+```bash
+pnpm dev
+```
+
+> **Known issue:** `20261104000000_venturelens_workspace.sql` and `202611040001_venturelens_workspace.sql` both create the initial schema. Apply only one on a fresh database until the history is reconciled (see `docs/REVIEW.md`, finding B1).
+
+Email templates for the passwordless flow live in `supabase/templates/` with setup notes in that folder's README.
+
+To enable live research for an account during the beta, insert a grant:
+
+```sql
+insert into public.research_dev_access (user_id, expires_at, max_runs)
+values ('<auth.users.id>', now() + interval '30 days', 3);
+```
+
+## Scripts
+
+```bash
+pnpm dev                 # Next.js dev server
+pnpm typecheck           # tsc --noEmit
+pnpm test                # unit tests (no network)
+pnpm build               # production build
+pnpm test:integration    # Supabase RLS/integration test — needs credentials and a test project
+pnpm test:research:e2e   # runs a real research job — incurs provider cost
+```
+
+## Repository layout
+
+```
+app/              routes (public, (workspace) group, /demo, /api, /auth)
+components/       screens and UI primitives (components/ui)
+lib/              research engine, providers, workspace data, schemas, Supabase clients
+workflows/        Vercel Workflow definition for a research run
+supabase/         migrations and auth email templates
+i18n/, messages/  locale negotiation, copy helpers, catalogues (en, zh-Hans, zh-Hant)
+tests/            node:test suites
+docs/             reviews and operating documentation
+```
+
+## How a research run works
+
+1. `POST /api/research` validates the brief, checks the profile and access grant, and calls `enqueue_research` (idempotent on `requestKey`).
+2. `dispatchResearch` starts the workflow; `initializeResearch` claims the run and verifies the provider.
+3. Stages run in order with a checkpoint after each: `discovery` → `retrieval:cN` (one per candidate) → `classification` → `evaluation` → `scoring` → `review` → `finalizing`.
+4. Every model or search call reserves budget through `reserve_research_usage` first; the run stops with `BUDGET_EXCEEDED` if the reservation does not fit.
+5. `finish_research` writes the report and `opportunities` rows only when at least one candidate survives the evidence gate (two independent domains, one non-vendor supporting source) and the review.
+
+Scoring rules live in `lib/research-core.ts` and are unit-tested in `tests/research.test.mjs`.
+
+## Adding UI copy
+
+Call `copy("English source text")` in components. Then add the string to all three catalogues with `node scripts/i18n-merge.mjs entries.json`, where `entries.json` lists `{ "en", "hans", "hant" }` objects; the key is produced by `messageKey()`. `pnpm test` fails if a literal `copy()` call has no entry in any locale. Strings passed through variables (arrays of titles, etc.) are not checked by the test, so add them too.
+
+## Contributing
+
+- Keep `/demo` fixtures separate from real data; never write demo content into Supabase.
+- New tables need RLS with `force row level security`, composite `(id, user_id)` foreign keys, and tests.
+- Do not add payment or billing logic until the entitlement ledger described in `plan.md` M3 exists.

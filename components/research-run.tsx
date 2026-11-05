@@ -11,6 +11,16 @@ import { researchErrors, stageLabels } from "@/lib/research-core";
 import type { ResearchDetail } from "@/lib/research-types";
 import { useCopy, useFormats } from "@/i18n/use-copy";
 import { feedbackSource } from "@/i18n/errors";
+const stageHints: Record<string, string> = {
+  queued: "Waiting for a worker to pick up the job.",
+  discovery: "Generating up to eight narrow hypotheses from your brief and profile.",
+  retrieval: "Searching the web for buyer pain, spending signals, competitors, and counter-evidence. This is the longest stage.",
+  classification: "Tagging every excerpt by kind, reliability, and whether it supports or contradicts the idea.",
+  evaluation: "Estimating buyer, pricing, cost, and risk for each candidate with enough evidence.",
+  scoring: "Applying the weighted scorecard and evidence caps.",
+  review: "Running an adversarial critique that can reject ideas or deduct points.",
+  finalizing: "Saving the report and linked sources to your workspace.",
+};
 const stages = [
   "discovery",
   "retrieval",
@@ -168,6 +178,12 @@ export function ResearchRunView({
               )}
             </h2>
           </div>
+          {active && (
+            <p className="max-w-prose text-sm leading-relaxed text-muted-foreground">
+              {copy(stageHints[data.stage] ?? stageHints.queued)}{" "}
+              {copy("A full run usually takes 5–10 minutes. You can leave this page; progress is saved on the server.")}
+            </p>
+          )}
           <ol className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {stages.map((stage, i) => {
               const done =

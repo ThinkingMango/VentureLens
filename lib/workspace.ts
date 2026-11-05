@@ -4,7 +4,9 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import {
   emptyProfile,
+  noResearchAccess,
   opportunitySchema,
+  type ResearchAccess,
   type WorkspaceData,
   type Profile,
 } from "@/lib/workspace-schema";
@@ -29,6 +31,7 @@ export async function readWorkspace(
     runsResult,
     opportunitiesResult,
     savesResult,
+    accessResult,
   ] = await Promise.all([
     supabase
       .from("founder_profiles")
@@ -56,6 +59,11 @@ export async function readWorkspace(
       .from("saved_opportunities")
       .select("opportunity_id,completed_tasks")
       .eq("user_id", user.id),
+    supabase
+      .from("research_dev_access")
+      .select("max_runs,runs_used,expires_at")
+      .eq("user_id", user.id)
+      .maybeSingle(),
   ]);
   const failed = [
     profileResult,
@@ -63,6 +71,7 @@ export async function readWorkspace(
     runsResult,
     opportunitiesResult,
     savesResult,
+    accessResult,
   ].some((r) => r.error);
   if (failed)
     throw new Error("We could not load your workspace. Please try again.");
@@ -87,11 +96,23 @@ export async function readWorkspace(
     });
     return parsed.success ? [parsed.data] : [];
   });
+  const grant = accessResult.data;
+  const active =
+    !!grant && new Date(grant.expires_at).getTime() > Date.now();
+  const access: ResearchAccess = active
+    ? {
+        enabled: Math.max(0, grant.max_runs - grant.runs_used) > 0,
+        remaining: Math.max(0, grant.max_runs - grant.runs_used),
+        maxRuns: grant.max_runs,
+        expiresAt: grant.expires_at,
+      }
+    : { ...noResearchAccess };
   return {
     userId: user.id,
     email: user.email ?? "",
     profile,
     onboarded: row?.onboarding_completed ?? false,
+    access,
     projects: projectsResult.data ?? [],
     runs: runsResult.data ?? [],
     opportunities,
