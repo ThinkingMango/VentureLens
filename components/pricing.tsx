@@ -158,12 +158,12 @@ export function Pricing() {
           <section className="grid gap-5 md:grid-cols-3">
             {[
               {
-                title: "Failed runs will not cost a credit",
-                text: "If retrieval fails or the evidence is too thin to support a report, the run stops and the credit is released. That is the policy we are building toward.",
+                title: "Failed runs do not cost a run",
+                text: "If retrieval fails, the model output is rejected, or the evidence is too thin to support a report, the run stops and your run is returned automatically. The same rule will apply to paid credits.",
               },
               {
-                title: "Everything in the demo is free",
-                text: "Explore the complete workspace, sample reports, and validation checklist without an account or a card.",
+                title: "Your first run is free",
+                text: "Every confirmed account receives one free research run, and the complete demo workspace needs no account or card.",
               },
               {
                 title: "Prices may change before launch",
@@ -195,7 +195,7 @@ export function Pricing() {
               },
               {
                 q: "How do I get access to live research now?",
-                a: "Live research is limited to authorized beta accounts while quality and cost are measured. Create a free account, complete your founder profile, and you will see your access status on the New research page.",
+                a: "Create a free account and confirm your email. One research run is granted automatically and shown on the New research page; complete your founder profile and start a brief to use it.",
               },
             ].map((f) => (
               <details key={f.q} className="surface group p-5">

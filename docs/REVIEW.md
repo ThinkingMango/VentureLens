@@ -212,9 +212,9 @@ Gross margin on AI cost alone is >90 %. The real cost drivers will be **failed r
 | --- | --- | --- | --- |
 | P0 | Merge this PR (activation UX, access pre-flight, landing) | done | — |
 | P0 | ~~Reconcile duplicate migrations; document in `docs/DATABASE_MIGRATIONS.md` (B1)~~ **done 2026-11-05** | — | — |
-| P0 | Free run on email confirmation + abuse limits (B2) | 1 d | backend |
+| P0 | ~~Free run on email confirmation + abuse limits (B2)~~ **done 2026-11-05** (migration `20261105155412`) | — | — |
 | P0 | ~~Report language per run; enum confidence; remove "stays in original language" copy (B3, B11, B12)~~ **done 2026-11-05** (not yet verified with a live run) | — | — |
-| P0 | Release quota/credit on engine-caused failure; one auto-retry for `INVALID_OUTPUT` (B4) | 1 d | research |
+| P0 | ~~Release quota on failure (B4)~~ **done 2026-11-05**; manual retry now also covers `INVALID_OUTPUT` and `RETRIEVAL_UNAVAILABLE`. An automatic retry is still open. | — | — |
 | P1 | `app_settings` table; move provider settings, budget cap, pricing (B5, B8) | 1 d | backend |
 | P1 | Admin by `app_metadata.role` only; drop email constant from client (B6) | 0.5 d | backend |
 | P1 | Realistic retrieval reservation + async usage reconciliation (B7) | 1 d | research |

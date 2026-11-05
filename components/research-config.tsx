@@ -75,10 +75,10 @@ export function ResearchConfig() {
           <div className="flex items-start gap-3">
             <Lock className="mt-0.5 size-5 shrink-0 text-warm" />
             <div className="flex flex-col gap-1">
-              <p className="font-medium">{copy("Live research is in private beta")}</p>
+              <p className="font-medium">{copy("No research runs left")}</p>
               <p className="text-sm leading-relaxed text-muted-foreground">
                 {copy(
-                  "Your brief will be saved to your workspace, but a live run cannot start on this account yet. Explore a complete sample report in the demo while access expands.",
+                  "Your brief will be saved to your workspace, but a live run cannot start until more runs are available. Paid credits are planned; explore a complete sample report in the demo meanwhile.",
                 )}
               </p>
             </div>
@@ -337,7 +337,7 @@ export function ResearchConfig() {
                 ) : (
                   <>
                     <Clock3 className="size-4" />
-                    {copy("Usually 5–10 minutes · Uses one beta research run")}
+                    {copy("Usually 5–10 minutes · Uses one research run, returned if the run fails")}
                     {" · "}
                     {copy("Report in {language}", { language: localeNames[locale] })}
                   </>

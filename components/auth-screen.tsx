@@ -336,7 +336,7 @@ export function AuthScreen() {
             )}
           </p>
           <p className="rounded-lg bg-secondary p-3 text-center text-sm text-foreground">
-            {copy("Free during beta. No card, no subscription, nothing to cancel.")}
+            {copy("One free research run on sign-up. No card, no subscription, nothing to cancel.")}
           </p>
         </div>
         <p className="text-sm text-muted-foreground">

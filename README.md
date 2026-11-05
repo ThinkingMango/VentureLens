@@ -7,7 +7,7 @@ A founder describes their experience, constraints and goals; VentureLens discove
 - **Live app routes:** `/`, `/pricing`, `/login`, `/signup`, `/onboarding`, `/dashboard`, `/research`, `/research/new`, `/research/[id]`, `/research/results`, `/opportunities/[id]`, `/saved`, `/profile`, `/billing`, `/admin`
 - **Synthetic demo:** everything under `/demo/*` runs on fixed fixtures with no account and no AI calls.
 - **Languages:** English, Simplified Chinese, Traditional Chinese (interface). Source excerpts are kept in their original language.
-- **Status:** private beta. Live research requires a `research_dev_access` grant; payments are not connected. See [`plan.md`](./plan.md) for the roadmap and [`docs/REVIEW.md`](./docs/REVIEW.md) for the current holistic review.
+- **Status:** beta. Every confirmed account receives one free research run (`research_dev_access`, granted by a database trigger); failed runs are returned automatically; payments are not connected. See [`plan.md`](./plan.md) for the roadmap and [`docs/REVIEW.md`](./docs/REVIEW.md) for the current holistic review.
 
 ## Stack
 
@@ -50,11 +50,11 @@ Migration versions match the live project's history; see [`docs/DATABASE_MIGRATI
 
 Email templates for the passwordless flow live in `supabase/templates/` with setup notes in that folder's README.
 
-To enable live research for an account during the beta, insert a grant:
+Every confirmed account receives one free research run automatically. To give an account more during the beta, raise its grant:
 
 ```sql
-insert into public.research_dev_access (user_id, expires_at, max_runs)
-values ('<auth.users.id>', now() + interval '30 days', 3);
+update public.research_dev_access set max_runs = 3, expires_at = now() + interval '30 days'
+where user_id = '<auth.users.id>';
 ```
 
 ## Scripts

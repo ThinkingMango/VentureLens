@@ -67,9 +67,13 @@ export function ResearchRunView({
   const retryable =
     data.status === "failed" &&
     data.retry_count < 1 &&
-    ["TRANSIENT_PROVIDER", "WORKFLOW_INTERRUPTED", "DISPATCH_FAILED"].includes(
-      data.error_code ?? "",
-    );
+    [
+      "TRANSIENT_PROVIDER",
+      "WORKFLOW_INTERRUPTED",
+      "DISPATCH_FAILED",
+      "INVALID_OUTPUT",
+      "RETRIEVAL_UNAVAILABLE",
+    ].includes(data.error_code ?? "");
   async function retry() {
     setRetrying(true);
     setRetryError("");
@@ -83,6 +87,7 @@ export function ResearchRunView({
       if (!response.ok)
         throw new Error(feedbackSource(result.code, "RETRY_UNAVAILABLE"));
       await mutate();
+      void refresh();
     } catch (error) {
       setRetryError(
         error instanceof Error
@@ -227,6 +232,9 @@ export function ResearchRunView({
                   researchErrors[data.error_code ?? ""] ??
                     "The task stopped without generating a report.",
                 )}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {copy("This run did not use up a research run: your allowance was restored. A retry takes the slot again until it completes.")}
               </p>
               {data.error_code === "BUDGET_EXCEEDED" && (
                 <p className="max-w-prose text-sm leading-relaxed text-muted-foreground">
