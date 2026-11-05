@@ -2,7 +2,9 @@
 import { useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
-import { Check, Circle, LoaderCircle, ArrowLeft } from "lucide-react";
+import { Check, Circle, LoaderCircle, ArrowLeft, Cpu } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { researchModels } from "@/lib/research-models";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/shared";
 import { useDemo } from "@/components/demo-provider";
@@ -21,6 +23,23 @@ const stageHints: Record<string, string> = {
   review: "Running an adversarial critique that can reject ideas or deduct points.",
   finalizing: "Saving the report and linked sources to your workspace.",
 };
+const providerNames: Record<string, string> = {
+  "dashscope-beijing": "Qwen via DashScope",
+  "google-gemini": "Gemini via Google",
+};
+export function ModelTag({ model, provider, planned = false }: { model: string | null; provider?: string | null; planned?: boolean }) {
+  const copy = useCopy();
+  if (!model) return null;
+  const name = model === "mixed" ? copy("Mixed models") : (researchModels as Record<string, { name: string }>)[model]?.name ?? model;
+  const vendor = provider ? providerNames[provider] : undefined;
+  return (
+    <Badge variant="secondary" className="gap-1.5 rounded-md font-medium" title={model}>
+      <Cpu className="size-3.5" aria-hidden="true" />
+      {planned ? copy("Planned model: {model}", { model: name }) : copy("Model: {model}", { model: name })}
+      {vendor && <span className="font-normal text-muted-foreground">· {copy(vendor)}</span>}
+    </Badge>
+  );
+}
 const stages = [
   "discovery",
   "retrieval",
@@ -123,6 +142,14 @@ export function ResearchRunView({
           </Button>
         )}
       </PageHeader>
+      <div className="flex flex-wrap items-center gap-2">
+        <ModelTag model={data.report?.model ?? data.model?.model ?? null} provider={data.report ? data.report.provider ?? data.model?.provider : data.model?.provider} planned={!data.report && !!data.model?.planned} />
+        {data.model?.used.length > 1 && (
+          <span className="text-sm text-muted-foreground">
+            {copy("Models used: {models}", { models: data.model.used.map((id) => (researchModels as Record<string, { name: string }>)[id]?.name ?? id).join(", ") })}
+          </span>
+        )}
+      </div>
       {error && (
         <p role="alert" className="text-sm text-muted-foreground">
           {copy(

@@ -100,8 +100,9 @@ export async function POST(request: NextRequest) {
     }
     try {
       await dispatchResearch(id, user.id);
-    } catch {
+    } catch (error) {
       /* The persisted failed state remains inspectable and retryable. */
+      console.error("[research] dispatch error", { run: id, message: error instanceof Error ? error.message : String(error) });
     }
     return json({ id }, 202);
   } catch (error) {

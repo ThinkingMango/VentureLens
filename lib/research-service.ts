@@ -4,7 +4,12 @@ import { HookConflictError } from "workflow/errors";
 import { researchWorkflow } from "@/workflows/research";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { createClient } from "@/lib/supabase/server";
-import type { ResearchDetail } from "@/lib/research-types";
+import type { ResearchDetail, ResearchModelInfo } from "@/lib/research-types";
+import { researchProviderSettings } from "@/lib/provider-settings";
+import { providerPlan } from "@/lib/provider-settings-core";
+import { selectedModel } from "@/lib/research-models";
+import { QWEN_PROVIDER } from "@/lib/qwen-core";
+import { GEMINI_PROVIDER } from "@/lib/research-fallback-core";
 
 export async function dispatchResearch(id: string, userId: string) {
   const client = createAdminClient();
@@ -19,6 +24,9 @@ export async function dispatchResearch(id: string, userId: string) {
     if (HookConflictError.is(error) && error.conflictingRunId) {
       workflowId = error.conflictingRunId;
     } else {
+      // Surface the SDK's reason in runtime logs; the run itself only records DISPATCH_FAILED.
+      const failure = error as { name?: string; message?: string; code?: string; cause?: { message?: string } };
+      console.error("[research] workflow dispatch failed", { run: id, retry: data.retry_count, name: failure?.name, code: failure?.code, message: failure?.message, cause: failure?.cause?.message });
       const { error: updateError } = await client.from("research_runs").update({ status: "failed", error_code: "DISPATCH_FAILED", completed_at: new Date().toISOString() }).eq("id", id).eq("user_id", userId).eq("status", "pending").is("workflow_id", null);
       if (updateError) throw new Error("WORKFLOW_INTERRUPTED");
       throw new Error("DISPATCH_FAILED");
@@ -49,12 +57,14 @@ export async function researchDetail(supabase: Awaited<ReturnType<typeof createC
       if (recovered?.length) { run.status = "failed"; run.error_code = interrupted; run.completed_at = completedAt; }
     }
   }
-  const [steps, usage, budgetBlock] = await Promise.all([
+  const [steps, usage, budgetBlock, setup] = await Promise.all([
     supabase.from("research_stages").select("stage_key,created_at").eq("run_id", id).eq("user_id", userId).order("created_at"),
-    supabase.from("research_usage").select("status,input_tokens,output_tokens,search_requests,estimated_usd,reserved_usd").eq("run_id", id).eq("user_id", userId),
+    supabase.from("research_usage").select("status,input_tokens,output_tokens,search_requests,estimated_usd,reserved_usd,provider,model").eq("run_id", id).eq("user_id", userId),
     supabase.from("research_stages").select("output").eq("run_id", id).eq("user_id", userId).eq("stage_key", "budget_block").maybeSingle(),
+    supabase.from("research_stages").select("output").eq("run_id", id).eq("user_id", userId).eq("stage_key", "setup").maybeSingle(),
   ]);
-  if (steps.error || usage.error || budgetBlock.error) throw new Error("WORKFLOW_INTERRUPTED");
+  if (steps.error || usage.error || budgetBlock.error || setup.error) throw new Error("WORKFLOW_INTERRUPTED");
+  const model = await describeModel(setup.data?.output, usage.data ?? []);
   const totals = (usage.data ?? []).reduce((sum, u) => ({
     estimated_usd: sum.estimated_usd + (u.status === "completed" ? Number(u.estimated_usd) : 0),
     committed_usd: sum.committed_usd + Number(u.status === "completed" ? u.estimated_usd : u.reserved_usd),
@@ -65,5 +75,21 @@ export async function researchDetail(supabase: Awaited<ReturnType<typeof createC
   const budget_block = run.status === "failed" && run.error_code === "BUDGET_EXCEEDED" && blocked && typeof blocked.model === "string" && Number.isFinite(blocked.required_usd)
     ? { model: blocked.model, required_usd: Number(blocked.required_usd), remaining_usd: Math.max(0, Number(run.budget_usd) - totals.committed_usd) }
     : undefined;
-  return { id: run.id, status: run.status, stage: run.stage, error_code: run.error_code, retry_count: run.retry_count, configuration: { brief: run.configuration.brief }, report: run.report, created_at: run.created_at, completed_at: run.completed_at, steps: steps.data ?? [], usage: { ...totals, budget_usd: Number(run.budget_usd) }, ...(budget_block ? { budget_block } : {}) };
+  return { id: run.id, status: run.status, stage: run.stage, model, error_code: run.error_code, retry_count: run.retry_count, configuration: { brief: run.configuration.brief }, report: run.report, created_at: run.created_at, completed_at: run.completed_at, steps: steps.data ?? [], usage: { ...totals, budget_usd: Number(run.budget_usd) }, ...(budget_block ? { budget_block } : {}) };
+}
+
+// Which model a run uses: the recorded choice once the run has initialized, otherwise the configured primary.
+async function describeModel(setupOutput: unknown, usage: { provider?: string | null; model?: string | null }[]): Promise<ResearchModelInfo> {
+  const used = [...new Set(usage.map(row => row.model).filter((value): value is string => typeof value === "string" && value.length > 0))];
+  const setup = setupOutput && typeof setupOutput === "object" ? setupOutput as { provider?: unknown; model?: unknown } : null;
+  if (setup && typeof setup.model === "string") {
+    return { provider: typeof setup.provider === "string" ? setup.provider : null, model: setup.model, planned: false, used };
+  }
+  try {
+    const settings = await researchProviderSettings();
+    const plan = providerPlan(settings);
+    return { provider: plan.primary === "gemini" ? GEMINI_PROVIDER : QWEN_PROVIDER, model: selectedModel(plan.primary, settings), planned: true, used };
+  } catch {
+    return { provider: null, model: null, planned: true, used };
+  }
 }

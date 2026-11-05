@@ -1,18 +1,17 @@
 import "server-only";
 import type { User } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { ADMIN_EMAIL, isAdministrator } from "@/lib/admin-access";
+import { isAdministrator } from "@/lib/admin-access";
 import { QWEN_MODEL } from "@/lib/qwen-core";
 import { GEMINI_MODEL } from "@/lib/research-fallback-core";
 import {
+  RESEARCH_SETTINGS_KEY,
   assertProvidersConfigured,
   providerSettingsSchema,
   readStoredProviderSettings,
   type ProviderAvailability,
   type ProviderSettingsResponse,
 } from "@/lib/provider-settings-core";
-
-const metadataKey = "research_provider_settings";
 
 export function providerAvailability(): ProviderAvailability {
   return {
@@ -21,49 +20,36 @@ export function providerAvailability(): ProviderAvailability {
   };
 }
 
-export async function administratorSettings(user: User): Promise<ProviderSettingsResponse> {
-  if (!isAdministrator(user)) throw new Error("ADMIN_REQUIRED");
-  const settings = user.email?.toLowerCase() === ADMIN_EMAIL
-    ? readStoredProviderSettings(user.app_metadata?.[metadataKey])
-    : await researchProviderSettings();
-  return { settings, providers: providerAvailability() };
+// The research policy lives in public.app_settings (service role only). Missing row → defaults.
+export async function researchProviderSettings(): Promise<ProviderSettingsResponse["settings"]> {
+  const { data, error } = await createAdminClient()
+    .from("app_settings")
+    .select("value")
+    .eq("key", RESEARCH_SETTINGS_KEY)
+    .maybeSingle();
+  if (error) throw new Error("WORKFLOW_INTERRUPTED");
+  return readStoredProviderSettings(data?.value);
 }
 
-async function providerSettingsOwner(): Promise<User | null> {
-  const client = createAdminClient();
-  let page = 1;
-  while (true) {
-    const { data, error } = await client.auth.admin.listUsers({ page, perPage: 1000 });
-    if (error) throw new Error("WORKFLOW_INTERRUPTED");
-    const owner = data.users.find(user => user.email?.toLowerCase() === ADMIN_EMAIL && isAdministrator(user));
-    if (owner) return owner;
-    if (!data.nextPage) return null;
-    page = data.nextPage;
-  }
+export async function administratorSettings(user: User): Promise<ProviderSettingsResponse> {
+  if (!isAdministrator(user)) throw new Error("ADMIN_REQUIRED");
+  return { settings: await researchProviderSettings(), providers: providerAvailability() };
 }
 
 export async function saveProviderSettings(actorId: string, input: unknown): Promise<ProviderSettingsResponse> {
   const settings = providerSettingsSchema.parse(input);
   const client = createAdminClient();
+  // Re-check the actor against the auth server; the session cookie alone is not trusted for writes.
   const current = await client.auth.admin.getUserById(actorId);
   if (current.error) throw new Error("SETTINGS_UNAVAILABLE");
-  const actor = current.data.user;
-  if (!isAdministrator(actor)) throw new Error("ADMIN_REQUIRED");
+  if (!isAdministrator(current.data.user)) throw new Error("ADMIN_REQUIRED");
   const providers = providerAvailability();
   assertProvidersConfigured(settings, providers);
-  const stored = { ...settings, updatedAt: new Date().toISOString() };
-  const owner = actor.email?.toLowerCase() === ADMIN_EMAIL ? actor : await providerSettingsOwner();
-  if (!owner) throw new Error("SETTINGS_UNAVAILABLE");
-  // Keep the global policy on the original owner so administrator ordering cannot change research routing.
-  // app_metadata is server-owned; user_metadata must never authorize or configure research spending.
-  const saved = await client.auth.admin.updateUserById(owner.id, {
-    app_metadata: { [metadataKey]: stored },
-  });
+  const updatedAt = new Date().toISOString();
+  const stored = { ...settings, updatedAt };
+  const saved = await client
+    .from("app_settings")
+    .upsert({ key: RESEARCH_SETTINGS_KEY, value: stored, updated_by: actorId, updated_at: updatedAt }, { onConflict: "key" });
   if (saved.error) throw new Error("SETTINGS_UNAVAILABLE");
   return { settings: stored, providers };
-}
-
-export async function researchProviderSettings(): Promise<ProviderSettingsResponse["settings"]> {
-  const owner = await providerSettingsOwner();
-  return readStoredProviderSettings(owner?.app_metadata?.[metadataKey]);
 }
