@@ -255,12 +255,10 @@ export function ResearchResults({
                 : copy("No saved opportunities yet")}
             </h3>
             <p className="text-muted-foreground">
-              {savedOnly
-                ? copy(
-                    "Save an opportunity from your research results to build your shortlist.",
-                  )
+              {query || confidence !== "All confidence levels"
+                ? copy("Try a broader search or a different confidence filter.")
                 : copy(
-                    "Try a broader search or a different confidence filter.",
+                    "Save an opportunity from your research results to build your shortlist.",
                   )}
             </p>
             {query || confidence !== "All confidence levels" ? (
@@ -271,12 +269,12 @@ export function ResearchResults({
                   setConfidence("All confidence levels");
                 }}
               >
-                Clear filters
+                {copy("Clear filters")}
               </Button>
             ) : (
               <Button asChild variant="outline">
                 <Link href="/research/results">
-                  Explore opportunities
+                  {copy("Explore opportunities")}
                   <ArrowRight data-icon="inline-end" />
                 </Link>
               </Button>

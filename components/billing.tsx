@@ -116,12 +116,17 @@ export function Billing() {
         <h2 className="border-b px-6 py-5 text-lg font-semibold">
           {copy("Example credit activity")}
         </h2>
-        <div className="overflow-x-auto">
+        <div
+          className="overflow-x-auto"
+          role="region"
+          tabIndex={0}
+          aria-label={copy("Example credit activity")}
+        >
           <table className="w-full min-w-[560px] text-left">
             <thead className="bg-background text-sm text-muted-foreground">
               <tr>
                 {["Activity", "Type", "Credits", "Status"].map((t) => (
-                  <th key={t} className="px-6 py-3 font-medium">
+                  <th scope="col" key={t} className="px-6 py-3 font-medium">
                     {copy(t)}
                   </th>
                 ))}

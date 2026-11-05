@@ -125,7 +125,7 @@ export function safeReturnPath(
 ) {
   if (
     !value ||
-    !/^\/(dashboard|research|saved|profile|billing|onboarding|opportunities|reset-password)(\/|\?|$)/.test(
+    !/^\/(dashboard|research|saved|profile|billing|onboarding|opportunities)(\/|\?|$)/.test(
       value,
     ) ||
     /[\\\r\n]/.test(value)

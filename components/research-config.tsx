@@ -30,6 +30,7 @@ export function ResearchConfig() {
   const [submitting, setSubmitting] = useState(false);
   const requestKey = useRef<string | null>(null);
   const [nameError, setNameError] = useState("");
+  const [formError, setFormError] = useState("");
   const router = useRouter();
   return (
     <>
@@ -64,6 +65,8 @@ export function ResearchConfig() {
                 document.getElementById("research-name")?.focus();
                 return;
               }
+              setNameError("");
+              setFormError("");
               setSubmitting(true);
               try {
                 const brief = { ...draft, name: draft.name.trim() };
@@ -89,7 +92,7 @@ export function ResearchConfig() {
                 }
                 router.refresh();
               } catch (error) {
-                setNameError(
+                setFormError(
                   error instanceof Error ? error.message : "研究暂时无法启动。",
                 );
               } finally {
@@ -276,6 +279,11 @@ export function ResearchConfig() {
                 </FieldDescription>
               </Field>
             </FieldGroup>
+            {formError && (
+              <p role="alert" className="rounded-lg border p-4 text-sm">
+                {copy(formError)}
+              </p>
+            )}
             <div className="flex flex-wrap items-center justify-between gap-4 border-t pt-5">
               <span className="text-sm text-muted-foreground">
                 {isDemo

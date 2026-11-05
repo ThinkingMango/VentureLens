@@ -79,6 +79,7 @@ test("catalogs have key and interpolation parity and every ICU message formats",
       for (const [key, message] of Object.entries(
         catalogs[locale][namespace],
       )) {
+        assert.ok(!message.includes("\uFFFD"), `${locale}:${namespace}.${key}: invalid text encoding`);
         const args = argumentsOf(message);
         assert.deepEqual(
           args,

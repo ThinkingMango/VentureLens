@@ -137,12 +137,12 @@ export function Dashboard() {
         <SectionTitle
           title={copy("Opportunities worth a closer look")}
           description={copy(
-            "A few possibilities, selected for your founder profile.",
+            "Demo results are fixed illustrative fixtures, not tailored AI output.",
           )}
           href="/research/results"
           label={copy("Explore all")}
         />
-        <div className="grid gap-5 md:grid-cols-2 2xl:grid-cols-3">
+        <div className="grid gap-5 md:grid-cols-2">
           {opportunities.slice(0, 2).map((o) => (
             <OpportunityCard key={o.id} opportunity={o} />
           ))}

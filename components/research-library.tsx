@@ -80,7 +80,7 @@ export function ResearchLibrary() {
         </Button>
       </PageHeader>
       <div className="surface overflow-hidden">
-        <div className="flex items-center justify-between gap-4 border-b p-5">
+        <div className="flex flex-col items-start justify-between gap-4 border-b p-5 sm:flex-row sm:items-center">
           <h2 className="font-semibold">{copy("Research library")}</h2>
           <div className="flex max-w-xs items-center gap-2">
             <Search className="size-4 text-muted-foreground" />
@@ -92,16 +92,21 @@ export function ResearchLibrary() {
             />
           </div>
         </div>
-        <div className="overflow-x-auto">
+        <div
+          className="overflow-x-auto"
+          role="region"
+          tabIndex={0}
+          aria-label={copy("Research library")}
+        >
           <table className="w-full min-w-[620px] text-left">
             <thead className="bg-background text-sm text-muted-foreground">
               <tr>
-                <th className="px-6 py-3 font-medium">{copy("Research")}</th>
-                <th className="px-4 py-3 font-medium">
+                <th scope="col" className="px-6 py-3 font-medium">{copy("Research")}</th>
+                <th scope="col" className="px-4 py-3 font-medium">
                   {isDemo ? copy("Opportunities") : copy("Completed runs")}
                 </th>
-                <th className="px-4 py-3 font-medium">{copy("Status")}</th>
-                <th className="px-4 py-3 font-medium">{copy("Open")}</th>
+                <th scope="col" className="px-4 py-3 font-medium">{copy("Status")}</th>
+                <th scope="col" className="px-4 py-3 font-medium">{copy("Open")}</th>
               </tr>
             </thead>
             <tbody>
@@ -129,6 +134,7 @@ export function ResearchLibrary() {
                     <Link
                       href={r.target}
                       aria-label={copy("Open {title}", { title: r.title })}
+                      className="flex size-11 items-center justify-center rounded-md hover:bg-secondary"
                     >
                       <ArrowUpRight className="size-5 text-muted-foreground" />
                     </Link>

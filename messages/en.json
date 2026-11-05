@@ -1,5 +1,9 @@
 {
   "ui": {
+    "mc5adjf": "Enter your name.",
+    "mhe77uq": "Add your skills or experience.",
+    "ma043pl": "Clear filters",
+    "m1095ud9": "Explore opportunities",
     "mthnxru": "Overview",
     "ml5qt0w": "My research",
     "mmknyol": "Saved opportunities",
@@ -743,7 +747,25 @@
     "muofqzq": "30 research credits / month",
     "mc9931v": "2 completed demo runs",
     "m1nh6w2k": "Moderate: primary validation still needed",
-    "m4ixhhs": "Limited: few independent sources"
+    "m4ixhhs": "Limited: few independent sources",
+    "m19gyoar": "Your next chapter starts here.",
+    "m1sktlws": "Check your email.",
+    "m1qnsqu2": "Sign in or create an account with your email. No password needed.",
+    "m1p783ba": "Enter the one-time code sent to {email}.",
+    "m1kh9uwn": "Verification code",
+    "m1ncj5a1": "Codes expire and can only be used once. Never share your code.",
+    "med1rri": "Verify and continue",
+    "m15fku6d": "Send sign-in code",
+    "m19paw2f": "Resend code",
+    "mpqvoqa": "Use a different email",
+    "m1y3zzhs": "You can request another code in {seconds}s.",
+    "m1dmfnbn": "One email, one code. The same simple flow for new and returning users.",
+    "mf1q0i5": "A sign-in code has been requested for {email}. Check your inbox and spam folder. Use the newest code.",
+    "mftci36": "This email link is invalid or expired. Request a new sign-in code.",
+    "mze8jl6": "Enter a valid email address.",
+    "mbrmxe0": "Enter the 6-digit code from your email.",
+    "m2me0m5": "That code is invalid or expired. Try again or request a new code.",
+    "mpcygx9": "Email sign-in is temporarily unavailable. Please contact support."
   },
   "language": {
     "label": "Interface language",

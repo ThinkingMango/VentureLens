@@ -2,10 +2,13 @@
 
 import { useCopy } from "@/i18n/use-copy";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Brand } from "@/components/shared";
 import { Button } from "@/components/ui/button";
 export default function NotFound() {
   const copy = useCopy();
+  const pathname = usePathname();
+  const workspaceHref = pathname?.startsWith("/demo/") ? "/demo/dashboard" : "/dashboard";
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-6 p-6 text-center">
       <Brand />
@@ -18,7 +21,7 @@ export default function NotFound() {
         )}
       </p>
       <Button asChild>
-        <Link href="/dashboard">{copy("Back to your workspace")}</Link>
+        <Link href={workspaceHref}>{copy("Back to your workspace")}</Link>
       </Button>
     </main>
   );

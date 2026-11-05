@@ -3,34 +3,36 @@ import { createClient } from "@/lib/supabase/server";
 import { safeReturnPath } from "@/lib/workspace-schema";
 
 export async function GET(request: NextRequest) {
-  const code = request.nextUrl.searchParams.get("code");
-  if (code) {
+  const respond = (path: string) => {
+    const response = NextResponse.redirect(new URL(path, request.url));
+    response.headers.set("Cache-Control", "private, no-store");
+    return response;
+  };
+  try {
+    if (request.nextUrl.searchParams.has("error"))
+      return respond("/login?notice=callback");
     const supabase = await createClient();
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (!error) {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (user) {
-        const { data: profile, error: profileError } = await supabase
-          .from("founder_profiles")
-          .select("onboarding_completed")
-          .eq("user_id", user.id)
-          .maybeSingle();
-        if (!profileError) {
-          const destination = safeReturnPath(
-            request.nextUrl.searchParams.get("next"),
-          );
-          const next =
-            destination === "/reset-password" || profile?.onboarding_completed
-              ? destination
-              : "/onboarding";
-          const response = NextResponse.redirect(new URL(next, request.url));
-          response.headers.set("Cache-Control", "private, no-store");
-          return response;
-        }
-      }
+    const code = request.nextUrl.searchParams.get("code");
+    if (code) {
+      const { error } = await supabase.auth.exchangeCodeForSession(code);
+      if (error) return respond("/login?notice=callback");
     }
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser();
+    if (error || !user) return respond("/login?notice=callback");
+    const { data: profile, error: profileError } = await supabase
+      .from("founder_profiles")
+      .select("onboarding_completed")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (profileError) return respond("/login?notice=configuration");
+    const destination = safeReturnPath(
+      request.nextUrl.searchParams.get("next"),
+    );
+    return respond(profile?.onboarding_completed ? destination : "/onboarding");
+  } catch {
+    return respond("/login?notice=configuration");
   }
-  return NextResponse.redirect(new URL("/login?notice=callback", request.url));
 }
