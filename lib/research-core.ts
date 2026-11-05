@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { getDomain } from "tldts";
 
-export const RESEARCH_MODEL = "alibaba/qwen3.8-flash";
+export const RESEARCH_MODEL = "qwen3.8-flash";
 export const methodology = "evidence-driven-v1";
 export const stageLabels: Record<string, string> = {
   queued: "等待处理", discovery: "发现候选机会", retrieval: "检索外部证据",
@@ -105,7 +105,7 @@ export const researchErrors: Record<string, string> = {
   INSUFFICIENT_EVIDENCE: "证据不足以支持任何机会，本次没有生成报告。",
   INVALID_OUTPUT: "模型输出未通过结构或证据核验，本次没有生成报告。",
   TRANSIENT_PROVIDER: "服务暂时不可用。可在剩余预算内手动重试一次。",
-  PROVIDER_CREDITS_REQUIRED: "Research requires paid AI Gateway credits for the configured model. Ask the project owner to add credits before starting another run.",
+  PROVIDER_CREDITS_REQUIRED: "Research requires an available model-provider balance. Ask the project owner to check billing before starting another run.",
   PROVIDER_CONFIGURATION: "研究服务暂不可用，请检查部署配置。",
   WORKFLOW_INTERRUPTED: "工作流执行中断。可在剩余预算内手动重试一次。",
   DISPATCH_FAILED: "任务未能启动，可手动重试一次。",
@@ -122,7 +122,7 @@ export function errorCode(error: unknown): string {
   const message = failures.map(failure => failure.message).join('\n');
   const known = Object.keys(researchErrors).find(code => message.includes(code));
   if (known) return known;
-  if (/free tier users do not have access|upgrade to paid credits|insufficient (?:credits|balance)|credit balance|credits? (?:are )?(?:exhausted|required)/i.test(message)) return 'PROVIDER_CREDITS_REQUIRED';
+  if (/free tier users do not have access|upgrade to paid credits|insufficient (?:credits|balance)|credit balance|credits? (?:are )?(?:exhausted|required)|arrearage|overdue|insufficientquota|insufficient_quota|prepaid balance/i.test(message)) return 'PROVIDER_CREDITS_REQUIRED';
   if (failures.some(({ status }) => [401, 402, 403].includes(status)) || /authentication|api.key|oidc/i.test(message)) return 'PROVIDER_CONFIGURATION';
   if (failures.some(({ status }) => status === 429 || status >= 500) || /timeout|abort|fetch failed/i.test(message)) return 'TRANSIENT_PROVIDER';
   return 'INVALID_OUTPUT';
