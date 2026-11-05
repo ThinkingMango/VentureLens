@@ -2,7 +2,7 @@
 import { useCopy } from "@/i18n/use-copy";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Menu, X, ArrowUpRight } from "lucide-react";
 import { Brand } from "@/components/shared";
 import { LanguageSwitcher } from "@/components/language-switcher";
@@ -10,9 +10,18 @@ import { Button } from "@/components/ui/button";
 export function PublicShell({ children }: { children: React.ReactNode }) {
   const copy = useCopy();
   const [open, setOpen] = useState(false);
+  const menuTrigger = useRef<HTMLButtonElement>(null);
   return (
     <div className="min-h-screen bg-card text-foreground">
-      <header className="border-b">
+      <header
+        className="border-b"
+        onKeyDown={(event) => {
+          if (event.key === "Escape" && open) {
+            setOpen(false);
+            menuTrigger.current?.focus();
+          }
+        }}
+      >
         <div className="mx-auto flex min-h-20 max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3 md:px-8">
           <Brand />
           <nav
@@ -57,6 +66,8 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
               className="lg:hidden"
               aria-label={open ? copy("Close menu") : copy("Open menu")}
               aria-expanded={open}
+              aria-controls="public-mobile-menu"
+              ref={menuTrigger}
               onClick={() => setOpen(!open)}
             >
               {open ? <X /> : <Menu />}
@@ -65,9 +76,14 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
         </div>
         {open && (
           <nav
-            className="flex flex-col gap-4 border-t p-5 lg:hidden"
+            id="public-mobile-menu"
+            className="flex flex-col gap-1 border-t p-5 lg:hidden [&>a]:flex [&>a]:min-h-11 [&>a]:items-center"
             aria-label={copy("Mobile main navigation")}
+            onClick={(event) => {
+              if ((event.target as HTMLElement).closest("a")) setOpen(false);
+            }}
           >
+            <Link href="/#how-it-works">{copy("How it works")}</Link>
             <Link href="/demo/dashboard">{copy("Explore the platform")}</Link>
             <Link href="/pricing">{copy("Pricing")}</Link>
             <Link href="/login">{copy("Log in")}</Link>

@@ -213,7 +213,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="flex-1">
           <p className="font-medium">
             {profile.name}
-            {isDemo ? copy("Morgan") : ""}
           </p>
           <p className="max-w-40 truncate text-sm text-muted-foreground">
             {isDemo ? copy("Demo founder") : data?.email}
@@ -231,7 +230,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       >
         {copy("Skip to content")}
       </a>
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r bg-card lg:flex">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col overflow-y-auto border-r bg-card lg:flex">
         {sidebar}
       </aside>
       <Dialog open={open} onOpenChange={setOpen}>
@@ -295,7 +294,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </button>
             <span className="hidden size-8 items-center justify-center rounded-full bg-secondary font-medium text-primary sm:flex">
               {profile.name.slice(0, 1)}
-              {isDemo ? copy("M") : ""}
             </span>
           </div>
         </header>

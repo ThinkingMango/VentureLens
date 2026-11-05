@@ -1,7 +1,7 @@
 "use client";
 import { useCopy } from "@/i18n/use-copy";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "@/components/workspace-link";
 import { useRouter } from "next/navigation";
 import {
@@ -49,9 +49,20 @@ export function Onboarding({ editing = false }: { editing?: boolean }) {
   const [error, setError] = useState("");
   const [draft, setDraft] = useState(profile);
   const [step, setStep] = useState(0);
+  const [invalidField, setInvalidField] = useState<"name" | "skills" | null>(null);
+  const stepHeading = useRef<HTMLHeadingElement>(null);
+  const previousStep = useRef(step);
+  const StepHeading = editing ? "h2" : "h1";
   const router = useRouter();
-  const update = (key: keyof typeof draft, value: string) =>
+  useEffect(() => {
+    if (previousStep.current !== step) stepHeading.current?.focus();
+    previousStep.current = step;
+  }, [step]);
+  const update = (key: keyof typeof draft, value: string) => {
     setDraft((p) => ({ ...p, [key]: value }));
+    setError("");
+    setInvalidField(null);
+  };
   const select = (id: keyof typeof draft, label: string, options: string[]) => (
     <Field>
       <FieldLabel htmlFor={id}>{copy(label)}</FieldLabel>
@@ -59,6 +70,7 @@ export function Onboarding({ editing = false }: { editing?: boolean }) {
         className="field-select"
         id={id}
         value={draft[id]}
+        disabled={busy}
         onChange={(e) => update(id, e.target.value)}
       >
         {options.map((o) => (
@@ -73,10 +85,11 @@ export function Onboarding({ editing = false }: { editing?: boolean }) {
     <div className="grid overflow-hidden rounded-xl border bg-card md:grid-cols-[240px_1fr]">
       <aside className="flex flex-col gap-6 border-b bg-background p-6 md:border-r md:border-b-0">
         <p className="font-semibold">{copy("Your founder profile")}</p>
-        <ol className="flex flex-col gap-6">
+        <ol className="flex justify-between gap-4 md:flex-col md:gap-6">
           {steps.map((s, i) => (
             <li
               key={s.title}
+              aria-current={step === i ? "step" : undefined}
               className={cn(
                 "flex items-start gap-3",
                 step !== i && "text-muted-foreground",
@@ -92,7 +105,7 @@ export function Onboarding({ editing = false }: { editing?: boolean }) {
               >
                 {step > i ? <Check className="size-4" /> : i + 1}
               </span>
-              <span className="pt-0.5 text-sm font-medium">
+              <span className="sr-only pt-0.5 text-sm font-medium md:not-sr-only">
                 {copy(s.title)}
               </span>
             </li>
@@ -109,7 +122,9 @@ export function Onboarding({ editing = false }: { editing?: boolean }) {
           <p className="text-sm text-muted-foreground">
             {copy("Step {step} of {total}", { step: step + 1, total: 4 })}
           </p>
-          <h1 className="text-2xl font-semibold">{copy(steps[step].title)}</h1>
+          <StepHeading ref={stepHeading} tabIndex={-1} className="text-2xl font-semibold">
+            {copy(steps[step].title)}
+          </StepHeading>
           <p className="text-muted-foreground">
             {copy(steps[step].description)}
           </p>
@@ -120,10 +135,22 @@ export function Onboarding({ editing = false }: { editing?: boolean }) {
             e.preventDefault();
             if (busy) return;
             setError("");
+            setInvalidField(null);
+            const missing = step === 0 && !draft.name.trim()
+              ? "name"
+              : step === 1 && !draft.skills.trim()
+                ? "skills"
+                : null;
+            if (missing) {
+              setInvalidField(missing);
+              setError(missing === "name" ? "Enter your name." : "Add your skills or experience.");
+              document.getElementById(missing)?.focus();
+              return;
+            }
             if (step < 3) setStep(step + 1);
             else {
               try {
-                await setProfile(draft);
+                await setProfile({ ...draft, name: draft.name.trim(), skills: draft.skills.trim() });
                 toast.success(
                   isDemo
                     ? copy("Demo profile updated")
@@ -151,14 +178,18 @@ export function Onboarding({ editing = false }: { editing?: boolean }) {
           <FieldGroup>
             {step === 0 && (
               <>
-                <Field>
+                <Field data-invalid={invalidField === "name"}>
                   <FieldLabel htmlFor="name">
                     {copy("What should we call you?")}
                   </FieldLabel>
                   <Input
                     id="name"
                     value={draft.name}
-                    maxLength={40}
+                    maxLength={80}
+                    autoComplete="given-name"
+                    disabled={busy}
+                    aria-invalid={invalidField === "name"}
+                    aria-describedby={invalidField === "name" ? "profile-error" : undefined}
                     required
                     onChange={(e) => update("name", e.target.value)}
                     placeholder={copy("Your first name")}
@@ -182,7 +213,7 @@ export function Onboarding({ editing = false }: { editing?: boolean }) {
                   "Education",
                   "Other",
                 ])}
-                <Field>
+                <Field data-invalid={invalidField === "skills"}>
                   <FieldLabel htmlFor="skills">
                     {copy("What skills or experiences can you build on?")}
                   </FieldLabel>
@@ -190,11 +221,14 @@ export function Onboarding({ editing = false }: { editing?: boolean }) {
                     id="skills"
                     className="field-select min-h-28 resize-y"
                     value={draft.skills}
+                    disabled={busy}
+                    aria-invalid={invalidField === "skills"}
+                    aria-describedby={invalidField === "skills" ? "skills-help profile-error" : "skills-help"}
                     required
                     maxLength={500}
                     onChange={(e) => update("skills", e.target.value)}
                   />
-                  <p className="text-sm text-muted-foreground">
+                  <p id="skills-help" className="text-sm text-muted-foreground">
                     {copy(
                       "Think domain expertise, technical abilities, and access to potential buyers.",
                     )}
@@ -244,7 +278,7 @@ export function Onboarding({ editing = false }: { editing?: boolean }) {
                       <div key={k} className="flex justify-between gap-3">
                         <dt className="text-muted-foreground">{copy(k)}</dt>
                         <dd className="text-right font-medium">
-                          {k === "Founder" ? copy(v) : copy(v)}
+                          {k === "Founder" ? v : copy(v)}
                         </dd>
                       </div>
                     ))}
@@ -254,7 +288,7 @@ export function Onboarding({ editing = false }: { editing?: boolean }) {
             )}
           </FieldGroup>
           {error && (
-            <p role="alert" className="rounded-lg border p-4 text-sm">
+            <p id="profile-error" role="alert" className="rounded-lg border p-4 text-sm">
               {copy(error)}
             </p>
           )}
@@ -262,11 +296,13 @@ export function Onboarding({ editing = false }: { editing?: boolean }) {
             <Button
               type="button"
               variant="ghost"
-              onClick={() =>
-                step > 0
-                  ? setStep(step - 1)
-                  : router.push(editing ? href("/dashboard") : "/")
-              }
+              disabled={busy}
+              onClick={() => {
+                setError("");
+                setInvalidField(null);
+                if (step > 0) setStep(step - 1);
+                else router.push(editing ? href("/dashboard") : "/");
+              }}
             >
               <ArrowLeft />
               {step > 0 ? copy("Back") : copy("Cancel")}
