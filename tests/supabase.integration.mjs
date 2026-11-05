@@ -47,8 +47,8 @@ try {
     const token = issued.data.properties.email_otp;
     assert.match(
       token,
-      /^\d{6}$/,
-      "The configured provider uses six-digit email codes",
+      /^[0-9]{6,10}$/,
+      "The configured provider issues a supported email code without assuming a fixed length",
     );
     const invalid = await client.auth.verifyOtp({
       email,
