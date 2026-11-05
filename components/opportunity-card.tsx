@@ -13,7 +13,8 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Confidence } from "@/components/shared";
-import { type Opportunity } from "@/lib/demo-data";
+import { type WorkspaceOpportunity } from "@/lib/workspace-schema";
+import { reportEvidenceCount } from "@/lib/report-presentation";
 import { useDemo } from "@/components/demo-provider";
 import { cn } from "@/lib/utils";
 import { useDemoContent } from "@/i18n/demo";
@@ -21,7 +22,7 @@ import { useDemoContent } from "@/i18n/demo";
 export function OpportunityCard({
   opportunity: original,
 }: {
-  opportunity: Opportunity;
+  opportunity: WorkspaceOpportunity;
 }) {
   const copy = useCopy();
   const { saved, toggleSave, isDemo, busy } = useDemo();
@@ -31,7 +32,13 @@ export function OpportunityCard({
     <Card className="flex h-full min-w-0 flex-col transition-colors hover:border-primary/40">
       <CardHeader className="gap-3 pb-5">
         <div className="flex items-center justify-between gap-3">
-          <p className="text-sm text-muted-foreground">{o.category}</p>
+          <p className="text-sm text-muted-foreground">
+            <strong className="mr-2 text-xl font-semibold tabular-nums text-foreground">
+              {o.score}
+              <span className="text-sm font-normal">/100</span>
+            </strong>
+            {isDemo ? copy("Demo score") : copy("Research score")}
+          </p>
           <Button
             variant="ghost"
             size="icon"
@@ -52,6 +59,9 @@ export function OpportunityCard({
             />
           </Button>
         </div>
+        {!["combined", "founder", "market"].includes(
+          o.category.toLowerCase().trim(),
+        ) && <p className="text-sm text-muted-foreground">{o.category}</p>}
         <CardTitle>
           <h3 className="text-xl font-semibold leading-snug">
             <Link
@@ -76,13 +86,19 @@ export function OpportunityCard({
           </div>
           <div className="flex flex-col gap-1">
             <dt className="text-sm text-muted-foreground">
-              {copy("Monthly price hypothesis")}
+              {copy(
+                isDemo
+                  ? "Monthly price hypothesis"
+                  : "Business model and pricing assumptions",
+              )}
             </dt>
-            <dd className="font-medium tabular-nums">
+            <dd className="text-sm leading-relaxed tabular-nums">
               {o.revenue}
-              <span className="ml-1 text-sm font-normal text-muted-foreground">
-                {copy("USD / customer")}
-              </span>
+              {isDemo && (
+                <span className="ml-1 font-normal text-muted-foreground">
+                  {copy("USD / customer")}
+                </span>
+              )}
             </dd>
           </div>
           <div className="flex flex-col gap-1">
@@ -91,21 +107,29 @@ export function OpportunityCard({
             </dt>
             <dd className="text-sm leading-relaxed">{o.risk}</dd>
           </div>
+          {!isDemo && original.validation?.[0] && (
+            <div className="flex flex-col gap-1">
+              <dt className="text-sm text-muted-foreground">
+                {copy("Next validation step")}
+              </dt>
+              <dd className="text-sm leading-relaxed">
+                {original.validation[0]}
+              </dd>
+            </div>
+          )}
         </dl>
         <div className="flex flex-wrap items-center gap-2">
           <Confidence level={o.confidence} />
-          <span className="text-sm text-muted-foreground">
-            {isDemo ? copy("Demo assessment") : copy("Research assessment")}
-          </span>
         </div>
       </CardContent>
       <CardFooter className="flex-wrap justify-between gap-3 border-t px-6 py-4">
         <p className="text-sm text-muted-foreground">
-          <strong className="mr-1 text-lg font-semibold tabular-nums text-foreground">
-            {o.score}
-            <span className="text-sm font-normal">/100</span>
-          </strong>
-          {isDemo ? copy("Demo score") : copy("Research score")}
+          {isDemo
+            ? copy("Demo assessment")
+            : copy(
+                "{count, plural, one {# linked source page} other {# linked source pages}}",
+                { count: reportEvidenceCount([original]) },
+              )}
         </p>
         <Button asChild variant="link" className="h-auto p-0">
           <Link

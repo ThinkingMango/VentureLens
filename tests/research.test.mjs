@@ -2,6 +2,31 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { scoringWeights, weightedScore, safeSourceUrl, groundedClassifications, eligibleEvidence, requireExactIds, errorCode } from '../lib/research-core.ts';
 import { projectSchema, emptyBrief } from '../lib/workspace-schema.ts';
+import { reportEvidenceCount, reportShortlist } from '../lib/report-presentation.ts';
+
+test('report source counts deduplicate pages across opportunities without inflating endorsements', () => {
+  assert.equal(reportEvidenceCount([
+    { evidence: [{ url: 'https://buyers.org/page#one' }, { url: 'https://buyers.org/page#two' }] },
+    { evidence: [{ url: 'https://buyers.org/page' }, { url: 'https://buyers.org/another' }, { url: 'invalid' }, { url: 'javascript:alert(1)' }] },
+    {},
+  ]), 2);
+});
+
+test('report sorting and saved filtering preserve original research and use unique page counts', () => {
+  const opportunities = [
+    { id: 'a', title: 'Alpha', score: 40, evidence: [{ url: 'https://a.org/1' }, { url: 'https://a.org/2' }] },
+    { id: 'b', title: 'Beta', score: 68, evidence: [{ url: 'https://b.org/1' }, { url: 'https://b.org/1#repeat' }] },
+    { id: 'c', title: 'Gamma', score: 66 },
+  ];
+  const original = structuredClone(opportunities);
+  assert.deepEqual(reportShortlist(opportunities, [], false, 'score', 'en').map(o => o.id), ['b', 'c', 'a']);
+  assert.deepEqual(reportShortlist(opportunities, [], false, 'evidence', 'en').map(o => o.id), ['a', 'b', 'c']);
+  assert.deepEqual(reportShortlist(opportunities, [], false, 'title', 'en').map(o => o.id), ['a', 'b', 'c']);
+  assert.deepEqual(reportShortlist(opportunities, ['c'], true, 'score', 'zh-Hant').map(o => o.id), ['c']);
+  assert.deepEqual(reportShortlist(opportunities, [], true, 'score', 'en'), []);
+  assert.deepEqual(opportunities, original);
+});
+
 const evidence = [
   { source_key:'c1-s1',candidate_id:'c1',url:'https://buyers.org/pain',excerpt:'Buyers report spending ten hours every week preparing proposals.' },
   { source_key:'c1-s2',candidate_id:'c1',url:'https://survey.org/analysis',excerpt:'Independent survey confirms proposal preparation delays sales.' },
