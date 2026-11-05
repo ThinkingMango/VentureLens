@@ -5,12 +5,20 @@ import { errorCode } from "@/lib/research-core";
 type Context = { runId: string; userId: string; workflowId: string };
 async function initialize(ctx: Context) {
   "use step";
-  return initializeResearch(ctx);
+  try {
+    return await initializeResearch(ctx);
+  } catch (error) {
+    throw new Error(errorCode(error));
+  }
 }
 initialize.maxRetries = 0;
 async function stage(ctx: Context, key: string) {
   "use step";
-  return executeResearchStage(ctx, key);
+  try {
+    return await executeResearchStage(ctx, key);
+  } catch (error) {
+    throw new Error(errorCode(error));
+  }
 }
 stage.maxRetries = 0;
 async function recordFailure(ctx: Context, code: string) {

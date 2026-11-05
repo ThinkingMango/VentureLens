@@ -75,6 +75,19 @@ test('stage IDs reject omissions, additions and duplicate candidate outputs',()=
   assert.doesNotThrow(()=>requireExactIds(['c1','c2'],['c2','c1']));
   for(const ids of [['c1'],['c1','c1'],['c1','c3']]) assert.throws(()=>requireExactIds(['c1','c2'],ids));
 });
+test('Gateway credit restrictions remain actionable across workflow serialization',()=>{
+  const message = 'Free tier users do not have access to this model. Upgrade to paid credits.';
+  const restricted = Object.assign(new Error(message), {statusCode:403});
+  assert.equal(errorCode(restricted),'PROVIDER_CREDITS_REQUIRED');
+  assert.equal(errorCode({message,statusCode:403}),'PROVIDER_CREDITS_REQUIRED');
+  assert.equal(errorCode(new Error('Gateway failed',{cause:restricted})),'PROVIDER_CREDITS_REQUIRED');
+  const normalized = new Error(errorCode(restricted));
+  assert.equal(errorCode(JSON.parse(JSON.stringify({message:normalized.message}))),'PROVIDER_CREDITS_REQUIRED');
+  assert.equal(errorCode(new Error('Gateway wrapper',{cause:{statusCode:503}})),'TRANSIENT_PROVIDER');
+  assert.equal(errorCode({message:'Unauthorized',statusCode:401}),'PROVIDER_CONFIGURATION');
+  const cyclic = {message:'Invalid JSON'}; cyclic.cause=cyclic;
+  assert.equal(errorCode(cyclic),'INVALID_OUTPUT');
+});
 test('failures expose stable codes rather than provider details',()=>{
   assert.equal(errorCode(new Error('BUDGET_EXCEEDED')),'BUDGET_EXCEEDED');
   assert.equal(errorCode({statusCode:429}),'TRANSIENT_PROVIDER');

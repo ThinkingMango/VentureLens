@@ -105,16 +105,25 @@ export const researchErrors: Record<string, string> = {
   INSUFFICIENT_EVIDENCE: "证据不足以支持任何机会，本次没有生成报告。",
   INVALID_OUTPUT: "模型输出未通过结构或证据核验，本次没有生成报告。",
   TRANSIENT_PROVIDER: "服务暂时不可用。可在剩余预算内手动重试一次。",
+  PROVIDER_CREDITS_REQUIRED: "Research requires paid AI Gateway credits for the configured model. Ask the project owner to add credits before starting another run.",
   PROVIDER_CONFIGURATION: "研究服务暂不可用，请检查部署配置。",
   WORKFLOW_INTERRUPTED: "工作流执行中断。可在剩余预算内手动重试一次。",
   DISPATCH_FAILED: "任务未能启动，可手动重试一次。",
 };
-export function errorCode(error: unknown) {
-  const message = error instanceof Error ? error.message : String(error);
+export function errorCode(error: unknown): string {
+  const seen = new Set<unknown>();
+  const failures: { message: string; status: number }[] = [];
+  for (let current = error; current && !seen.has(current) && failures.length < 8;) {
+    seen.add(current);
+    const record = typeof current === 'object' ? current as { message?: unknown; statusCode?: unknown; cause?: unknown } : null;
+    failures.push({ message: typeof record?.message === 'string' ? record.message : String(current), status: Number(record?.statusCode ?? 0) });
+    current = record?.cause;
+  }
+  const message = failures.map(failure => failure.message).join('\n');
   const known = Object.keys(researchErrors).find(code => message.includes(code));
   if (known) return known;
-  const status = typeof error === 'object' && error && 'statusCode' in error ? Number(error.statusCode) : 0;
-  if (status === 429 || status >= 500 || /timeout|abort|fetch failed/i.test(message)) return 'TRANSIENT_PROVIDER';
-  if ([401, 402, 403].includes(status) || /authentication|api.key|oidc/i.test(message)) return 'PROVIDER_CONFIGURATION';
+  if (/free tier users do not have access|upgrade to paid credits|insufficient (?:credits|balance)|credit balance|credits? (?:are )?(?:exhausted|required)/i.test(message)) return 'PROVIDER_CREDITS_REQUIRED';
+  if (failures.some(({ status }) => [401, 402, 403].includes(status)) || /authentication|api.key|oidc/i.test(message)) return 'PROVIDER_CONFIGURATION';
+  if (failures.some(({ status }) => status === 429 || status >= 500) || /timeout|abort|fetch failed/i.test(message)) return 'TRANSIENT_PROVIDER';
   return 'INVALID_OUTPUT';
 }
