@@ -71,6 +71,7 @@ Scanners do not submit forms.
   and redirects to `/auth/callback`. Next.js rejects Server Action posts from
   other origins, so another site cannot submit the form for the founder.
 - The form is rendered on the server, so it also works without JavaScript.
-- The page sends `Referrer-Policy: same-origin`, so the token in its URL is
-  never sent to other sites. Do not change it to `no-referrer`: browsers then
+- The page sets a `same-origin` referrer policy through its
+  `<meta name="referrer">` tag, so the token in its URL is never sent to
+  other sites. Do not change it to `no-referrer`: browsers then
   send `Origin: null` on the form post and Next.js rejects it.
