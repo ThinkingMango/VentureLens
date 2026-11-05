@@ -179,14 +179,18 @@ test("email link verification submits only the token hash and type", async () =>
   );
 });
 
-test("sign-in email template carries both the confirm link and the code", () => {
-  const html = readFileSync("supabase/templates/magic-link.html", "utf8");
-  assert.match(
-    html,
-    /href="\{\{ \.SiteURL \}\}\/auth\/confirm\?token_hash=\{\{ \.TokenHash \}\}&type=email"/,
-  );
-  assert.match(html, /\{\{ \.Token \}\}/);
-  assert.doesNotMatch(html, /\{\{ \.ConfirmationURL \}\}/);
+test("sign-in and sign-up email templates carry the confirm link and the code", () => {
+  for (const name of ["magic-link", "confirm-signup"]) {
+    const html = readFileSync(`supabase/templates/${name}.html`, "utf8");
+    assert.match(
+      html,
+      /href="\{\{ \.SiteURL \}\}\/auth\/confirm\?token_hash=\{\{ \.TokenHash \}\}&type=email"/,
+      name,
+    );
+    assert.match(html, /\{\{ \.Token \}\}/, name);
+    assert.match(html, /\{\{ \.SiteURL \}\}\/email\/logo\.png/, name);
+    assert.doesNotMatch(html, /\{\{ \.ConfirmationURL \}\}/, name);
+  }
   const route = readFileSync("app/auth/confirm/route.ts", "utf8");
   assert.match(route, /verifyEmailLink/);
   assert.match(route, /safeReturnPath/);
