@@ -264,8 +264,8 @@ export function LiveOpportunityDetail({
             ["Buyer", item.buyer],
             ["Buyer problem", item.pain],
             ["Key risk", item.risk],
-            ["Price hypothesis / month", item.revenue],
-            ["Delivery cost / month", item.cost],
+            ["Business model and pricing assumptions", item.revenue],
+            ["Delivery cost assumptions", item.cost],
             ["Assessment score", `${item.score}/100`],
           ].map(([label, value]) => (
             <div key={label}>
