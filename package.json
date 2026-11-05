@@ -12,6 +12,7 @@
     "test:research:e2e": "node --experimental-strip-types --env-file-if-exists=/vercel/share/.env.project --env-file-if-exists=.env.development.local tests/research.e2e.mjs"
   },
   "dependencies": {
+    "@ai-sdk/openai-compatible": "^3.0.85",
     "@radix-ui/react-dialog": "^1.1.6",
     "@radix-ui/react-label": "^2.1.17",
     "@radix-ui/react-separator": "^1.2.0",
@@ -19,8 +20,10 @@
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.118.0",
     "ai": "^7.0.162",
+    "cheerio": "^1.2.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "ipaddr.js": "^2.5.0",
     "lucide-react": "^0.468.0",
     "next": "^16.0.0",
     "next-intl": "^4.14.9",
