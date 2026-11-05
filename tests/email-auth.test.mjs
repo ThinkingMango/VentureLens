@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import {
   emailSchema,
   emailCodeSchema,
@@ -8,6 +8,8 @@ import {
   emailAuthError,
   requestEmailCode,
   verifyEmailCode,
+  parseEmailLink,
+  verifyEmailLink,
 } from "../lib/email-auth.ts";
 import { messageKey, locales } from "../i18n/config.ts";
 
@@ -130,4 +132,95 @@ test("legacy password routes no longer expose password authentication", () => {
   assert.match(screen, /isComposing/);
   assert.match(screen, /keyCode === 229/);
   assert.match(screen, /autoComplete="one-time-code"/);
+});
+
+test("email links accept only a well-formed token hash and sign-in types", () => {
+  const hash = "a".repeat(56);
+  const parse = (query) => parseEmailLink(new URLSearchParams(query));
+  assert.deepEqual(parse(`token_hash=${hash}&type=email`), {
+    token_hash: hash,
+    type: "email",
+  });
+  assert.deepEqual(parse(`token_hash=pkce_${hash}`), {
+    token_hash: `pkce_${hash}`,
+    type: "email",
+  });
+  for (const type of ["magiclink", "signup"])
+    assert.equal(parse(`token_hash=${hash}&type=${type}`)?.type, type);
+  for (const query of [
+    "",
+    "type=email",
+    "token_hash=short&type=email",
+    `token_hash=${hash}%0A&type=email`,
+    `token_hash=${hash}&type=recovery`,
+    `token_hash=${hash}&type=invite`,
+    `token_hash=${hash}&type=email_change`,
+    `token_hash=${"a".repeat(129)}&type=email`,
+  ])
+    assert.equal(parse(query), null, query);
+});
+
+test("email link verification submits only the token hash and type", async () => {
+  let input;
+  const result = { data: { session: null }, error: { code: "otp_expired" } };
+  const client = {
+    auth: {
+      verifyOtp: async (value) => {
+        input = value;
+        return result;
+      },
+    },
+  };
+  const link = { token_hash: "b".repeat(56), type: "email" };
+  assert.equal(await verifyEmailLink(client, link), result);
+  assert.deepEqual(input, link);
+  assert.throws(() =>
+    verifyEmailLink(client, { token_hash: "bad", type: "email" }),
+  );
+});
+
+test("sign-in and sign-up email templates carry the confirm link and the code", () => {
+  for (const name of ["magic-link", "confirm-signup"]) {
+    const html = readFileSync(`supabase/templates/${name}.html`, "utf8");
+    assert.match(
+      html,
+      /href="\{\{ \.SiteURL \}\}\/auth\/confirm\?token_hash=\{\{ \.TokenHash \}\}&type=email"/,
+      name,
+    );
+    assert.match(html, /\{\{ \.Token \}\}/, name);
+    assert.match(html, /\{\{ \.SiteURL \}\}\/email\/logo\.png/, name);
+    assert.doesNotMatch(html, /\{\{ \.ConfirmationURL \}\}/, name);
+  }
+});
+
+test("email links are read from submitted form data the same way", () => {
+  const form = new FormData();
+  form.set("token_hash", "c".repeat(56));
+  form.set("type", "signup");
+  assert.deepEqual(parseEmailLink(form), {
+    token_hash: "c".repeat(56),
+    type: "signup",
+  });
+  const file = new FormData();
+  file.set("token_hash", new Blob(["c".repeat(56)]));
+  assert.equal(parseEmailLink(file), null);
+});
+
+test("opening the confirm link never signs in; only the submitted form does", () => {
+  assert.equal(existsSync("app/auth/confirm/route.ts"), false);
+  const page = readFileSync("app/auth/confirm/page.tsx", "utf8");
+  assert.doesNotMatch(page, /verifyEmailLink|verifyOtp|createClient/);
+  assert.match(page, /parseEmailLink/);
+  assert.match(page, /referrer: "same-origin"/);
+  assert.match(page, /index: false/);
+  const action = readFileSync("app/auth/confirm/actions.ts", "utf8");
+  assert.match(action, /^"use server";/);
+  assert.match(action, /verifyEmailLink/);
+  assert.match(action, /safeReturnPath/);
+  // The form is server-rendered so it also submits without JavaScript.
+  assert.match(page, /<form action=\{confirmEmailLink\}/);
+  assert.doesNotMatch(page, /^"use client"/);
+  assert.doesNotMatch(page, /requestSubmit|\.submit\(|autoFocus/);
+  const button = readFileSync("components/confirm-continue-button.tsx", "utf8");
+  assert.match(button, /useFormStatus/);
 });
