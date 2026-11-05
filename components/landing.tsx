@@ -147,7 +147,7 @@ const faqs = [
   },
   {
     q: "Is live research available today?",
-    a: "Live, evidence-driven research is currently in a private beta for authorized accounts while we measure quality and cost per report. Everyone can explore the demo, build a founder profile, and save briefs. Paid credits are planned, and no payments are collected yet.",
+    a: "Yes. Every confirmed account receives one free, evidence-driven research run. If a run fails before producing a report, it is returned to you automatically. Paid credits for further runs are planned, and no payments are collected yet.",
   },
 ];
 

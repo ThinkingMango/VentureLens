@@ -128,7 +128,7 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
               {copy("Create a free account")}
             </Link>
             <p className="mt-2 text-muted-foreground">
-              {copy("Live research is in private beta. Pricing shown is planned, and no payments are collected yet.")}
+              {copy("Every confirmed account includes one free research run. Pricing shown is planned, and no payments are collected yet.")}
             </p>
           </div>
         </div>

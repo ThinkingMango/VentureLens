@@ -103,7 +103,7 @@ export function ResearchAccessCard({ compact = false }: { compact?: boolean }) {
             {copy("Live research enabled")}
           </span>
           <Badge variant="outline" className="border-success/30 bg-card text-success">
-            {copy("Beta")}
+            {copy("Included")}
           </Badge>
         </div>
         <p className="text-sm text-muted-foreground">
@@ -131,15 +131,17 @@ export function ResearchAccessCard({ compact = false }: { compact?: boolean }) {
     <div className="flex flex-col gap-3 rounded-xl border bg-background p-4">
       <span className="flex items-center gap-2 font-medium">
         <Lock className="size-4 text-muted-foreground" />
-        {copy("Live research is in private beta")}
+        {access.maxRuns > 0
+          ? copy("No research runs left")
+          : copy("No research run on this account yet")}
       </span>
       <p className="text-sm leading-relaxed text-muted-foreground">
         {access.maxRuns > 0
           ? copy(
-              "You have used all of your beta research runs. Your reports and briefs stay saved.",
+              "You have used your free research run. Failed runs are returned automatically, and paid credits are planned. Your reports and briefs stay saved.",
             )
           : copy(
-              "This account is not yet enabled for live research. You can build your profile, save briefs, and explore the full demo now; paid credits are planned.",
+              "Every confirmed account receives one free research run. If yours is missing, sign out and back in, or contact support. You can build your profile, save briefs, and explore the full demo meanwhile.",
             )}
       </p>
       {!compact && (
@@ -179,8 +181,8 @@ export function LiveDashboard() {
     {
       title: "Run evidence-driven research",
       detail: data.access.enabled
-        ? "A run takes several minutes and saves a full report to this workspace."
-        : "Available to beta accounts. Explore a complete sample report in the demo meanwhile.",
+        ? "Your first run is free. It takes several minutes and saves a full report to this workspace."
+        : "Your free run has been used. Explore a complete sample report in the demo meanwhile.",
       done: completedRuns > 0,
       href: data.access.enabled ? "/research/new" : "/demo/research/results",
       action: data.access.enabled ? "Start research" : "Open sample report",
