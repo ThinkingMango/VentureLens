@@ -1,16 +1,9 @@
 import { z } from "zod";
+import { DEFAULT_QWEN_MODEL, researchModelPricing } from "./research-models.ts";
 
-export const QWEN_MODEL = "qwen3.8-flash";
+export const QWEN_MODEL = DEFAULT_QWEN_MODEL;
 export const QWEN_PROVIDER = "dashscope-beijing";
-export const qwenPricing = {
-  // Upper published rates, not the discounted Global rates; provider invoices remain authoritative.
-  input: 0.15 / 1_000_000,
-  output: 0.47 / 1_000_000,
-  search: 0.573411 / 1000,
-  checked_at: "2026-11-04",
-  source: "https://www.alibabacloud.com/help/en/model-studio/model-pricing",
-  search_source: "https://www.alibabacloud.com/help/en/model-studio/web-search",
-};
+export const qwenPricing = researchModelPricing(QWEN_MODEL);
 export function qwenOrigin(workspace: string | undefined): string {
   if (!workspace || !/^[a-zA-Z0-9-]{1,100}$/.test(workspace)) throw new Error("PROVIDER_CONFIGURATION");
   return `https://${workspace}.cn-beijing.maas.aliyuncs.com`;
@@ -19,7 +12,7 @@ const responseSchema = z.object({
   error: z.unknown().nullish(),
   status: z.string().optional(),
   output: z.array(z.object({
-    type: z.string(), status: z.string().optional(),
+    type: z.string(), status: z.string().nullish(),
     action: z.object({
       sources: z.array(z.object({ url: z.string(), title: z.string().optional() })).optional(),
       queries: z.array(z.string()).optional(),

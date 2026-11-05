@@ -22,7 +22,7 @@ export async function GET() {
     const user = await identity();
     if (!user) return json({ code: "AUTH_REQUIRED" }, 401);
     if (!isAdministrator(user)) return json({ code: "ADMIN_REQUIRED" }, 403);
-    return json(administratorSettings(user));
+    return json(await administratorSettings(user));
   } catch {
     return json({ code: "SETTINGS_UNAVAILABLE" }, 503);
   }

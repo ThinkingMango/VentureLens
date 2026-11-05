@@ -14,5 +14,5 @@ export async function generateMetadata() {
 export default async function Page() {
   const { user } = await requireUser();
   if (!isAdministrator(user)) notFound();
-  return <AdminProviders initialData={administratorSettings(user)} />;
+  return <AdminProviders initialData={await administratorSettings(user)} />;
 }

@@ -130,7 +130,7 @@ export function AppShell({ children, isAdmin = false }: { children: React.ReactN
           {isAdmin && !isDemo && (
             <Link href="/admin" onClick={() => setOpen(false)} aria-current={path === "/admin" ? "page" : undefined} className={cn("nav-link", path === "/admin" && "active")}>
               <ShieldCheck className="size-[18px]" aria-hidden="true" />
-              {copy("AI providers")}
+              {copy("Admin")}
             </Link>
           )}
         </nav>

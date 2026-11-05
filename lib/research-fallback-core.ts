@@ -1,17 +1,11 @@
 import { z } from "zod";
+import { DEFAULT_GEMINI_MODEL, researchModelPricing } from "./research-models.ts";
 
-// Flash-Lite keeps the direct fallback cost-efficient; Gemini 2.5 no longer accepts new users.
-export const GEMINI_MODEL = "gemini-3.5-flash-lite";
+export const GEMINI_MODEL = DEFAULT_GEMINI_MODEL;
 export const GEMINI_PROVIDER = "google-gemini";
 export const GEMINI_SEARCH_INPUT_ALLOWANCE = 64_000;
 export const GEMINI_SEARCH_QUERY_ALLOWANCE = 4;
-export const geminiPricing = {
-  input: 0.30 / 1_000_000,
-  output: 2.50 / 1_000_000,
-  search: 14 / 1000,
-  checked_at: "2026-11-05",
-  source: "https://ai.google.dev/gemini-api/docs/pricing",
-};
+export const geminiPricing = researchModelPricing(GEMINI_MODEL);
 
 export async function withResearchFallback<T>(primary: () => Promise<T>, fallback: (() => Promise<T>) | undefined, classify: (error: unknown) => string): Promise<T> {
   try {

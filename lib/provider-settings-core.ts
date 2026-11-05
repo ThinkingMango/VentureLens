@@ -1,8 +1,11 @@
 import { z } from "zod";
+import { DEFAULT_QWEN_MODEL, DEFAULT_GEMINI_MODEL, qwenModelSchema, geminiModelSchema } from "./research-models.ts";
 
 export const providerSettingsSchema = z.strictObject({
   primary: z.enum(["qwen", "gemini"]),
   autoFallback: z.boolean(),
+  qwenModel: qwenModelSchema.default(DEFAULT_QWEN_MODEL),
+  geminiModel: geminiModelSchema.default(DEFAULT_GEMINI_MODEL),
 });
 export type ProviderSettings = z.infer<typeof providerSettingsSchema>;
 export type ResearchProvider = ProviderSettings["primary"];
@@ -10,10 +13,7 @@ export const storedProviderSettingsSchema = providerSettingsSchema.extend({
   updatedAt: z.iso.datetime(),
 });
 export type StoredProviderSettings = z.infer<typeof storedProviderSettingsSchema>;
-export const defaultProviderSettings: ProviderSettings = {
-  primary: "qwen",
-  autoFallback: true,
-};
+export const defaultProviderSettings: ProviderSettings = providerSettingsSchema.parse({ primary: "qwen", autoFallback: true });
 export type ProviderAvailability = Record<ResearchProvider, { configured: boolean; model: string }>;
 export type ProviderSettingsResponse = {
   settings: ProviderSettings & { updatedAt: string | null };
