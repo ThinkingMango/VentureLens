@@ -765,7 +765,12 @@
     "mze8jl6": "Enter a valid email address.",
     "mbrmxe0": "Enter the 6-digit code from your email.",
     "m2me0m5": "That code is invalid or expired. Try again or request a new code.",
-    "mpcygx9": "Email sign-in is temporarily unavailable. Please contact support."
+    "mpcygx9": "Email sign-in is temporarily unavailable. Please contact support.",
+    "m5887ww": "Confirm sign-in",
+    "mrlvwki": "Continue to VentureLens",
+    "maqb575": "For your security, confirm that you want to sign in on this device.",
+    "m1wxuh5i": "This link works once. If it has expired, request a new email from the sign-in page.",
+    "mpdsptb": "Back to sign in"
   },
   "language": {
     "label": "Interface language",

@@ -50,7 +50,9 @@ export function verifyEmailCode(
   });
 }
 
-// Email-link sign-in: the template links to /auth/confirm with {{ .TokenHash }}.
+// Email-link sign-in: the templates link to /auth/confirm with {{ .TokenHash }}.
+// The page there only verifies after the founder submits its form, so mail
+// scanners that open links do not use up the one-time token.
 export const emailLinkTypes = ["email", "magiclink", "signup"] as const;
 export const emailLinkSchema = z.object({
   token_hash: z.string().regex(/^[A-Za-z0-9_-]{16,128}$/),
@@ -58,10 +60,16 @@ export const emailLinkSchema = z.object({
 });
 export type EmailLink = z.infer<typeof emailLinkSchema>;
 
-export function parseEmailLink(params: URLSearchParams): EmailLink | null {
+export function parseEmailLink(
+  params: Pick<URLSearchParams | FormData, "get">,
+): EmailLink | null {
+  const value = (name: string) => {
+    const entry = params.get(name);
+    return typeof entry === "string" ? entry : undefined;
+  };
   const parsed = emailLinkSchema.safeParse({
-    token_hash: params.get("token_hash") ?? undefined,
-    type: params.get("type") ?? undefined,
+    token_hash: value("token_hash"),
+    type: value("type"),
   });
   return parsed.success ? parsed.data : null;
 }

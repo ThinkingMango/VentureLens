@@ -55,11 +55,22 @@ subject = "Confirm your email for VentureLens"
 content_path = "./supabase/templates/confirm-signup.html"
 ```
 
-## Known limitation: link scanners
+## Link scanners
 
 Some corporate mail filters, such as Microsoft Defender Safe Links, open every
-link in an email before the person does. A scanner that opens the button link
-consumes the token, so the founder's click then fails and the code fails too.
-They can request a new email from the login screen. If this shows up in
-support requests, change `/auth/confirm` to show a "Continue" button that
-submits a form, because scanners do not submit forms.
+link in an email before the person does. If opening the link signed the
+founder in, the scanner would use up the one-time token, and both the button
+and the code would then fail.
+
+So opening `/auth/confirm` never signs anyone in. It shows a **Continue**
+button, and the token is only checked when the founder submits that form.
+Scanners do not submit forms.
+
+- `app/auth/confirm/page.tsx` renders the page. It does not call Supabase.
+- `app/auth/confirm/actions.ts` is the Server Action that verifies the token
+  and redirects to `/auth/callback`. Next.js rejects Server Action posts from
+  other origins, so another site cannot submit the form for the founder.
+- The form is rendered on the server, so it also works without JavaScript.
+- The page sends `Referrer-Policy: same-origin`, so the token in its URL is
+  never sent to other sites. Do not change it to `no-referrer`: browsers then
+  send `Origin: null` on the form post and Next.js rejects it.

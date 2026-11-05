@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import {
   emailSchema,
   emailCodeSchema,
@@ -191,7 +191,36 @@ test("sign-in and sign-up email templates carry the confirm link and the code", 
     assert.match(html, /\{\{ \.SiteURL \}\}\/email\/logo\.png/, name);
     assert.doesNotMatch(html, /\{\{ \.ConfirmationURL \}\}/, name);
   }
-  const route = readFileSync("app/auth/confirm/route.ts", "utf8");
-  assert.match(route, /verifyEmailLink/);
-  assert.match(route, /safeReturnPath/);
+});
+
+test("email links are read from submitted form data the same way", () => {
+  const form = new FormData();
+  form.set("token_hash", "c".repeat(56));
+  form.set("type", "signup");
+  assert.deepEqual(parseEmailLink(form), {
+    token_hash: "c".repeat(56),
+    type: "signup",
+  });
+  const file = new FormData();
+  file.set("token_hash", new Blob(["c".repeat(56)]));
+  assert.equal(parseEmailLink(file), null);
+});
+
+test("opening the confirm link never signs in; only the submitted form does", () => {
+  assert.equal(existsSync("app/auth/confirm/route.ts"), false);
+  const page = readFileSync("app/auth/confirm/page.tsx", "utf8");
+  assert.doesNotMatch(page, /verifyEmailLink|verifyOtp|createClient/);
+  assert.match(page, /parseEmailLink/);
+  assert.match(page, /referrer: "same-origin"/);
+  assert.match(page, /index: false/);
+  const action = readFileSync("app/auth/confirm/actions.ts", "utf8");
+  assert.match(action, /^"use server";/);
+  assert.match(action, /verifyEmailLink/);
+  assert.match(action, /safeReturnPath/);
+  // The form is server-rendered so it also submits without JavaScript.
+  assert.match(page, /<form action=\{confirmEmailLink\}/);
+  assert.doesNotMatch(page, /^"use client"/);
+  assert.doesNotMatch(page, /requestSubmit|\.submit\(|autoFocus/);
+  const button = readFileSync("components/confirm-continue-button.tsx", "utf8");
+  assert.match(button, /useFormStatus/);
 });
