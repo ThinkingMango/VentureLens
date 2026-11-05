@@ -14,6 +14,8 @@ import { Separator } from "@/components/ui/separator";
 import { ADMIN_EMAIL } from "@/lib/admin-access";
 import { providerPlan, type ProviderSettings, type ProviderSettingsResponse, type ResearchProvider } from "@/lib/provider-settings-core";
 import { useFormats } from "@/i18n/use-copy";
+import { ProviderModelField } from "@/components/provider-model-field";
+import { selectedModel, researchModels, qwenModelSchema, geminiModelSchema } from "@/lib/research-models";
 
 const endpoint = "/api/admin/providers";
 const names = { qwen: "Qwen", gemini: "Gemini" };
@@ -32,12 +34,12 @@ export function AdminProviders({ initialData }: { initialData: ProviderSettingsR
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<"saveFailed" | "notConfigured" | "accessExpired" | null>(null);
   const settings = draft ?? data.settings;
-  const changed = settings.primary !== data.settings.primary || settings.autoFallback !== data.settings.autoFallback;
+  const changed = settings.primary !== data.settings.primary || settings.autoFallback !== data.settings.autoFallback || settings.qwenModel !== data.settings.qwenModel || settings.geminiModel !== data.settings.geminiModel;
   const plan = providerPlan(settings);
   const configured = data.providers[plan.primary].configured && (!plan.fallback || data.providers[plan.fallback].configured);
 
   function change(patch: Partial<ProviderSettings>) {
-    setDraft({ primary: settings.primary, autoFallback: settings.autoFallback, ...patch });
+    setDraft({ primary: settings.primary, autoFallback: settings.autoFallback, qwenModel: settings.qwenModel, geminiModel: settings.geminiModel, ...patch });
     setSaveError(null);
   }
 
@@ -49,7 +51,7 @@ export function AdminProviders({ initialData }: { initialData: ProviderSettingsR
     try {
       const response = await fetch(endpoint, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ primary: settings.primary, autoFallback: settings.autoFallback }),
+        body: JSON.stringify({ primary: settings.primary, autoFallback: settings.autoFallback, qwenModel: settings.qwenModel, geminiModel: settings.geminiModel }),
       });
       if (!response.ok) {
         const body = await response.json().catch(() => ({}));
@@ -89,10 +91,13 @@ export function AdminProviders({ initialData }: { initialData: ProviderSettingsR
                     aria-describedby="primary-help"
                     className="h-12 w-full rounded-md border bg-card px-3 text-base text-foreground md:max-w-sm"
                   >
-                    {providerNames.map(provider => <option key={provider} value={provider}>{names[provider]} · {data.providers[provider].model}</option>)}
+                    {providerNames.map(provider => <option key={provider} value={provider}>{names[provider]}</option>)}
                   </select>
                   <FieldDescription id="primary-help">{t("primaryHelp")}</FieldDescription>
                 </Field>
+                <ProviderModelField provider="qwen" model={settings.qwenModel} disabled={saving || !!loadError} onChange={model => change({ qwenModel: qwenModelSchema.parse(model) })} />
+                <ProviderModelField provider="gemini" model={settings.geminiModel} disabled={saving || !!loadError} onChange={model => change({ geminiModel: geminiModelSchema.parse(model) })} />
+                <p className="text-sm leading-relaxed text-muted-foreground">{t("modelBudget")}</p>
                 <Separator />
                 <Field orientation="horizontal" data-disabled={saving}>
                   <input
@@ -109,8 +114,8 @@ export function AdminProviders({ initialData }: { initialData: ProviderSettingsR
                 <div className="flex flex-col gap-3 rounded-lg bg-background p-4 text-foreground" role="status" aria-live="polite">
                   <p className="text-sm font-medium">{t("nextRun")}</p>
                   <p className="flex flex-wrap items-center gap-2 font-medium">
-                    {names[plan.primary]}
-                    {plan.fallback ? <><ArrowRight className="size-4 text-muted-foreground" aria-hidden="true" />{names[plan.fallback]}</> : <span className="text-sm font-normal text-muted-foreground">· {t("noFallback")}</span>}
+                    {researchModels[selectedModel(plan.primary, settings)].name}
+                    {plan.fallback ? <><ArrowRight className="size-4 text-muted-foreground" aria-hidden="true" />{researchModels[selectedModel(plan.fallback, settings)].name}</> : <span className="text-sm font-normal text-muted-foreground">· {t("noFallback")}</span>}
                   </p>
                   <p className="text-sm text-muted-foreground">{t("fallbackLimit")}</p>
                 </div>
@@ -144,7 +149,7 @@ export function AdminProviders({ initialData }: { initialData: ProviderSettingsR
               {providerNames.map(provider => (
                 <div key={provider} className="flex flex-col gap-1">
                   <dt className="flex flex-wrap items-center justify-between gap-2 font-medium">{names[provider]}<Badge variant={data.providers[provider].configured ? "secondary" : "outline"}>{t(data.providers[provider].configured ? "configured" : "missing")}</Badge></dt>
-                  <dd className="text-sm text-muted-foreground">{data.providers[provider].model}</dd>
+                  <dd className="text-sm text-muted-foreground">{researchModels[selectedModel(provider, settings)].name}</dd>
                 </div>
               ))}
             </dl>

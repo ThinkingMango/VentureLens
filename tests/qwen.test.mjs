@@ -16,6 +16,17 @@ test('search must contain completed provider tool sources, not model-generated p
   assert.equal(result.sources[0].url,'https://buyers.org');
   assert.throws(() => parseQwenSearch({output:[],error:{code:'Denied'}}), /RETRIEVAL_UNAVAILABLE/);
 });
+test('Qwen Max reasoning blocks with null status do not discard completed native search', () => {
+  const result = parseQwenSearch({ status: 'completed', output: [
+    { type: 'reasoning', status: null },
+    { type: 'web_search_call', status: 'completed', action: { queries: ['official documentation'], sources: [{ url: 'https://ai-sdk.dev/docs' }] } },
+    { type: 'reasoning', status: null },
+    { type: 'message', status: 'completed' },
+  ], usage: { input_tokens: 1414, output_tokens: 461, x_tools: { web_search: { count: 1 } } } });
+  assert.equal(result.searchRequests, 1);
+  assert.deepEqual(result.tokens, { inputTokens: 1414, outputTokens: 461 });
+  assert.equal(result.sources[0].url, 'https://ai-sdk.dev/docs');
+});
 test('incomplete native usage never fabricates zero tokens', () => {
   const output = [{type:'web_search_call',status:'completed',action:{sources:[{url:'https://buyers.org'}]}}];
   assert.equal(parseQwenSearch({output}).tokens,undefined);
