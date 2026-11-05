@@ -4,7 +4,10 @@ import { setTimeout as delay } from "node:timers/promises";
 import { createClient } from "@supabase/supabase-js";
 import { createServerClient } from "@supabase/ssr";
 import { emptyBrief, emptyProfile, opportunitySchema } from "../lib/workspace-schema.ts";
-import { RESEARCH_MODEL, eligibleEvidence, groundedClassifications, weightedScore } from "../lib/research-core.ts";
+import { eligibleEvidence, groundedClassifications, weightedScore } from "../lib/research-core.ts";
+import { qwenModelIds, geminiModelIds } from "../lib/research-models.ts";
+const allowedModels = [...qwenModelIds, ...geminiModelIds];
+const allowedProviders = ["dashscope-beijing", "google-gemini"];
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -58,10 +61,10 @@ let completed = false;
 let summary;
 try {
   const email = `venturelens-research-${randomUUID()}@example.com`;
-  const password = `Vl-research-${randomUUID()}!`;
-  const account = checked(await admin.auth.admin.createUser({ email, password, email_confirm: true }), "创建隔离测试账号失败");
+  const account = checked(await admin.auth.admin.createUser({ email, email_confirm: true }), "创建隔离测试账号失败");
   userId = account.user.id;
-  checked(await client.auth.signInWithPassword({ email, password }), "测试账号登录失败");
+  const issued = checked(await admin.auth.admin.generateLink({ type: "magiclink", email }), "生成隔离测试验证码失败");
+  checked(await client.auth.verifyOtp({ email, token: issued.properties.email_otp, type: "email" }), "测试账号登录失败");
   const profile = { ...emptyProfile, name: "研究验收账号", skills: "B2B workflow automation, customer interviews and professional services operations" };
   const savedProfile = await request("/api/workspace", { action: "profile", profile });
   assert.equal(savedProfile.status, 200, "通过正式 API 保存测试画像失败");
@@ -102,7 +105,9 @@ try {
   }
   assert.equal(detail?.status, "completed", "真实研究未在 20 分钟内完成；测试未通过");
   assert.ok(detail.report, "完成状态必须有报告");
-  assert.equal(detail.report.model, RESEARCH_MODEL);
+  assert.ok(detail.report.model === "mixed" || allowedModels.includes(detail.report.model));
+  assert.ok(detail.report.models?.length > 0 && detail.report.models.every(model => allowedModels.includes(model)));
+  assert.ok(detail.report.providers?.length > 0 && detail.report.providers.every(provider => allowedProviders.includes(provider)));
   assert.equal(detail.report.mode, "combined");
   assert.equal(detail.report.methodology, "evidence-driven-v1");
   const opportunities = detail.report.opportunities.map(item => opportunitySchema.parse(item));
@@ -138,7 +143,9 @@ try {
   const storedOpportunities = checked(await fresh.from("opportunities").select("id,payload").eq("run_id", runId).eq("user_id", userId), "读取落库机会失败");
   assert.deepEqual(storedOpportunities.map(o => o.payload).sort((a, b) => a.id.localeCompare(b.id)), [...opportunities].sort((a, b) => a.id.localeCompare(b.id)), "报告与机会表必须完整一致");
   const usage = checked(await fresh.from("research_usage").select("provider,model,status,input_tokens,output_tokens,search_requests,estimated_usd,reserved_usd").eq("run_id", runId).eq("user_id", userId), "读取真实用量记录失败");
-  assert.ok(usage.length > 0 && usage.every(u => u.provider === "vercel-ai-gateway" && u.model === RESEARCH_MODEL));
+  assert.ok(usage.length > 0 && usage.every(u => allowedProviders.includes(u.provider) && allowedModels.includes(u.model)));
+  assert.deepEqual([...new Set(usage.map(u => u.model))].sort(), [...detail.report.models].sort());
+  assert.deepEqual([...new Set(usage.map(u => u.provider))].sort(), [...detail.report.providers].sort());
   assert.ok(usage.some(u => u.search_requests > 0), "必须记录外部检索调用");
   assert.ok(usage.some(u => u.input_tokens > 0 && u.output_tokens > 0), "必须记录真实模型用量");
   const committed = usage.reduce((sum, u) => sum + Number(u.status === "completed" ? u.estimated_usd : u.reserved_usd), 0);

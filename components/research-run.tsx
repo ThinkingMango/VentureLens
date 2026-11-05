@@ -115,7 +115,7 @@ export function ResearchRunView({
           )}{" "}
           <button
             className="ml-2 min-h-11 underline"
-            onClick={() => void mutate()}
+            onClick={() => { void mutate().catch(() => undefined); }}
           >
             {copy("Refresh status")}
           </button>
@@ -158,7 +158,7 @@ export function ResearchRunView({
             aria-live="polite"
           >
             {active && (
-              <LoaderCircle className="size-5 animate-spin text-primary" />
+              <LoaderCircle className="size-5 animate-spin text-primary motion-reduce:animate-none" aria-hidden="true" />
             )}
             <h2 className="text-lg font-semibold">
               {copy(
@@ -187,7 +187,7 @@ export function ResearchRunView({
                   />
                   <span>
                     {copy(stageLabels[stage])}
-                    {stage === "retrieval" && active && (
+                    {stage === "retrieval" && (active || data.steps.some(s => s.stage_key.startsWith("retrieval:"))) && (
                       <span className="block text-muted-foreground">
                         {copy(
                           "{count, plural, one {# candidate retrieved} other {# candidates retrieved}}",
@@ -212,6 +212,19 @@ export function ResearchRunView({
                     "The task stopped without generating a report.",
                 )}
               </p>
+              {data.error_code === "BUDGET_EXCEEDED" && (
+                <p className="max-w-prose text-sm leading-relaxed text-muted-foreground">
+                  {data.budget_block
+                    ? copy("The next {model} request needed a {required} reservation, but only {remaining} remained. This request was not sent or charged.", { model: data.budget_block.model, required: format.usd(data.budget_block.required_usd, 4), remaining: format.usd(data.budget_block.remaining_usd, 4) })
+                    : copy("A request can be blocked before the displayed limit is spent: its estimated reservation must fit within the remaining budget.")}
+                  {" "}{copy("Ask an administrator to choose a lower-cost model before creating another run. Existing progress and costs remain saved.")}
+                </p>
+              )}
+              {!retryable && (
+                <Button variant="outline" className="w-fit" asChild>
+                  <Link href="/research/new">{copy("New research")}</Link>
+                </Button>
+              )}
               {retryable && (
                 <Button
                   variant="outline"

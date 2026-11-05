@@ -11,7 +11,7 @@
     "fallbackHelp": "Try the other provider if the primary has a configuration, credit, availability, or retrieval failure.",
     "nextRun": "Routing for new research",
     "noFallback": "No fallback",
-    "fallbackLimit": "One-way fallback only. Validation, evidence, and budget failures never trigger another provider.",
+    "fallbackLimit": "One-way fallback only. If a reservation is rejected before sending a request, the other configured provider may be tried within the same budget. Validation, evidence, and post-request budget failures never trigger fallback.",
     "unsaved": "Unsaved changes",
     "lastSaved": "Saved {date} (UTC)",
     "defaults": "Using default settings",
@@ -785,7 +785,7 @@
     "mcy85f9": "This account does not have development research access. Paid research is not enabled.",
     "m1bk8hd7": "Your development research allowance has been used.",
     "myotoh9": "A research task is already active. Open it to check progress.",
-    "m1ovxefm": "This run reached its estimated budget cap and has stopped.",
+    "m1ovxefm": "Research stopped because the next request could not fit within the remaining estimated budget, or a provider exceeded its reserved allowance.",
     "mevzriy": "External retrieval returned no verifiable content. No report was generated.",
     "m1z12vcg": "Evidence was insufficient to support an opportunity. No report was generated.",
     "m10an9pi": "Model output failed structural or evidence checks. No report was generated.",
@@ -844,7 +844,11 @@
     "m1jhyerv": "Next validation step",
     "m1nm90s0": "Report content stays in its original language.",
     "m11arxm0": "Scores compare hypotheses, not success probabilities. Validate with buyers.",
-    "mz0cxfe": "Delivery cost assumptions"
+    "mz0cxfe": "Delivery cost assumptions",
+    "mk2vrby": "The next {model} request needed a {required} reservation, but only {remaining} remained. This request was not sent or charged.",
+    "m2p0d1b": "A request can be blocked before the displayed limit is spent: its estimated reservation must fit within the remaining budget.",
+    "m1ke5sbb": "Ask an administrator to choose a lower-cost model before creating another run. Existing progress and costs remain saved.",
+    "mq4tzo6": "The research input exceeds the safe processing limit. No further model request was sent."
   },
   "language": {
     "label": "Interface language",

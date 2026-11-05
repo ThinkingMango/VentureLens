@@ -11,7 +11,11 @@ export async function withResearchFallback<T>(primary: () => Promise<T>, fallbac
   try {
     return await primary();
   } catch (error) {
-    if (!fallback || !["PROVIDER_CONFIGURATION", "PROVIDER_CREDITS_REQUIRED", "TRANSIENT_PROVIDER", "RETRIEVAL_UNAVAILABLE"].includes(classify(error))) throw error;
+    const code = classify(error);
+    const reservationRejected = code === "BUDGET_EXCEEDED" && typeof error === "object" && error !== null &&
+      "reservationRejected" in error && error.reservationRejected === true &&
+      "requestNotSent" in error && error.requestNotSent === true;
+    if (!fallback || (!reservationRejected && !["PROVIDER_CONFIGURATION", "PROVIDER_CREDITS_REQUIRED", "TRANSIENT_PROVIDER", "RETRIEVAL_UNAVAILABLE"].includes(code))) throw error;
     return fallback();
   }
 }

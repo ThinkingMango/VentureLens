@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import ts from "typescript";
+import { createElement, cloneElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { ADMIN_EMAIL, isAdministrator } from "../lib/admin-access.ts";
 import { providerSettingsSchema, readStoredProviderSettings, providerPlan, assertProvidersConfigured } from "../lib/provider-settings-core.ts";
 import * as settingsCore from "../lib/provider-settings-core.ts";
@@ -11,12 +13,15 @@ import { z } from "zod";
 import * as models from "../lib/research-models.ts";
 const modelDefaults = { qwenModel: models.DEFAULT_QWEN_MODEL, geminiModel: models.DEFAULT_GEMINI_MODEL };
 import { errorCode } from "../lib/research-core.ts";
+import * as researchCore from "../lib/research-core.ts";
+import * as workspaceSchema from "../lib/workspace-schema.ts";
+import * as fallbackCore from "../lib/research-fallback-core.ts";
 
 const verified = { id: "admin-test-id", email: ADMIN_EMAIL, email_confirmed_at: "2026-11-05T00:00:00.000Z", app_metadata: {} };
 const require = createRequire(import.meta.url);
 function loadModule(file, dependencies, env = {}, suffix = "") {
   const source = readFileSync(new URL(file, import.meta.url), "utf8") + suffix;
-  const { outputText } = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } });
+  const { outputText } = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } });
   const module = { exports: {} };
   const dependency = name => Object.hasOwn(dependencies, name) ? dependencies[name] : require(name);
   new Function("require", "exports", "module", "process", outputText)(dependency, module.exports, module, { env });
@@ -294,4 +299,213 @@ test("research checkpoints retain the saved policy, legacy compatibility, and bo
   assert.match(source, /\[QWEN_PROVIDER, GEMINI_PROVIDER\]\.includes/);
   assert.match(source, /\{ \.\.\.setup, active_provider: provider \}/);
   assert.doesNotMatch(source, /active_provider: provider, fallback_pricing: pricing/);
+});
+
+function researchFixture({ settings = { primary: "gemini", autoFallback: true, qwenModel: "qwen3.8-max", geminiModel: "gemini-4-argon" }, spent = 0.051042, generate = async () => ({ output: { ok: true }, totalUsage: { inputTokens: 100, outputTokens: 25 } }), evidence = [], checkpoints = new Map() } = {}) {
+  const context = { runId: "run", userId: "user", workflowId: "workflow" };
+  const setup = { provider_settings: settings, active_provider: settings.primary === "gemini" ? "google-gemini" : "dashscope-beijing", pricing: models.researchModelPricing(settings.qwenModel), fallback_pricing: models.researchModelPricing(settings.geminiModel), brief: { ...workspaceSchema.emptyBrief, name: "Regression research" }, profile: workspaceSchema.emptyProfile };
+  checkpoints.set("setup", setup);
+  const reservations = [], calls = [], records = [];
+  function from(table) {
+    const filters = {};
+    let patch;
+    const query = {
+      select: () => query, eq: (key, value) => { filters[key] = value; return query; },
+      single: async () => ({ data: table === "research_runs" ? { status: "running", workflow_id: "workflow" } : { output: checkpoints.get(filters.stage_key) }, error: null }),
+      maybeSingle: async () => ({ data: checkpoints.has(filters.stage_key) ? { output: checkpoints.get(filters.stage_key) } : null, error: null }),
+      upsert: async value => { checkpoints.set(value.stage_key, value.output); return { error: null }; },
+      update: value => { patch = value; return query; },
+      then: resolve => {
+        if (table === "research_usage" && patch) for (const record of records) if (record.id === filters.id && (!filters.status || filters.status === record.status)) Object.assign(record, patch);
+        return resolve({ data: table === "research_evidence" && !patch ? evidence : null, error: null });
+      },
+    };
+    return query;
+  }
+  const engine = loadModule("../lib/research-engine.ts", {
+    "server-only": {}, "ai": { Output: { object: ({ schema }) => schema }, generateText: async options => { calls.push(options); return generate(options); } },
+    "@/lib/qwen-provider": { qwenModel: model => ({ modelId: model }) },
+    "@/lib/gemini-provider": { geminiModel: model => ({ modelId: model }) },
+    "@/lib/qwen-core": { QWEN_PROVIDER: "dashscope-beijing" }, "@/lib/research-fallback-core": fallbackCore,
+    "@/lib/research-source": {}, "@/lib/provider-settings": {}, "@/lib/provider-settings-core": settingsCore,
+    "@/lib/research-models": models, "@/lib/workspace-schema": workspaceSchema, "@/lib/research-core": researchCore,
+    "@/lib/supabase/admin": { createAdminClient: () => ({ from, rpc: async (_name, input) => {
+      reservations.push(input);
+      const committed = spent + records.reduce((sum, record) => sum + (record.status === "completed" ? record.estimated_usd : record.reserved_usd), 0);
+      if (committed + input.p_reserved > 0.25) return { data: null, error: { message: "BUDGET_EXCEEDED" } };
+      const id = `usage-${records.length}`;
+      records.push({ id, status: "reserved", reserved_usd: input.p_reserved });
+      return { data: id, error: null };
+    } }) },
+  }, {}, "\nexport { structured, providerCall };\n");
+  return { engine, context, setup, reservations, records, calls, checkpoints };
+}
+
+test("the screenshot's Argon reservation falls back without sending the unaffordable request", async () => {
+  const fixture = researchFixture();
+  const executed = [];
+  const result = await fixture.engine.providerCall(fixture.context, "retrieval:c1", "Find external sources", fixture.setup.pricing, true, 0, async (provider, model) => {
+    executed.push({ provider, model });
+    return { value: "evidence", tokens: { inputTokens: 100, outputTokens: 25 }, searchRequests: 1 };
+  });
+  assert.equal(result, "evidence");
+  assert.deepEqual(executed, [{ provider: "dashscope-beijing", model: "qwen3.8-max" }]);
+  assert.ok(Math.abs(fixture.reservations[0].p_reserved - 0.20448) < 1e-9);
+  assert.equal(fixture.records.length, 1);
+  assert.equal(fixture.checkpoints.get("budget_block").model, "gemini-4-argon");
+  assert.equal(fixture.checkpoints.get("setup").active_provider, "dashscope-beijing");
+  assert.equal(fixture.checkpoints.get("setup").provider_settings.primary, "gemini");
+});
+
+test("disabled fallback and two unaffordable providers never send a paid request", async () => {
+  for (const fixture of [researchFixture({ settings: { primary: "gemini", autoFallback: false, qwenModel: "qwen3.8-max", geminiModel: "gemini-4-argon" } }), researchFixture({ spent: 0.24 })]) {
+    let calls = 0;
+    await assert.rejects(fixture.engine.providerCall(fixture.context, "retrieval:c1", "Find sources", fixture.setup.pricing, true, 0, async () => { calls++; }), /BUDGET_EXCEEDED/);
+    assert.equal(calls, 0);
+    assert.equal(fixture.records.length, 0);
+  }
+});
+
+test("billed invalid structured output settles known usage without charging its whole reservation", async () => {
+  const fixture = researchFixture({ spent: 0, generate: async () => { throw Object.assign(new Error("INVALID_OUTPUT"), { usage: { inputTokens: 100, outputTokens: 50 } }); } });
+  await assert.rejects(fixture.engine.structured(fixture.context, "discovery", z.object({ ok: z.boolean() }), "Prompt", fixture.setup.pricing), /INVALID_OUTPUT/);
+  assert.equal(fixture.calls.length, 1);
+  assert.equal(fixture.records[0].status, "completed");
+  assert.equal(fixture.records[0].estimated_usd, 100 * 0.000002 + 50 * 0.00001);
+});
+
+test("prompt-size protection is not misreported as a budget failure or sent to fallback", async () => {
+  const fixture = researchFixture({ spent: 0 });
+  await assert.rejects(fixture.engine.structured(fixture.context, "evaluation", z.object({ ok: z.boolean() }), "研".repeat(26000), fixture.setup.pricing), /RESEARCH_INPUT_TOO_LARGE/);
+  assert.equal(fixture.reservations.length, 0);
+  assert.equal(fixture.calls.length, 0);
+});
+
+test("full CJK evidence is classified, evaluated, and reviewed in resumable bounded batches", async () => {
+  const checkpoints = new Map();
+  const candidates = Array.from({ length: 8 }, (_, i) => ({ key: `c${i + 1}`, title: "候选机会", buyer: "买方", pain: "需求", solution: "方案", advantage: "资源", query: "independent buyer research" }));
+  checkpoints.set("discovery", { candidates });
+  const evidence = candidates.flatMap(candidate => Array.from({ length: 4 }, (_, i) => ({ source_key: `${candidate.key}-s${i + 1}`, candidate_id: candidate.key, url: `https://publisher${i}.org/${candidate.key}`, title: "独立研究", excerpt: "研究需求".repeat(450), retrieved_at: new Date().toISOString(), published_at: null })));
+  const fixture = researchFixture({ spent: 0, settings: { primary: "qwen", autoFallback: false, qwenModel: "qwen3.8-flash", geminiModel: "gemini-3.5-flash-lite" }, evidence, checkpoints, generate: async ({ prompt }) => {
+    assert.ok(Buffer.byteLength(prompt) < 75000);
+    let items;
+    if (prompt.includes("逐条分类")) {
+      const sources = JSON.parse(prompt.split("；来源=")[1]);
+      assert.equal(sources.length, 8);
+      items = sources.map(source => ({ source_key: source.source_key, relevant: true, kind: "pain", reliability: "primary", stance: "supports", quote: source.excerpt.slice(0, 100), claim: "真实需求" }));
+    } else if (prompt.includes("只评估")) {
+      const batch = JSON.parse(prompt.split("；候选=")[1].split("；带分类证据=")[0]);
+      assert.equal(batch.length, 2);
+      items = batch.map(candidate => ({ candidate_id: candidate.key, description: "业务描述", category: "专业服务", revenue: "假设，未验证", cost: "假设，未验证", risk: "需求尚未验证", assumptions: ["尚未验证"], validation: ["访谈买方", "付费试点"], dimensions: { pain: 50, demand: 50, economics: 50, feasibility: 50, advantage: 50 }, rationale: "基于独立来源" }));
+    } else {
+      const batch = JSON.parse(prompt.split("评估=")[1].split("；证据分类=")[0]).items;
+      assert.equal(batch.length, 2);
+      items = batch.map(item => ({ candidate_id: item.candidate_id, reject: false, critique: "需更多买方证据", penalty: 10, falsification: "付费试点验证" }));
+    }
+    return { output: { items }, totalUsage: { inputTokens: 100, outputTokens: 50 } };
+  } });
+  for (const stage of ["classification", "evaluation", "review"]) {
+    await fixture.engine.executeResearchStage(fixture.context, stage);
+    const expected = stage === "classification" ? 32 : 8;
+    assert.equal(checkpoints.get(stage).items.length, expected);
+  }
+  assert.equal(fixture.calls.length, 12);
+  for (const stage of ["classification", "evaluation", "review"]) {
+    checkpoints.delete(stage);
+    await fixture.engine.executeResearchStage(fixture.context, stage);
+  }
+  assert.equal(fixture.calls.length, 12, "Recovery reuses billed batch checkpoints");
+});
+
+test("concurrent dispatches share a durable hook and manual retries get a new identity", async () => {
+  const row = { status: "pending", workflow_id: null, retry_count: 0 };
+  const hooks = new Map(), requests = [], updates = [];
+  const service = loadModule("../lib/research-service.ts", {
+    "server-only": {},
+    "workflow/api": { start: async (_workflow, args, options) => {
+      assert.deepEqual(args, ["run", "owner"]);
+      requests.push(options.hook.token);
+      if (hooks.has(options.hook.token)) throw { conflict: true, conflictingRunId: hooks.get(options.hook.token) };
+      const runId = `workflow-${hooks.size}`;
+      hooks.set(options.hook.token, runId);
+      return { runId };
+    } },
+    "workflow/errors": { HookConflictError: { is: error => error?.conflict === true } },
+    "@/workflows/research": { researchWorkflow: () => undefined },
+    "@/lib/supabase/admin": { createAdminClient: () => ({ from: () => {
+      const filters = {}; let patch;
+      const query = {
+        select: () => query, eq: (key, value) => { filters[key] = value; return query; }, is: (key, value) => { filters[key] = value; return query; },
+        single: async () => ({ data: { ...row }, error: null }),
+        update: value => { patch = value; updates.push(value); return query; },
+        then: resolve => {
+          assert.equal(filters.user_id, "owner");
+          if (patch && Object.entries(filters).every(([key, value]) => ["id", "user_id"].includes(key) || row[key] === value)) Object.assign(row, patch);
+          resolve({ error: null });
+        },
+      };
+      return query;
+    } }) },
+  });
+  await Promise.all([service.dispatchResearch("run", "owner"), service.dispatchResearch("run", "owner")]);
+  assert.equal(hooks.size, 1);
+  assert.deepEqual(requests, ["research:run:0", "research:run:0"]);
+  assert.equal(row.workflow_id, "workflow-0");
+  assert.equal(row.status, "pending", "A duplicate start must never mark the admitted run failed");
+  row.retry_count = 1; row.workflow_id = null;
+  await service.dispatchResearch("run", "owner");
+  assert.equal(hooks.size, 2);
+  assert.equal(row.workflow_id, "workflow-1");
+  assert.ok(updates.every(update => !update.error_code));
+});
+
+test("research detail explains blocked reservations without adding them to spent totals", async () => {
+  const run = { id: "run", status: "failed", stage: "retrieval", error_code: "BUDGET_EXCEEDED", retry_count: 0, budget_usd: 0.25, configuration: { brief: {} }, report: null };
+  const scopes = [];
+  function from(table) {
+    const filters = {};
+    const query = {
+      select: () => query, eq: (key, value) => { filters[key] = value; return query; },
+      maybeSingle: async () => {
+        scopes.push(filters);
+        return { data: table === "research_runs" ? run : { output: { model: "gemini-4-argon", required_usd: 0.20448 } }, error: null };
+      },
+      order: () => query,
+      then: resolve => {
+        scopes.push(filters);
+        resolve({ data: table === "research_usage" ? [{ status: "completed", input_tokens: 756, output_tokens: 4953, search_requests: 0, estimated_usd: 0.051042, reserved_usd: 0.127646 }] : [{ stage_key: "discovery", created_at: "2026-11-05" }], error: null });
+      },
+    };
+    return query;
+  }
+  const service = loadModule("../lib/research-service.ts", { "server-only": {}, "workflow/api": {}, "workflow/errors": {}, "@/workflows/research": {}, "@/lib/supabase/admin": {} });
+  const detail = await service.researchDetail({ from }, "owner", "run");
+  assert.equal(detail.usage.committed_usd, 0.051042);
+  assert.equal(detail.usage.search_requests, 0);
+  assert.equal(detail.budget_block.required_usd, 0.20448);
+  assert.ok(Math.abs(detail.budget_block.remaining_usd - 0.198958) < 1e-9);
+  assert.ok(scopes.every(filters => filters.user_id === "owner"));
+});
+
+test("the actual progress view renders blocked-request costs and a usable recovery link", () => {
+  const data = { id: "run", status: "failed", stage: "retrieval", error_code: "BUDGET_EXCEEDED", retry_count: 0, configuration: { brief: { name: "Test 1" } }, report: null, steps: [{ stage_key: "discovery" }, { stage_key: "retrieval:c1" }], usage: { estimated_usd: 0.051042, committed_usd: 0.051042, budget_usd: 0.25, uncertain_calls: 0, input_tokens: 756, output_tokens: 4953, search_requests: 0 }, budget_block: { model: "gemini-4-argon", required_usd: 0.20448, remaining_usd: 0.198958 } };
+  const { ResearchRunView } = loadModule("../components/research-run.tsx", {
+    "next/link": { default: ({ children, ...props }) => createElement("a", props, children) },
+    "swr": { default: () => ({ data, mutate: async () => undefined }) },
+    "@/components/ui/button": { Button: ({ asChild, children, ...props }) => asChild ? cloneElement(children, props) : createElement("button", props, children) },
+    "@/components/shared": { PageHeader: ({ title, description }) => createElement("header", null, createElement("h1", null, title), createElement("p", null, description)) },
+    "@/components/demo-provider": { useDemo: () => ({ refresh: async () => undefined }) },
+    "@/components/research-report": { ResearchReportView: () => null },
+    "@/lib/research-core": researchCore,
+    "@/i18n/use-copy": { useCopy: () => (text, values = {}) => text.replace(/\{(\w+)\}/g, (_match, key) => values[key] ?? key), useFormats: () => ({ usd: (value, digits = 2) => `$${value.toFixed(digits)}`, number: value => String(value) }) },
+    "@/i18n/errors": { feedbackSource: (_code, fallback) => fallback },
+  });
+  const html = renderToStaticMarkup(createElement(ResearchRunView, { initialData: data }));
+  assert.match(html, /gemini-4-argon/);
+  assert.match(html, /\$0\.2045/);
+  assert.match(html, /\$0\.1990/);
+  assert.match(html, /This request was not sent or charged/);
+  assert.match(html, /href="\/research\/new"/);
+  assert.doesNotMatch(html, /Retry once from saved progress/);
+  assert.match(html, /Existing progress and costs remain saved/);
 });
