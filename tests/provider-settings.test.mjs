@@ -23,7 +23,7 @@ function storage(admin) {
   return loadModule("../lib/provider-settings.ts", {
     "server-only": {},
     "@/lib/supabase/admin": { createAdminClient: () => ({ auth: { admin } }) },
-    "@/lib/admin-access": { isAdministrator },
+    "@/lib/admin-access": { ADMIN_EMAIL, isAdministrator },
     "@/lib/qwen-core": { QWEN_MODEL: "qwen-test" },
     "@/lib/research-fallback-core": { GEMINI_MODEL: "gemini-test" },
     "@/lib/provider-settings-core": settingsCore,
@@ -42,10 +42,27 @@ function patch(body, origin = "https://venturelens.test") {
   return new Request("https://venturelens.test/api/admin/providers", { method: "PATCH", headers: { Origin: origin, Host: "venturelens.test", "Content-Type": "application/json" }, body: typeof body === "string" ? body : JSON.stringify(body) });
 }
 
-test("only the exact verified administrator email is authorized", () => {
+test("verified administrator email and server-managed administrator roles are authorized", () => {
   assert.equal(isAdministrator(verified), true);
   assert.equal(isAdministrator({ ...verified, email: ADMIN_EMAIL.toUpperCase() }), true);
-  for (const user of [null, undefined, {}, { email: ADMIN_EMAIL }, { ...verified, email_confirmed_at: null }, { ...verified, email: "smart@smartmango.ai" }, { ...verified, email: "ventures+admin@smartmango.ai" }, { ...verified, email: "ventures@smartmango.ai.example.org" }, { ...verified, email: " ventures@smartmango.ai" }, { email: "other@example.org", email_confirmed_at: verified.email_confirmed_at, user_metadata: { is_admin: true, email: ADMIN_EMAIL }, app_metadata: { is_admin: true } }]) assert.equal(isAdministrator(user), false);
+  for (const app_metadata of [{ role: "admin" }, { is_admin: true }]) {
+    const admin = { ...verified, email: "administrator@example.org", app_metadata };
+    assert.equal(isAdministrator(admin), true);
+    assert.equal(isAdministrator({ ...admin, email_confirmed_at: null }), false);
+  }
+  for (const user of [null, undefined, {}, { email: ADMIN_EMAIL }, { ...verified, email_confirmed_at: null }, { ...verified, email: "smart@smartmango.ai" }, { ...verified, email: "ventures+admin@smartmango.ai" }, { ...verified, email: "ventures@smartmango.ai.example.org" }, { ...verified, email: " ventures@smartmango.ai" }, { email: "other@example.org", email_confirmed_at: verified.email_confirmed_at, user_metadata: { is_admin: true, role: "admin", email: ADMIN_EMAIL }, app_metadata: {} }]) assert.equal(isAdministrator(user), false);
+  for (const app_metadata of [{ role: "user" }, { role: "ADMIN" }, { is_admin: "true" }, { is_admin: 1 }]) {
+    assert.equal(isAdministrator({ ...verified, email: "other@example.org", app_metadata }), false);
+  }
+});
+
+test("server-managed administrators can access the protected provider API", async () => {
+  for (const app_metadata of [{ role: "admin" }, { is_admin: true }]) {
+    const user = { ...verified, email: "administrator@example.org", app_metadata };
+    const api = route(user, async () => ({ settings: readStoredProviderSettings(undefined) }));
+    assert.equal((await api.GET()).status, 200);
+    assert.equal((await api.PATCH(patch({ primary: "qwen", autoFallback: true }))).status, 200);
+  }
 });
 
 test("provider updates reject arbitrary models, coercion, and privilege injection", () => {
@@ -125,6 +142,25 @@ test("server persistence revalidates identity and writes only server-owned setti
   assert.equal(saved.settings.primary, "gemini");
   const denied = storage({ getUserById: async () => ({ data: { user: { ...verified, email: "other@example.org" } }, error: null }) });
   await assert.rejects(denied.saveProviderSettings(verified.id, { primary: "qwen", autoFallback: true }), /ADMIN_REQUIRED/);
+});
+
+test("role administrators read and update the canonical global policy rather than creating competing policies", async () => {
+  const admin = { ...verified, id: "role-admin", email: "administrator@example.org", app_metadata: { role: "admin" } };
+  const ownerSettings = { primary: "gemini", autoFallback: false, updatedAt: verified.email_confirmed_at };
+  const owner = { ...verified, app_metadata: { research_provider_settings: ownerSettings } };
+  const writes = [];
+  const service = storage({
+    getUserById: async () => ({ data: { user: admin }, error: null }),
+    listUsers: async () => ({ data: { users: [admin, owner], nextPage: null }, error: null }),
+    updateUserById: async (id, attributes) => { writes.push({ id, attributes }); return { error: null }; },
+  });
+  assert.deepEqual((await service.administratorSettings(admin)).settings, ownerSettings);
+  assert.deepEqual(await service.researchProviderSettings(), ownerSettings);
+  await service.saveProviderSettings(admin.id, { primary: "qwen", autoFallback: true });
+  assert.equal(writes[0].id, owner.id);
+  assert.deepEqual(Object.keys(writes[0].attributes), ["app_metadata"]);
+  assert.equal(writes[0].attributes.app_metadata.research_provider_settings.primary, "qwen");
+  await assert.rejects(service.administratorSettings({ ...admin, email_confirmed_at: null }), /ADMIN_REQUIRED/);
 });
 
 test("new runs read paginated admin settings, ignore spoofed metadata, and preserve safe defaults", async () => {

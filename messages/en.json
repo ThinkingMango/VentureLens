@@ -31,10 +31,11 @@
     "configured": "Configured",
     "missing": "Not configured",
     "access": "Administrator access",
-    "accessHelp": "Only this verified email can change provider settings. Other workspace members cannot access this page.",
+    "accessHelp": "Verified administrators and this verified email can change provider settings. Administrator roles must be assigned on the server; other workspace members cannot access this page.",
     "scope": "Research already initialized keeps its saved policy. Model IDs, evidence requirements, development access, and spending limits are unchanged."
   },
   "ui": {
+    "m1pbhrck": "Admin",
     "m8vqxf9": "AI providers",
     "m16l7e4": "Research requires an available model-provider balance. Ask the project owner to check billing before starting another run.",
     "mc5adjf": "Enter your name.",
