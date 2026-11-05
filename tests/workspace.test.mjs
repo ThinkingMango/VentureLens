@@ -69,11 +69,14 @@ test("safe return path rejects external and malformed redirects", () => {
     "/auth/callback",
     "/demo/dashboard",
     "/dashboardevil",
+    "/adminevil",
     "/reset-password",
   ])
     assert.equal(safeReturnPath(path), "/dashboard");
   for (const path of [
     "/saved",
+    "/admin",
+    "/admin?tab=providers",
     "/research/new",
     "/onboarding",
     "/opportunities/id?tab=validation",
