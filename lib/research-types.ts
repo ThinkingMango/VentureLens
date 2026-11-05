@@ -15,6 +15,7 @@ export type ResearchDetail = {
   status: string;
   stage: string;
   error_code: string | null;
+  budget_block?: { model: string; required_usd: number; remaining_usd: number };
   retry_count: number;
   configuration: { brief: ResearchBrief };
   report: ResearchReport | null;

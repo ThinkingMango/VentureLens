@@ -101,6 +101,7 @@ export const researchErrors: Record<string, string> = {
   DEV_QUOTA_EXCEEDED: "开发研究额度已用完。",
   RUN_ALREADY_ACTIVE: "已有研究任务正在处理，请先查看该任务。",
   BUDGET_EXCEEDED: "已达到本次研究的估算预算上限，任务已停止。",
+  RESEARCH_INPUT_TOO_LARGE: "The research input exceeds the safe processing limit. No further model request was sent.",
   RETRIEVAL_UNAVAILABLE: "外部检索未返回可验证的内容。本次没有生成研究报告。",
   INSUFFICIENT_EVIDENCE: "证据不足以支持任何机会，本次没有生成报告。",
   INVALID_OUTPUT: "模型输出未通过结构或证据核验，本次没有生成报告。",

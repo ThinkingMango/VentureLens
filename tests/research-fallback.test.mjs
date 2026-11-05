@@ -27,6 +27,18 @@ test('validation, evidence, database and budget failures never trigger more spen
   }
 });
 
+test('only a proven unsent reservation rejection may try the configured fallback', async () => {
+  let calls = 0;
+  const blocked = Object.assign(new Error('BUDGET_EXCEEDED'), { reservationRejected: true, requestNotSent: true });
+  assert.equal(await withResearchFallback(async () => { throw blocked; }, async () => { calls++; return 'affordable'; }, errorCode), 'affordable');
+  assert.equal(calls, 1);
+  for (const metadata of [{ reservationRejected: true }, { requestNotSent: true }, { reservationRejected: true, requestNotSent: false }]) {
+    await assert.rejects(withResearchFallback(async () => { throw Object.assign(new Error('BUDGET_EXCEEDED'), metadata); }, async () => { calls++; }, errorCode), /BUDGET_EXCEEDED/);
+  }
+  assert.equal(calls, 1);
+  await assert.rejects(withResearchFallback(async () => { throw blocked; }, undefined, errorCode), error => error === blocked);
+});
+
 test('absent fallback preserves the original error and Gemini failure is not retried', async () => {
   const original = new Error('TRANSIENT_PROVIDER');
   await assert.rejects(withResearchFallback(async () => { throw original; }, undefined, errorCode), error => error === original);
