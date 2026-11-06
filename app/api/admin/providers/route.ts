@@ -48,6 +48,7 @@ export async function PATCH(request: NextRequest) {
     if (error instanceof SyntaxError || error instanceof TypeError) return json({ code: "INVALID_INPUT" }, 400);
     if (error instanceof Error && error.message === "ADMIN_REQUIRED") return json({ code: "ADMIN_REQUIRED" }, 403);
     if (error instanceof Error && error.message === "PROVIDER_NOT_CONFIGURED") return json({ code: "PROVIDER_NOT_CONFIGURED" }, 409);
+    if (error instanceof Error && error.message === "BUDGET_TOO_LOW") return json({ code: "BUDGET_TOO_LOW", requiredUsd: (error as { requiredUsd?: number }).requiredUsd ?? null }, 409);
     return json({ code: "SETTINGS_UNAVAILABLE" }, 503);
   }
 }

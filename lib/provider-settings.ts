@@ -6,6 +6,7 @@ import { QWEN_MODEL } from "@/lib/qwen-core";
 import { GEMINI_MODEL } from "@/lib/research-fallback-core";
 import {
   RESEARCH_SETTINGS_KEY,
+  assertBudgetFits,
   assertProvidersConfigured,
   providerSettingsSchema,
   readStoredProviderSettings,
@@ -45,6 +46,7 @@ export async function saveProviderSettings(actorId: string, input: unknown): Pro
   if (!isAdministrator(current.data.user)) throw new Error("ADMIN_REQUIRED");
   const providers = providerAvailability();
   assertProvidersConfigured(settings, providers);
+  assertBudgetFits(settings);
   const updatedAt = new Date().toISOString();
   const stored = { ...settings, updatedAt };
   const saved = await client

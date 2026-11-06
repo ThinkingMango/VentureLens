@@ -265,7 +265,9 @@ export function ResearchRunView({
               </p>
               {data.error_code === "BUDGET_EXCEEDED" && (
                 <p className="max-w-prose text-sm leading-relaxed text-muted-foreground">
-                  {data.budget_block
+                  {data.budget_block?.kind === "estimate"
+                    ? copy("A complete {model} run is estimated to need a budget of at least {required}, but this run's budget is {remaining}. The run stopped before sending any provider request.", { model: data.budget_block.model, required: format.usd(data.budget_block.required_usd, 2), remaining: format.usd(data.budget_block.remaining_usd, 2) })
+                    : data.budget_block
                     ? copy("The next {model} request needed a {required} reservation, but only {remaining} remained. This request was not sent or charged.", { model: data.budget_block.model, required: format.usd(data.budget_block.required_usd, 4), remaining: format.usd(data.budget_block.remaining_usd, 4) })
                     : copy("A request can be blocked before the displayed limit is spent: its estimated reservation must fit within the remaining budget.")}
                   {" "}{copy("Ask an administrator to choose a lower-cost model before creating another run. Existing progress and costs remain saved.")}

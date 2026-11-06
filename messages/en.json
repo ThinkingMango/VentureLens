@@ -50,7 +50,11 @@
     "workspaceEndpoint": "The server replaces {WorkspaceId} with the configured Beijing workspace ID. Keys never reach the browser.",
     "modelBudget": "Max and Argon use more of the same research budget and may hit the existing limit sooner. Native search context and query costs are estimates, not provider-enforced caps. Google Search requires paid-tier access.",
     "budget": "Per-run budget (USD)",
-    "budgetHelp": "Hard cap on model and search spend for each new research run, between {min} and {max} USD. Existing runs keep the cap they started with."
+    "budgetHelp": "Hard cap on model and search spend for each new research run, between {min} and {max} USD. Existing runs keep the cap they started with.",
+    "costEstimate": "Estimated cost of a complete run: about {expected}. Every reservation fits only with a per-run budget of at least {required}.",
+    "budgetTooLow": "{model} cannot finish a run within this budget: it needs at least {required}. Raise the budget or choose a less expensive model; otherwise every run stops before its report.",
+    "fallbackOverBudget": "{model} needs at least {required} to finish a run, so it will not be used as a fallback at this budget.",
+    "budgetTooLowSaved": "This budget is too low for the selected primary model. Raise the budget or choose a less expensive model."
   },
   "ui": {
     "m1pbhrck": "Admin",
@@ -1029,7 +1033,8 @@
     "mobgmq": "Mixed models",
     "m1i4fog0": "Models used: {models}",
     "m5sb60y": "Qwen via DashScope",
-    "mble3nh": "Gemini via Google"
+    "mble3nh": "Gemini via Google",
+    "mvcofaf": "A complete {model} run is estimated to need a budget of at least {required}, but this run's budget is {remaining}. The run stopped before sending any provider request."
   },
   "language": {
     "label": "Interface language",

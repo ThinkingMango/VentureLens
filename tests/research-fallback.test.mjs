@@ -89,8 +89,19 @@ test('missing Gemini usage remains unknown rather than fabricating zero usage', 
   assert.equal(parseGeminiSearch(value).tokens, undefined);
 });
 
-test('Gemini search reservation includes context and multiple paid queries within the unchanged estimate cap', () => {
+test('Gemini search reservation covers realistic context and every paid query the call may issue', () => {
+  // Production grounding prompts used ~120 tokens; the query charge, not context, dominates a Gemini search.
   const reserved = GEMINI_SEARCH_INPUT_ALLOWANCE * geminiPricing.input + 512 * geminiPricing.output + GEMINI_SEARCH_QUERY_ALLOWANCE * geminiPricing.search;
-  assert.ok(reserved > 0.07 && reserved < 0.25);
+  assert.ok(GEMINI_SEARCH_INPUT_ALLOWANCE >= 4_000);
+  assert.ok(GEMINI_SEARCH_QUERY_ALLOWANCE * geminiPricing.search > reserved / 2);
+  assert.ok(reserved > 0.05 && reserved < 0.1);
   assert.equal(geminiPricing.search, 0.014);
+});
+
+test('a billed Gemini response without grounding reports its usage instead of hiding the cost', () => {
+  const ungrounded = { ...grounded, sources: [], providerMetadata: { google: { groundingMetadata: null, usageMetadata: { promptTokenCount: 90, candidatesTokenCount: 12, thoughtsTokenCount: 2036 } } } };
+  assert.throws(() => parseGeminiSearch(ungrounded), error => error.message === 'RETRIEVAL_UNAVAILABLE' && error.usage.inputTokens === 90 && error.usage.outputTokens === 2048);
+  // Without provider metadata the SDK-normalised usage is used.
+  assert.throws(() => parseGeminiSearch({ text: 'no metadata', usage: { inputTokens: 40, outputTokens: 512 } }), error => error.usage.outputTokens === 512);
+  assert.throws(() => parseGeminiSearch({ text: 'nothing' }), error => error.message === 'RETRIEVAL_UNAVAILABLE' && error.usage === undefined);
 });

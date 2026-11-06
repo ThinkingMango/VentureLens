@@ -76,6 +76,7 @@ export const stageLabels: Record<string, string> = {
   review: "反向审查", finalizing: "保存报告", completed: "研究完成", failed: "研究中止",
 };
 const short = z.string().min(1).max(800);
+const long = z.string().min(1).max(2000);
 export const candidateSchema = z.object({
   key: z.string().regex(/^c[1-8]$/), title: z.string().min(1).max(180),
   buyer: short, pain: short, solution: short, advantage: short,
@@ -88,27 +89,128 @@ export const evidenceSchema = z.object({
   title: z.string(), excerpt: z.string(), retrieved_at: z.string(), published_at: z.string().nullable(),
 });
 export type Evidence = z.infer<typeof evidenceSchema>;
-export const classificationSchema = z.object({ items: z.array(z.object({
+const classificationItemSchema = z.object({
   source_key: z.string(), relevant: z.boolean(),
   kind: z.enum(["pain", "demand", "competition", "regulation", "other"]),
   reliability: z.enum(["primary", "secondary", "vendor", "unknown"]),
   stance: z.enum(["supports", "contradicts", "neutral"]),
   quote: z.string().max(500), claim: short,
-})).max(32) });
+});
+export const classificationSchema = z.object({ items: z.array(classificationItemSchema).max(32) });
 export type Classification = z.infer<typeof classificationSchema>["items"][number];
-export const evaluationSchema = z.object({ items: z.array(z.object({
+const dimensionsSchema = z.object({ pain: z.number().int().min(0).max(100), demand: z.number().int().min(0).max(100), economics: z.number().int().min(0).max(100), feasibility: z.number().int().min(0).max(100), advantage: z.number().int().min(0).max(100) });
+const evaluationItemSchema = z.object({
   candidate_id: z.string(), description: short, category: z.string().max(100),
   revenue: short, cost: short, risk: short, assumptions: z.array(short).min(1).max(4),
-  validation: z.array(short).min(2).max(4),
-  dimensions: z.object({ pain: z.number().int().min(0).max(100), demand: z.number().int().min(0).max(100), economics: z.number().int().min(0).max(100), feasibility: z.number().int().min(0).max(100), advantage: z.number().int().min(0).max(100) }),
-  rationale: short,
-})).min(1).max(8) });
+  validation: z.array(short).min(1).max(4),
+  dimensions: dimensionsSchema,
+  rationale: long,
+});
+export const evaluationSchema = z.object({ items: z.array(evaluationItemSchema).min(1).max(8) });
 export type Evaluation = z.infer<typeof evaluationSchema>["items"][number];
-export const reviewSchema = z.object({ items: z.array(z.object({
+const reviewItemSchema = z.object({
   candidate_id: z.string(), reject: z.boolean(), critique: short,
   penalty: z.number().int().min(0).max(30), falsification: short,
-})).min(1).max(8) });
+});
+export const reviewSchema = z.object({ items: z.array(reviewItemSchema).min(1).max(8) });
 export type Review = z.infer<typeof reviewSchema>["items"][number];
+
+// ---------------------------------------------------------------------------------------------------------------
+// Generation schemas. Models are asked for these looser shapes and the result is normalised on the server, so a
+// length overrun, a fractional score, a missing or duplicated id, or one surplus item no longer fails the whole run.
+// Length guidance is passed to the model as a description rather than enforced as a hard validation bound.
+// Enums, booleans and the overall object shape stay strict because the evidence gate depends on them.
+// ---------------------------------------------------------------------------------------------------------------
+const prose = (max: number) => z.string().min(1).describe(`Plain text, at most ${max} characters.`);
+const score = (max: number) => z.number().describe(`Integer from 0 to ${max}.`);
+export const discoveryDraftSchema = z.object({ candidates: z.array(z.object({
+  key: z.string().describe("c1, c2, … in order."), title: prose(180),
+  buyer: prose(800), pain: prose(800), solution: prose(800), advantage: prose(800),
+  query: z.string().min(1).describe("English web-search string, 10–300 characters."),
+})).min(1).describe("Exactly 8 candidates.") });
+export const classificationDraftSchema = z.object({ items: z.array(classificationItemSchema.extend({
+  quote: z.string().describe("Copied verbatim from the excerpt, 12–500 characters."), claim: prose(800),
+})) });
+export const evaluationDraftSchema = z.object({ items: z.array(z.object({
+  candidate_id: z.string(), description: prose(800), category: z.string().min(1).describe("At most 100 characters."),
+  revenue: prose(800), cost: prose(800), risk: prose(800),
+  assumptions: z.array(prose(800)).describe("1–4 items."), validation: z.array(prose(800)).describe("2–4 items."),
+  dimensions: z.object({ pain: score(100), demand: score(100), economics: score(100), feasibility: score(100), advantage: score(100) }),
+  rationale: prose(2000),
+})) });
+export const reviewDraftSchema = z.object({ items: z.array(z.object({
+  candidate_id: z.string(), reject: z.boolean(), critique: prose(800), penalty: score(30), falsification: prose(800),
+})) });
+
+/** Shortens text to `max` characters, preferring a sentence or word boundary, and marks the cut with an ellipsis. */
+export function clipText(value: string, max: number): string {
+  const text = value.replace(/\s+/g, " ").trim();
+  if (text.length <= max) return text;
+  const room = text.slice(0, max - 1);
+  const sentence = Math.max(...[". ", "。", "！", "？", "! ", "? ", "; "].map(mark => room.lastIndexOf(mark) + mark.trimEnd().length));
+  const cut = sentence >= max * 0.6 ? sentence : room.lastIndexOf(" ") >= max * 0.6 ? room.lastIndexOf(" ") : room.length;
+  return `${room.slice(0, cut).trimEnd()}…`;
+}
+function clampInt(value: number, min: number, max: number) {
+  return Number.isFinite(value) ? Math.min(max, Math.max(min, Math.round(value))) : min;
+}
+/** Keeps the first item for each expected id, in model order, and drops unknown or repeated ids. */
+function matchIds<T>(expected: string[], items: T[], id: (item: T) => string): T[] {
+  const wanted = new Set(expected);
+  const seen = new Set<string>();
+  return items.filter(item => {
+    const key = id(item);
+    if (!wanted.has(key) || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+export function normalizeDiscovery(draft: z.infer<typeof discoveryDraftSchema>): z.infer<typeof discoverySchema> {
+  // Keys are positional labels, so they are assigned here rather than trusted from the model.
+  const candidates = draft.candidates.slice(0, 8).map((candidate, index) => {
+    const query = clipText(candidate.query, 300);
+    return {
+      key: `c${index + 1}`, title: clipText(candidate.title, 180),
+      buyer: clipText(candidate.buyer, 800), pain: clipText(candidate.pain, 800), solution: clipText(candidate.solution, 800), advantage: clipText(candidate.advantage, 800),
+      query: query.length >= 10 ? query : clipText(`${candidate.title} ${candidate.buyer}`, 300),
+    };
+  });
+  if (candidates.length < 5) throw new Error("INVALID_OUTPUT");
+  return discoverySchema.parse({ candidates });
+}
+export function normalizeClassification(draft: z.infer<typeof classificationDraftSchema>, sourceKeys: string[]): z.infer<typeof classificationSchema> {
+  // A source the model skipped stays unclassified, which keeps it out of the evidence gate.
+  return classificationSchema.parse({ items: matchIds(sourceKeys, draft.items, item => item.source_key).map(item => ({
+    ...item,
+    // A prefix of a verbatim quote is still verbatim, so trimming keeps it groundable; never add an ellipsis here.
+    quote: item.quote.trim().slice(0, 500).trim(),
+    claim: clipText(item.claim, 800),
+  })) });
+}
+export function normalizeEvaluation(draft: z.infer<typeof evaluationDraftSchema>, candidateIds: string[]): { items: Evaluation[] } {
+  const items = matchIds(candidateIds, draft.items, item => item.candidate_id).flatMap(item => {
+    const assumptions = item.assumptions.map(text => clipText(text, 800)).filter(Boolean).slice(0, 4);
+    const validation = item.validation.map(text => clipText(text, 800)).filter(Boolean).slice(0, 4);
+    // Without at least one stated assumption and one validation step the evaluation is unusable; leave it out.
+    if (!assumptions.length || !validation.length) return [];
+    const d = item.dimensions;
+    return [evaluationItemSchema.parse({
+      candidate_id: item.candidate_id, description: clipText(item.description, 800), category: clipText(item.category, 100),
+      revenue: clipText(item.revenue, 800), cost: clipText(item.cost, 800), risk: clipText(item.risk, 800),
+      assumptions, validation, rationale: clipText(item.rationale, 2000),
+      dimensions: { pain: clampInt(d.pain, 0, 100), demand: clampInt(d.demand, 0, 100), economics: clampInt(d.economics, 0, 100), feasibility: clampInt(d.feasibility, 0, 100), advantage: clampInt(d.advantage, 0, 100) },
+    })];
+  });
+  return { items };
+}
+export function normalizeReview(draft: z.infer<typeof reviewDraftSchema>, candidateIds: string[]): { items: Review[] } {
+  // A candidate without a review is excluded at finalizing, the conservative outcome.
+  return { items: matchIds(candidateIds, draft.items, item => item.candidate_id).map(item => reviewItemSchema.parse({
+    candidate_id: item.candidate_id, reject: item.reject, critique: clipText(item.critique, 800),
+    penalty: clampInt(item.penalty, 0, 30), falsification: clipText(item.falsification, 800),
+  })) };
+}
 export type Mode = "founder" | "market" | "combined";
 export const scoringWeights = {
   founder: { pain: 0.25, demand: 0.15, economics: 0.15, feasibility: 0.2, advantage: 0.25 },

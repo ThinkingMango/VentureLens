@@ -1,6 +1,6 @@
 import "server-only";
 import { start, getRun } from "workflow/api";
-import { HookConflictError } from "workflow/errors";
+import { HookConflictError, WorkflowWorldError } from "workflow/errors";
 import { researchWorkflow } from "@/workflows/research";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { createClient } from "@/lib/supabase/server";
@@ -18,8 +18,7 @@ export async function dispatchResearch(id: string, userId: string) {
   if (data.status !== "pending" || data.workflow_id) return;
   let workflowId: string;
   try {
-    const run = await start(researchWorkflow, [id, userId], { hook: { token: `research:${id}:${data.retry_count}`, experimental_minRetention: "30 days" } });
-    workflowId = run.runId;
+    workflowId = await startResearchWorkflow(id, userId, data.retry_count);
   } catch (error) {
     if (HookConflictError.is(error) && error.conflictingRunId) {
       workflowId = error.conflictingRunId;
@@ -34,6 +33,24 @@ export async function dispatchResearch(id: string, userId: string) {
   }
   const linked = await client.from("research_runs").update({ workflow_id: workflowId }).eq("id", id).eq("user_id", userId).eq("status", "pending").is("workflow_id", null);
   if (linked.error) throw new Error("WORKFLOW_INTERRUPTED");
+}
+// A start hook makes dispatch idempotent per attempt, but `start({ hook })` is opt-in on the Vercel World
+// (WORKFLOW_VERCEL_EXPERIMENTAL_START_HOOK=1) and throws, creating no run, where the deployment does not support it.
+// Without the hook a duplicate dispatch can create a second workflow, but initializeResearch claims the run with a
+// conditional update, so only one workflow ever executes it; the other exits before any provider request.
+export function startHookUnsupported(error: unknown) {
+  return WorkflowWorldError.is(error) && ["WORLD_CONTRACT_ERROR", "START_HOOK_ADMISSION_DISABLED"].includes(String(error.code));
+}
+async function startResearchWorkflow(id: string, userId: string, retryCount: number) {
+  try {
+    const run = await start(researchWorkflow, [id, userId], { hook: { token: `research:${id}:${retryCount}`, experimental_minRetention: "30 days" } });
+    return run.runId;
+  } catch (error) {
+    if (!startHookUnsupported(error)) throw error;
+    console.warn("[research] start hooks unavailable on this deployment; starting without one", { run: id, message: (error as Error).message });
+    const run = await start(researchWorkflow, [id, userId]);
+    return run.runId;
+  }
 }
 export async function researchDetail(supabase: Awaited<ReturnType<typeof createClient>>, userId: string, id: string): Promise<ResearchDetail | null> {
   const result = await supabase.from("research_runs").select("id,status,stage,error_code,retry_count,configuration,report,created_at,completed_at,workflow_id,updated_at,budget_usd").eq("id", id).eq("user_id", userId).maybeSingle();
@@ -73,7 +90,7 @@ export async function researchDetail(supabase: Awaited<ReturnType<typeof createC
   }), { estimated_usd: 0, committed_usd: 0, uncertain_calls: 0, input_tokens: 0, output_tokens: 0, search_requests: 0 });
   const blocked = budgetBlock.data?.output;
   const budget_block = run.status === "failed" && run.error_code === "BUDGET_EXCEEDED" && blocked && typeof blocked.model === "string" && Number.isFinite(blocked.required_usd)
-    ? { model: blocked.model, required_usd: Number(blocked.required_usd), remaining_usd: Math.max(0, Number(run.budget_usd) - totals.committed_usd) }
+    ? { model: blocked.model, required_usd: Number(blocked.required_usd), remaining_usd: Math.max(0, Number(run.budget_usd) - totals.committed_usd), kind: blocked.kind === "estimate" ? "estimate" as const : "reservation" as const }
     : undefined;
   return { id: run.id, status: run.status, stage: run.stage, model, error_code: run.error_code, retry_count: run.retry_count, configuration: { brief: run.configuration.brief }, report: run.report, created_at: run.created_at, completed_at: run.completed_at, steps: steps.data ?? [], usage: { ...totals, budget_usd: Number(run.budget_usd) }, ...(budget_block ? { budget_block } : {}) };
 }
