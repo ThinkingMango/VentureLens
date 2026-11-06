@@ -188,7 +188,7 @@ export function normalizeClassification(draft: z.infer<typeof classificationDraf
     claim: clipText(item.claim, 800),
   })) });
 }
-export function normalizeEvaluation(draft: z.infer<typeof evaluationDraftSchema>, candidateIds: string[]): { items: Evaluation[] } {
+export function normalizeEvaluation(draft: z.infer<typeof evaluationDraftSchema>, candidateIds: string[], mode?: Mode): { items: Evaluation[] } {
   const items = matchIds(candidateIds, draft.items, item => item.candidate_id).flatMap(item => {
     const assumptions = item.assumptions.map(text => clipText(text, 800)).filter(Boolean).slice(0, 4);
     const validation = item.validation.map(text => clipText(text, 800)).filter(Boolean).slice(0, 4);
@@ -199,7 +199,8 @@ export function normalizeEvaluation(draft: z.infer<typeof evaluationDraftSchema>
       candidate_id: item.candidate_id, description: clipText(item.description, 800), category: clipText(item.category, 100),
       revenue: clipText(item.revenue, 800), cost: clipText(item.cost, 800), risk: clipText(item.risk, 800),
       assumptions, validation, rationale: clipText(item.rationale, 2000),
-      dimensions: { pain: clampInt(d.pain, 0, 100), demand: clampInt(d.demand, 0, 100), economics: clampInt(d.economics, 0, 100), feasibility: clampInt(d.feasibility, 0, 100), advantage: clampInt(d.advantage, 0, 100) },
+      // Market mode ignores founder fit by definition, whatever the model returned.
+      dimensions: { pain: clampInt(d.pain, 0, 100), demand: clampInt(d.demand, 0, 100), economics: clampInt(d.economics, 0, 100), feasibility: clampInt(d.feasibility, 0, 100), advantage: mode === "market" ? 0 : clampInt(d.advantage, 0, 100) },
     })];
   });
   return { items };

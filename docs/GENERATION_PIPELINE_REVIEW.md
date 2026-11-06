@@ -107,3 +107,18 @@ These change production configuration, so they were **not** done automatically.
 | A reservation for a call that times out stays held. | That cost is real but unknown. | Reconcile "unknown" rows from provider usage APIs. |
 | Pricing is hard-coded with date switches (`researchModelPricing`). | Prices go stale silently. | Move pricing into `app_settings`, keep a `checked_at`, and fail closed when it is stale. |
 | Cost estimates are calibrated on only three runs. | Estimates may be off. | Re-calibrate `typicalRun` from `research_usage` after 10–20 completed runs. |
+
+---
+
+## 7. Production validation (2026-11-06)
+
+After PR #16 was deployed with the research policy **Qwen 3.8 Flash → Gemini 3.5 Flash-Lite, $0.40**, run `7005616b` was the **first research run to complete in production**: 8 candidates, 32 classified sources, **5 opportunities**, 4 min 45 s, $0.297 committed.
+
+| What the run showed | Follow-up |
+|---|---|
+| Dispatch without start hooks works (`start hooks unavailable … starting without one`). | None. |
+| Qwen structured output (discovery) works in non-thinking mode: 346 in / 1,068 out tokens. | None. |
+| The first Qwen web search **timed out after 90 s**; the run switched to Gemini for the rest, which is why it cost $0.30 rather than ≈ $0.05. | Open: confirm whether DashScope search latency from Vercel to cn-beijing routinely exceeds 90 s before raising the timeout (the step must also fit the fallback search and page fetches). |
+| The browser showed **"Load failed"** although the server created and started the run: Safari's raw `fetch` error after the response was lost. | Fixed: `lib/api-client.ts` re-sends the idempotent start with the same request key, never shows raw browser text, and parses HTML/empty bodies safely. Retry is not re-sent; the run's status decides. |
+| **Advantage was 0 for every opportunity in a combined run**: Flash-Lite applied "In market mode advantage=0" regardless of mode, costing up to 15 points each. | Fixed: the instruction is now mode-specific and market mode is enforced server-side. |
+| **Most evidence came from AI vendors' own sites**, classified as "secondary". | Fixed in the prompts: search prefers independent sources (forums, associations, surveys, news, government, job postings), and any page from a company selling in the space is classified "vendor". This makes the evidence gate stricter, so expect fewer but better-supported opportunities. |

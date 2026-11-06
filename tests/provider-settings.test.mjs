@@ -17,6 +17,7 @@ import * as researchCore from "../lib/research-core.ts";
 import * as workspaceSchema from "../lib/workspace-schema.ts";
 import * as fallbackCore from "../lib/research-fallback-core.ts";
 import * as budget from "../lib/research-budget.ts";
+import * as apiClient from "../lib/api-client.ts";
 
 const verified = { id: "admin-test-id", email: "owner@example.org", email_confirmed_at: "2026-11-05T00:00:00.000Z", app_metadata: { role: "admin" } };
 const require = createRequire(import.meta.url);
@@ -519,6 +520,7 @@ test("the actual progress view renders blocked-request costs and a usable recove
     "@/components/ui/badge": { Badge: ({ children, ...props }) => createElement("span", props, children) },
     "@/i18n/use-copy": { useCopy: () => (text, values = {}) => text.replace(/\{(\w+)\}/g, (_match, key) => values[key] ?? key), useFormats: () => ({ usd: (value, digits = 2) => `$${value.toFixed(digits)}`, number: value => String(value) }) },
     "@/i18n/errors": { feedbackSource: (_code, fallback) => fallback },
+    "@/lib/api-client": apiClient,
   });
   const html = renderToStaticMarkup(createElement(ResearchRunView, { initialData: data }));
   assert.match(html, /gemini-4-argon/);
