@@ -2,7 +2,7 @@
 
 Supabase project: **VentureLens** (`ndrxywlouwigawhgrtrj`, ap-southeast-1).
 
-## Applied history (as of 2026-11-05)
+## Applied history (as of 2026-11-06)
 
 Read from `supabase_migrations.schema_migrations` on the live project:
 
@@ -14,6 +14,7 @@ Read from `supabase_migrations.schema_migrations` on the live project:
 | `20261105131043` | `smartmango_research_development_access` | `supabase/migrations/20261105131043_smartmango_research_development_access.sql` | identical (file recovered from the live history) |
 | `20261105155412` | `signup_free_run_and_quota_release` | `supabase/migrations/20261105155412_signup_free_run_and_quota_release.sql` | identical (applied with `apply_migration`, file renamed to the assigned version) |
 | `20261105161832` | `app_settings_and_role_admin` | `supabase/migrations/20261105161832_app_settings_and_role_admin.sql` | identical (applied with `apply_migration`, file renamed to the assigned version) |
+| `20261106141806` | `research_dev_access_max_runs_limit` | `supabase/migrations/20261106141806_research_dev_access_max_runs_limit.sql` | identical (applied with `apply_migration`, file renamed to the assigned version) |
 
 "Identical" means the MD5 of the SQL with all whitespace removed matches between the repository file and the `statements` column of the applied migration.
 
@@ -39,7 +40,12 @@ After this change `supabase migration list` shows local and remote in sync, and 
 2. **Never edit an applied file.** Write a new migration instead. If a file must be renamed to match history, keep its content byte-identical.
 3. **Verify before merging.** Compare `md5(regexp_replace(array_to_string(statements, E'\n'), '\s+', '', 'g'))` on the project against the local file.
 4. **Keep RLS invariants.** New tables use `enable` + `force row level security`, composite `(id, user_id)` foreign keys, `revoke all … from anon, authenticated`, and explicit `grant` statements, as in the existing files.
-5. **Business parameters live in `public.app_settings`, not in check constraints.** The per-run budget is read by `public.research_budget_usd()` from the `research` row (bounded 0.05–5 USD). `research_dev_access.max_runs <= 3` is still a hard-coded limit to revisit with the entitlement ledger.
+5. **Business parameters live in `public.app_settings`, not in check constraints.** The per-run budget is read by `public.research_budget_usd()` from the `research` row (bounded 0.05–5 USD). `research_dev_access.max_runs` is bounded 1–100 by a check constraint (raised from 3 on 2026-11-06); the grant size itself is set per account by an operator until the entitlement ledger exists.
+
+## Notes on `20261106141806_research_dev_access_max_runs_limit`
+
+- Replaces `research_dev_access_max_runs_check` (`max_runs between 1 and 3`) with `between 1 and 100`. No grant is changed by the migration.
+- Applied for an operator grant on 2026-11-06: `ventures@smartmango.ai` was set to `max_runs = 20`, and `runs_used` was reset to its completed and active runs (0), because its three earlier runs all failed before failed runs released their slot. This was a data change made directly, not part of the migration.
 
 ## Notes on `20261105161832_app_settings_and_role_admin`
 

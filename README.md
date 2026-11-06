@@ -52,10 +52,10 @@ Migration versions match the live project's history; see [`docs/DATABASE_MIGRATI
 
 Email templates for the passwordless flow live in `supabase/templates/` with setup notes in that folder's README.
 
-Every confirmed account receives one free research run automatically. To give an account more during the beta, raise its grant:
+Every confirmed account receives one free research run automatically. To give an account more during the beta, raise its grant (`max_runs` is bounded 1–100):
 
 ```sql
-update public.research_dev_access set max_runs = 3, expires_at = now() + interval '30 days'
+update public.research_dev_access set max_runs = 20, expires_at = now() + interval '30 days'
 where user_id = '<auth.users.id>';
 ```
 
