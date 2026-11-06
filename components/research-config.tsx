@@ -1,6 +1,7 @@
 "use client";
 import { useCopy } from "@/i18n/use-copy";
 import { feedbackSource } from "@/i18n/errors";
+import { postJson, ApiNetworkError } from "@/lib/api-client";
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -118,25 +119,33 @@ export function ResearchConfig() {
                   router.push("/research");
                 } else {
                   requestKey.current ??= crypto.randomUUID();
-                  const response = await fetch("/api/research", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
+                  // The request key makes a start idempotent: re-sending after a dropped connection returns
+                  // the run the first attempt created instead of a second run.
+                  let result;
+                  try {
+                    result = await postJson("/api/research", {
                       action: "start",
                       brief: { ...brief, language: locale },
                       requestKey: requestKey.current,
-                    }),
-                  });
-                  const result = await response.json();
-                  if (!response.ok)
-                    throw new Error(feedbackSource(result.code));
+                    }, { networkRetries: 2 });
+                  } catch (error) {
+                    if (!(error instanceof ApiNetworkError)) throw error;
+                    await refresh().catch(() => undefined);
+                    throw new Error(feedbackSource("NETWORK_ERROR"));
+                  }
+                  const id = typeof result.body.id === "string" ? result.body.id : null;
+                  if (!result.ok || !id) {
+                    // The server answered and created nothing, so an edited brief may start fresh.
+                    if (result.status >= 400 && result.status < 500) requestKey.current = null;
+                    throw new Error(feedbackSource(result.body.code, "START_FAILED"));
+                  }
                   await refresh().catch(() => undefined);
-                  router.push(`/research/${result.id}`);
+                  router.push(`/research/${id}`);
                 }
                 router.refresh();
               } catch (error) {
                 setFormError(
-                  error instanceof Error ? error.message : "Research could not start right now.",
+                  error instanceof Error && error.message ? error.message : feedbackSource("START_FAILED"),
                 );
               } finally {
                 setSubmitting(false);

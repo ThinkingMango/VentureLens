@@ -13,6 +13,7 @@ import { researchErrors, stageLabels } from "@/lib/research-core";
 import type { ResearchDetail } from "@/lib/research-types";
 import { useCopy, useFormats } from "@/i18n/use-copy";
 import { feedbackSource } from "@/i18n/errors";
+import { getJson, postJson, ApiNetworkError } from "@/lib/api-client";
 const stageHints: Record<string, string> = {
   queued: "Waiting for a worker to pick up the job.",
   discovery: "Generating up to eight narrow hypotheses from your brief and profile.",
@@ -50,11 +51,10 @@ const stages = [
   "finalizing",
 ];
 async function fetchRun(url: string): Promise<ResearchDetail> {
-  const response = await fetch(url, { cache: "no-store" });
-  const data = await response.json();
-  if (!response.ok)
-    throw new Error(feedbackSource(data.code, "STATUS_UNAVAILABLE"));
-  return data;
+  const result = await getJson(url).catch(() => null);
+  if (!result?.ok)
+    throw new Error(feedbackSource(result?.body.code, "STATUS_UNAVAILABLE"));
+  return result.body as unknown as ResearchDetail;
 }
 export function ResearchRunView({
   initialData,
@@ -97,14 +97,20 @@ export function ResearchRunView({
     setRetrying(true);
     setRetryError("");
     try {
-      const response = await fetch("/api/research", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "retry", id: data.id }),
-      });
-      const result = await response.json();
-      if (!response.ok)
-        throw new Error(feedbackSource(result.code, "RETRY_UNAVAILABLE"));
+      let result;
+      try {
+        // A retry is not idempotent, so it is never re-sent; after a dropped connection the run's own
+        // status shows whether the retry was accepted.
+        result = await postJson("/api/research", { action: "retry", id: data.id });
+      } catch (error) {
+        if (!(error instanceof ApiNetworkError)) throw error;
+        const latest = await mutate().catch(() => undefined);
+        void refresh();
+        if (latest && ["pending", "running"].includes(latest.status)) return;
+        throw new Error(feedbackSource("NETWORK_ERROR"));
+      }
+      if (!result.ok)
+        throw new Error(feedbackSource(result.body.code, "RETRY_UNAVAILABLE"));
       await mutate();
       void refresh();
     } catch (error) {

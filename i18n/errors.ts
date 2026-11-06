@@ -19,6 +19,9 @@ export const feedback: Record<string, string> = {
   SAVE_FAILED: "Your change could not be saved. Please try again.",
   STATUS_UNAVAILABLE:
     "Research status could not refresh. Showing the last server record.",
+  NETWORK_ERROR:
+    "The connection dropped before the server replied. Your research may already have started: check My research before trying again.",
+  START_FAILED: "Research could not start right now. Please try again.",
 };
 export function feedbackSource(code: unknown, fallback = "SAVE_FAILED") {
   return typeof code === "string" && Object.hasOwn(feedback, code)
