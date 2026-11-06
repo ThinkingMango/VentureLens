@@ -12,14 +12,27 @@ export const DEFAULT_GEMINI_MODEL: GeminiModelId = "gemini-3.5-flash-lite";
 export const GOOGLE_API_BASE = "https://generativelanguage.googleapis.com/v1beta";
 export const QWEN_API_TEMPLATE = "https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/compatible-mode/v1";
 export const MODEL_CATALOG_CHECKED_AT = "2026-11-05";
+export type ThinkingLevel = false | true | "minimal" | "low" | "medium" | "high";
 
+// `thinking` applies to structured stages; `searchThinking` to native web search.
+// Gemini counts thinking tokens against maxOutputTokens, so a search call with heavy thinking can spend its whole
+// output allowance before it issues a query and return no grounding at all. Search only needs the model to issue
+// queries, so it uses the lowest level each model supports.
+// Qwen structured output (json_schema) is supported only in non-thinking mode, so Qwen structured calls never think;
+// `thinking` for Qwen therefore applies to search only.
+// `searchInputAllowance` is the reserved context for one native-search call. Observed Gemini grounding prompts are a few
+// hundred tokens; DashScope injects retrieved pages into context, so Qwen gets more headroom.
 export const researchModels = {
-  "qwen3.8-flash": { name: "Qwen 3.8 Flash", capability: "fast", thinking: false, outputTokens: 7000, searchOutputTokens: 512, searchInputAllowance: 1_000_000 },
-  "qwen3.8-max": { name: "Qwen 3.8 Max", capability: "complex", thinking: true, outputTokens: 10000, searchOutputTokens: 2048, searchInputAllowance: 64_000 },
-  "gemini-3.5-flash-lite": { name: "Gemini 3.5 Flash-Lite", capability: "economical", thinking: "minimal", outputTokens: 7000, searchOutputTokens: 512, searchInputAllowance: 64_000 },
-  "gemini-3.8-flash": { name: "Gemini 3.8 Flash", capability: "fastReasoning", thinking: "low", outputTokens: 7000, searchOutputTokens: 2048, searchInputAllowance: 64_000 },
-  "gemini-4-argon": { name: "Gemini 4 Argon", capability: "complex", thinking: "high", outputTokens: 10000, searchOutputTokens: 2048, searchInputAllowance: 64_000 },
-} as const;
+  "qwen3.8-flash": { name: "Qwen 3.8 Flash", capability: "fast", thinking: false, searchThinking: false, outputTokens: 7000, searchOutputTokens: 512, searchInputAllowance: 64_000 },
+  "qwen3.8-max": { name: "Qwen 3.8 Max", capability: "complex", thinking: false, searchThinking: true, outputTokens: 10000, searchOutputTokens: 2048, searchInputAllowance: 64_000 },
+  "gemini-3.5-flash-lite": { name: "Gemini 3.5 Flash-Lite", capability: "economical", thinking: "minimal", searchThinking: "minimal", outputTokens: 7000, searchOutputTokens: 512, searchInputAllowance: 16_000 },
+  "gemini-3.8-flash": { name: "Gemini 3.8 Flash", capability: "fastReasoning", thinking: "low", searchThinking: "low", outputTokens: 7000, searchOutputTokens: 2048, searchInputAllowance: 16_000 },
+  "gemini-4-argon": { name: "Gemini 4 Argon", capability: "complex", thinking: "high", searchThinking: "low", outputTokens: 10000, searchOutputTokens: 2048, searchInputAllowance: 16_000 },
+} as const satisfies Record<ResearchModelId, { thinking: ThinkingLevel; searchThinking: ThinkingLevel; outputTokens: number; searchOutputTokens: number; searchInputAllowance: number; name: string; capability: string }>;
+
+// Paid search queries reserved per native-search call. Gemini normally issues 1–2 queries per call; DashScope's agent
+// strategy may search several rounds but each query costs a fraction of a cent.
+export const searchQueryAllowance = { qwen: 32, gemini: 4 } as const;
 
 export function selectedModel(provider: "qwen" | "gemini", settings: { qwenModel?: QwenModelId; geminiModel?: GeminiModelId }): ResearchModelId {
   return provider === "qwen"
@@ -27,8 +40,15 @@ export function selectedModel(provider: "qwen" | "gemini", settings: { qwenModel
     : geminiModelSchema.parse(settings.geminiModel ?? DEFAULT_GEMINI_MODEL);
 }
 
-export function geminiThinkingOptions(model: GeminiModelId) {
-  return { google: { thinkingConfig: { thinkingLevel: researchModels[model].thinking } } };
+export function geminiThinkingOptions(model: GeminiModelId, purpose: "structured" | "search" = "structured") {
+  const config = researchModels[model];
+  return { google: { thinkingConfig: { thinkingLevel: purpose === "search" ? config.searchThinking : config.thinking } } };
+}
+
+// DashScope request fields for a Qwen call. Structured output requires non-thinking mode.
+export function qwenThinkingFields(model: QwenModelId, purpose: "structured" | "search") {
+  const thinking = purpose === "search" && researchModels[model].searchThinking === true;
+  return { enable_thinking: thinking, ...(thinking ? { thinking_budget: 1024 } : {}) };
 }
 
 export function researchModelPricing(model: ResearchModelId, at = new Date()) {

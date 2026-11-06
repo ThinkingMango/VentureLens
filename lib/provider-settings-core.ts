@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { DEFAULT_QWEN_MODEL, DEFAULT_GEMINI_MODEL, qwenModelSchema, geminiModelSchema } from "./research-models.ts";
+import { DEFAULT_QWEN_MODEL, DEFAULT_GEMINI_MODEL, qwenModelSchema, geminiModelSchema, selectedModel } from "./research-models.ts";
+import { estimateRunCost } from "./research-budget.ts";
 
 // Row key in public.app_settings that holds the research policy below.
 export const RESEARCH_SETTINGS_KEY = "research";
@@ -48,4 +49,20 @@ export function assertProvidersConfigured(settings: ProviderSettings, providers:
   if (!providers[plan.primary].configured || (plan.fallback && !providers[plan.fallback].configured)) {
     throw new Error("PROVIDER_NOT_CONFIGURED");
   }
+}
+
+// What a complete run is expected to cost on the planned primary and fallback models, and the budget each needs.
+export function runCostEstimates(settings: ProviderSettings, at = new Date()) {
+  const plan = providerPlan(settings);
+  return {
+    primary: estimateRunCost(selectedModel(plan.primary, settings), at),
+    fallback: plan.fallback ? estimateRunCost(selectedModel(plan.fallback, settings), at) : undefined,
+  };
+}
+
+// A primary model that cannot finish a run within the per-run budget makes every run fail after spending money.
+// A fallback that cannot finish is allowed; the engine simply does not use it.
+export function assertBudgetFits(settings: ProviderSettings, at = new Date()) {
+  const { primary } = runCostEstimates(settings, at);
+  if (primary.requiredUsd > settings.budgetUsd) throw Object.assign(new Error("BUDGET_TOO_LOW"), { requiredUsd: primary.requiredUsd, model: primary.model });
 }

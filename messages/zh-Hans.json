@@ -50,7 +50,11 @@
     "workspaceEndpoint": "服务器会将 {WorkspaceId} 替换为已配置的北京工作空间 ID。密钥不会传到浏览器。",
     "modelBudget": "Max 和 Argon 消耗同一研究预算的速度更快，可能更早触及现有上限。原生搜索上下文和查询费用为估算，并非服务商强制限额。Google 搜索需要付费层访问权限。",
     "budget": "单次研究预算（美元）",
-    "budgetHelp": "每次新研究的模型与检索花费硬上限，介于 {min} 与 {max} 美元之间。已有研究保留启动时的上限。"
+    "budgetHelp": "每次新研究的模型与检索花费硬上限，介于 {min} 与 {max} 美元之间。已有研究保留启动时的上限。",
+    "costEstimate": "完整一次研究的估算费用约为 {expected}。单次预算至少为 {required} 时，所有预留才能通过。",
+    "budgetTooLow": "{model} 无法在此预算内完成研究：至少需要 {required}。请提高预算或选择更便宜的模型，否则每次研究都会在生成报告前停止。",
+    "fallbackOverBudget": "{model} 完成一次研究至少需要 {required}，因此在此预算下不会被用作备用。",
+    "budgetTooLowSaved": "此预算不足以支持所选主要模型。请提高预算或选择更便宜的模型。"
   },
   "ui": {
     "m1pbhrck": "管理后台",
@@ -1029,7 +1033,8 @@
     "mobgmq": "多个模型",
     "m1i4fog0": "使用过的模型：{models}",
     "m5sb60y": "Qwen（DashScope）",
-    "mble3nh": "Gemini（Google）"
+    "mble3nh": "Gemini（Google）",
+    "mvcofaf": "完整的 {model} 研究预计至少需要 {required} 的预算，但本次研究的预算为 {remaining}。研究在发送任何服务商请求前已停止。"
   },
   "language": {
     "label": "界面语言",

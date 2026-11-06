@@ -1,5 +1,5 @@
-import { getWorkflowMetadata } from "workflow";
-import { initializeResearch, executeResearchStage, failResearch } from "@/lib/research-engine";
+import { FatalError, getWorkflowMetadata } from "workflow";
+import { initializeResearch, executeResearchStage, failResearch, recordStageFailure } from "@/lib/research-engine";
 import { errorCode } from "@/lib/research-core";
 
 type Context = { runId: string; userId: string; workflowId: string };
@@ -8,7 +8,8 @@ async function initialize(ctx: Context) {
   try {
     return await initializeResearch(ctx);
   } catch (error) {
-    throw new Error(errorCode(error));
+    await recordStageFailure(ctx, "setup", error);
+    throw new FatalError(errorCode(error));
   }
 }
 initialize.maxRetries = 0;
@@ -17,10 +18,14 @@ async function stage(ctx: Context, key: string) {
   try {
     return await executeResearchStage(ctx, key);
   } catch (error) {
-    throw new Error(errorCode(error));
+    // Errors raised by the engine are classified and final: retrying them would only repeat paid requests.
+    await recordStageFailure(ctx, key, error);
+    throw new FatalError(errorCode(error));
   }
 }
-stage.maxRetries = 0;
+// One retry covers a step lost to the platform (function timeout or crash) rather than to the engine. Completed batches
+// are checkpointed, so a retried stage resumes after the last saved batch instead of starting over.
+stage.maxRetries = 1;
 async function recordFailure(ctx: Context, code: string) {
   "use step";
   await failResearch(ctx, code);

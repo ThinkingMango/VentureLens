@@ -38,6 +38,8 @@ SUPABASE_SECRET_KEY=<service role / secret key>      # server only
 DASHSCOPE_API_KEY=<key>
 DASHSCOPE_WORKSPACE_ID=<beijing workspace id>
 GOOGLE_GENERATIVE_AI_API_KEY=<key>
+# Optional: idempotent workflow dispatch through start hooks (dispatch works without it)
+WORKFLOW_VERCEL_EXPERIMENTAL_START_HOOK=1
 ```
 
 Apply the migrations in `supabase/migrations/` to your project, then:
@@ -59,7 +61,7 @@ where user_id = '<auth.users.id>';
 
 ## Administrators and settings
 
-Administrator access is granted only by a server-managed claim, `app_metadata.role = "admin"`, set with the service role or in the Supabase dashboard; no email address is special. Administrators manage the research policy (primary provider, fallback, models, per-run budget cap) at `/admin`, which is stored in the service-role-only `public.app_settings` table under the key `research`.
+Administrator access is granted only by a server-managed claim, `app_metadata.role = "admin"`, set with the service role or in the Supabase dashboard; no email address is special. Administrators manage the research policy (primary provider, fallback, models, per-run budget cap) at `/admin`, which is stored in the service-role-only `public.app_settings` table under the key `research`. The page shows what a complete run is expected to cost and refuses a primary model that the per-run budget cannot pay for. At the $0.25 default only Qwen 3.8 Flash can finish a run; Gemini Flash-Lite needs about $0.40 because Google Search grounding is billed per query. See [`docs/GENERATION_PIPELINE_REVIEW.md`](./docs/GENERATION_PIPELINE_REVIEW.md).
 
 ```sql
 update auth.users set raw_app_meta_data = coalesce(raw_app_meta_data, '{}'::jsonb) || '{"role": "admin"}'
@@ -95,7 +97,8 @@ docs/             reviews and operating documentation
 1. `POST /api/research` validates the brief, checks the profile and access grant, and calls `enqueue_research` (idempotent on `requestKey`).
 2. `dispatchResearch` starts the workflow; `initializeResearch` claims the run and verifies the provider.
 3. Stages run in order with a checkpoint after each: `discovery` → `retrieval:cN` (one per candidate) → `classification` → `evaluation` → `scoring` → `review` → `finalizing`.
-4. Every model or search call reserves budget through `reserve_research_usage` first; the run stops with `BUDGET_EXCEEDED` if the reservation does not fit.
+4. Before the first request, `initializeResearch` checks that the configured models can finish a run within its budget (`lib/research-budget.ts`); if none can, the run stops uncharged. Every model or search call then reserves budget through `reserve_research_usage`; the run stops with `BUDGET_EXCEEDED` if a reservation does not fit.
+   Models answer against lenient draft schemas that the server normalises (`lib/research-core.ts`), so a length overrun or a skipped id no longer fails a run; a hypothesis whose search finds nothing is skipped.
 5. `finish_research` writes the report and `opportunities` rows only when at least one candidate survives the evidence gate (two independent domains, one non-vendor supporting source) and the review.
 
 The report is written in the language recorded on the run (`configuration.brief.language`, defaulting to the interface language at submission). Source excerpts are always kept verbatim in their original language.

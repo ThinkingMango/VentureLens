@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldContent, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Separator } from "@/components/ui/separator";
-import { providerPlan, MIN_RESEARCH_BUDGET_USD, MAX_RESEARCH_BUDGET_USD, type ProviderSettings, type ProviderSettingsResponse, type ResearchProvider } from "@/lib/provider-settings-core";
+import { providerPlan, runCostEstimates, MIN_RESEARCH_BUDGET_USD, MAX_RESEARCH_BUDGET_USD, type ProviderSettings, type ProviderSettingsResponse, type ResearchProvider } from "@/lib/provider-settings-core";
 import { useFormats } from "@/i18n/use-copy";
 import { ProviderModelField } from "@/components/provider-model-field";
 import { selectedModel, researchModels, qwenModelSchema, geminiModelSchema } from "@/lib/research-models";
@@ -31,11 +31,14 @@ export function AdminProviders({ initialData }: { initialData: ProviderSettingsR
   const { data = initialData, error: loadError, mutate, isValidating } = useSWR(endpoint, loadSettings, { fallbackData: initialData });
   const [draft, setDraft] = useState<ProviderSettings | null>(null);
   const [saving, setSaving] = useState(false);
-  const [saveError, setSaveError] = useState<"saveFailed" | "notConfigured" | "accessExpired" | null>(null);
+  const [saveError, setSaveError] = useState<"saveFailed" | "notConfigured" | "accessExpired" | "budgetTooLowSaved" | null>(null);
   const settings = draft ?? data.settings;
   const changed = settings.primary !== data.settings.primary || settings.autoFallback !== data.settings.autoFallback || settings.qwenModel !== data.settings.qwenModel || settings.geminiModel !== data.settings.geminiModel || settings.budgetUsd !== data.settings.budgetUsd;
   const plan = providerPlan(settings);
   const configured = data.providers[plan.primary].configured && (!plan.fallback || data.providers[plan.fallback].configured);
+  const estimates = runCostEstimates(settings);
+  const primaryFits = estimates.primary.requiredUsd <= settings.budgetUsd;
+  const fallbackFits = !estimates.fallback || estimates.fallback.requiredUsd <= settings.budgetUsd;
 
   function change(patch: Partial<ProviderSettings>) {
     setDraft({ primary: settings.primary, autoFallback: settings.autoFallback, qwenModel: settings.qwenModel, geminiModel: settings.geminiModel, budgetUsd: settings.budgetUsd, ...patch });
@@ -54,7 +57,7 @@ export function AdminProviders({ initialData }: { initialData: ProviderSettingsR
       });
       if (!response.ok) {
         const body = await response.json().catch(() => ({}));
-        setSaveError(body.code === "PROVIDER_NOT_CONFIGURED" ? "notConfigured" : [401, 403].includes(response.status) ? "accessExpired" : "saveFailed");
+        setSaveError(body.code === "PROVIDER_NOT_CONFIGURED" ? "notConfigured" : body.code === "BUDGET_TOO_LOW" ? "budgetTooLowSaved" : [401, 403].includes(response.status) ? "accessExpired" : "saveFailed");
         return;
       }
       const saved: ProviderSettingsResponse = await response.json();
@@ -126,6 +129,9 @@ export function AdminProviders({ initialData }: { initialData: ProviderSettingsR
                     {researchModels[selectedModel(plan.primary, settings)].name}
                     {plan.fallback ? <><ArrowRight className="size-4 text-muted-foreground" aria-hidden="true" />{researchModels[selectedModel(plan.fallback, settings)].name}</> : <span className="text-sm font-normal text-muted-foreground">· {t("noFallback")}</span>}
                   </p>
+                  <p className="text-sm text-muted-foreground">{t("costEstimate", { expected: formats.usd(estimates.primary.expectedUsd, 2), required: formats.usd(estimates.primary.requiredUsd, 2) })}</p>
+                  {!primaryFits && <p className="text-sm font-medium text-destructive">{t("budgetTooLow", { model: researchModels[estimates.primary.model].name, required: formats.usd(estimates.primary.requiredUsd, 2) })}</p>}
+                  {primaryFits && !fallbackFits && estimates.fallback && <p className="text-sm text-muted-foreground">{t("fallbackOverBudget", { model: researchModels[estimates.fallback.model].name, required: formats.usd(estimates.fallback.requiredUsd, 2) })}</p>}
                   <p className="text-sm text-muted-foreground">{t("fallbackLimit")}</p>
                 </div>
               </FieldGroup>
@@ -136,7 +142,7 @@ export function AdminProviders({ initialData }: { initialData: ProviderSettingsR
               </p>
               <div className="flex flex-wrap items-center gap-2">
                 {changed && <Button type="button" variant="ghost" disabled={saving} onClick={() => { setDraft(null); setSaveError(null); }}>{t("discard")}</Button>}
-                <Button type="submit" disabled={!changed || saving || !!loadError || !configured}>
+                <Button type="submit" disabled={!changed || saving || !!loadError || !configured || !primaryFits}>
                   {saving ? <LoaderCircle className="animate-spin motion-reduce:animate-none" aria-hidden="true" data-icon="inline-start" /> : <Check aria-hidden="true" data-icon="inline-start" />}
                   {saving ? t("saving") : t("save")}
                 </Button>

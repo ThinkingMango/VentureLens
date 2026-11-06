@@ -25,7 +25,8 @@ export async function searchGemini(prompt: string, model: GeminiModelId = GEMINI
   const result = await generateText({
     model: geminiModel(model), prompt,
     tools: { google_search: google.tools.googleSearch({}) },
-    providerOptions: geminiThinkingOptions(model),
+    // Thinking shares maxOutputTokens with the answer; search only needs the model to issue queries.
+    providerOptions: geminiThinkingOptions(model, "search"),
     maxOutputTokens: researchModels[model].searchOutputTokens, maxRetries: 0, abortSignal: AbortSignal.timeout(90000),
   });
   return parseGeminiSearch(result);

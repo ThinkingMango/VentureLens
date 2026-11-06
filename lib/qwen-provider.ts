@@ -1,7 +1,7 @@
 import "server-only";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { QWEN_MODEL, qwenOrigin, parseQwenSearch } from "@/lib/qwen-core";
-import { qwenModelSchema, researchModels, type QwenModelId } from "@/lib/research-models";
+import { qwenModelSchema, qwenThinkingFields, researchModels, type QwenModelId } from "@/lib/research-models";
 
 function credentials() {
   const apiKey = process.env.DASHSCOPE_API_KEY;
@@ -17,7 +17,8 @@ export function qwenModel(model: QwenModelId = QWEN_MODEL) {
   const { apiKey, origin } = credentials();
   return createOpenAICompatible({
     name: "dashscope", apiKey, baseURL: `${origin}/compatible-mode/v1`, supportsStructuredOutputs: true,
-    transformRequestBody: body => ({ ...body, enable_thinking: researchModels[model].thinking, ...(researchModels[model].thinking ? { thinking_budget: 1024 } : {}) }),
+    // This client only serves structured stages; DashScope supports json_schema output only in non-thinking mode.
+    transformRequestBody: body => ({ ...body, ...qwenThinkingFields(model, "structured") }),
   }).chatModel(model);
 }
 export async function verifyQwenModel(model: QwenModelId = QWEN_MODEL) {
@@ -48,8 +49,7 @@ export async function searchQwen(prompt: string, model: QwenModelId = QWEN_MODEL
       model,
       input: prompt,
       tools: [{ type: "web_search" }], tool_choice: "required",
-      enable_thinking: researchModels[model].thinking,
-      ...(researchModels[model].thinking ? { thinking_budget: 1024 } : {}),
+      ...qwenThinkingFields(model, "search"),
       max_output_tokens: researchModels[model].searchOutputTokens,
     }),
   });

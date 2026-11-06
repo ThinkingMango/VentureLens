@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { qwenOrigin, parseQwenSearch, qwenPricing } from '../lib/qwen-core.ts';
 import { isPublicAddress, sourceUrl, sourceExcerpt } from '../lib/research-source.ts';
 import { errorCode } from '../lib/research-core.ts';
+import { researchModels } from '../lib/research-models.ts';
 
 test('Beijing workspace is constrained to a provider hostname, never a user URL', () => {
   assert.equal(qwenOrigin('workspace-123'), 'https://workspace-123.cn-beijing.maas.aliyuncs.com');
@@ -32,9 +33,16 @@ test('incomplete native usage never fabricates zero tokens', () => {
   assert.equal(parseQwenSearch({output}).tokens,undefined);
   assert.throws(() => parseQwenSearch({output,usage:{input_tokens:1}}));
 });
-test('native search pricing reservation fits the unchanged quarter-dollar cap', () => {
-  const reserved = 1_000_000*qwenPricing.input + 512*qwenPricing.output + 32*qwenPricing.search;
-  assert.ok(reserved > 0 && reserved < .25);
+test('native search reservation is sized to realistic context, far below the run budget', () => {
+  const reserved = researchModels['qwen3.8-flash'].searchInputAllowance*qwenPricing.input + 512*qwenPricing.output + 32*qwenPricing.search;
+  // The former 1M-token allowance reserved ~$0.17 per search: one uncertain call starved the rest of a $0.25 run.
+  assert.ok(reserved > 0 && reserved < .05);
+});
+test('a billed Qwen response without sources reports its usage instead of hiding the cost', () => {
+  const usage = { input_tokens: 2100, output_tokens: 300, x_tools: { web_search: { count: 2 } } };
+  assert.throws(() => parseQwenSearch({ output: [{ type: 'message' }], usage }), error => error.message === 'RETRIEVAL_UNAVAILABLE' && error.usage.inputTokens === 2100 && error.searchRequests === 2);
+  assert.throws(() => parseQwenSearch({ output: [], status: 'failed', usage }), error => error.usage.outputTokens === 300);
+  assert.throws(() => parseQwenSearch({ output: [] }), error => error.usage === undefined);
 });
 test('source DNS must resolve exclusively to public unicast addresses', () => {
   for (const ip of ['127.0.0.1','10.0.0.1','169.254.169.254','100.100.100.200','192.168.1.1','172.16.0.1','0.0.0.0','224.0.0.1','::1','fe80::1','fc00::1','::ffff:127.0.0.1','invalid']) assert.equal(isPublicAddress(ip),false,ip);

@@ -25,7 +25,7 @@ export type ResearchDetail = {
   stage: string;
   model: ResearchModelInfo;
   error_code: string | null;
-  budget_block?: { model: string; required_usd: number; remaining_usd: number };
+  budget_block?: { model: string; required_usd: number; remaining_usd: number; kind: "reservation" | "estimate" };
   retry_count: number;
   configuration: { brief: ResearchBrief };
   report: ResearchReport | null;

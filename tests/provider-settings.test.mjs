@@ -16,9 +16,13 @@ import { errorCode } from "../lib/research-core.ts";
 import * as researchCore from "../lib/research-core.ts";
 import * as workspaceSchema from "../lib/workspace-schema.ts";
 import * as fallbackCore from "../lib/research-fallback-core.ts";
+import * as budget from "../lib/research-budget.ts";
 
 const verified = { id: "admin-test-id", email: "owner@example.org", email_confirmed_at: "2026-11-05T00:00:00.000Z", app_metadata: { role: "admin" } };
 const require = createRequire(import.meta.url);
+// Stand-in for the AI SDK error raised when a response does not parse into the requested object.
+const noObject = { isInstance: error => error?.name === "AI_NoObjectGeneratedError" };
+const unparsable = usage => Object.assign(new Error("No object generated: could not parse the response."), { name: "AI_NoObjectGeneratedError", usage });
 function loadModule(file, dependencies, env = {}, suffix = "") {
   const source = readFileSync(new URL(file, import.meta.url), "utf8") + suffix;
   const { outputText } = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } });
@@ -153,14 +157,17 @@ test("admin updates enforce origin, JSON validation, request limits, and the ses
 test("server persistence revalidates identity and writes only the app_settings row", async () => {
   const writes = [];
   const service = storage({ writes, admin: { getUserById: async id => { assert.equal(id, verified.id); return { data: { user: verified }, error: null }; } } });
-  const saved = await service.saveProviderSettings(verified.id, { primary: "gemini", autoFallback: false });
+  // Gemini Flash-Lite cannot finish a run on the $0.25 default (production run 11436d76 stopped at the 8th search).
+  await assert.rejects(service.saveProviderSettings(verified.id, { primary: "gemini", autoFallback: false }), /BUDGET_TOO_LOW/);
+  assert.equal(writes.length, 0, "an unfinishable policy is never written");
+  const saved = await service.saveProviderSettings(verified.id, { primary: "gemini", autoFallback: false, budgetUsd: 0.5 });
   assert.equal(writes.length, 1);
   assert.equal(writes[0].row.key, "research");
   assert.equal(writes[0].row.updated_by, verified.id);
   assert.deepEqual(writes[0].options, { onConflict: "key" });
   assert.deepEqual(readStoredProviderSettings(writes[0].row.value), saved.settings);
   assert.equal(saved.settings.primary, "gemini");
-  assert.equal(saved.settings.budgetUsd, 0.25);
+  assert.equal(saved.settings.budgetUsd, 0.5);
   const denied = storage({ admin: { getUserById: async () => ({ data: { user: { ...verified, app_metadata: {} } }, error: null }) } });
   await assert.rejects(denied.saveProviderSettings(verified.id, { primary: "qwen", autoFallback: true }), /ADMIN_REQUIRED/);
   const offline = storage({ admin: { getUserById: async () => ({ data: null, error: new Error("offline") }) } });
@@ -191,7 +198,7 @@ test("new runs read the app_settings policy, fall back to defaults, and surface 
 });
 test("verified model choices persist and unknown or cross-provider IDs are rejected", async () => {
   for (const qwenModel of models.qwenModelIds) for (const geminiModel of models.geminiModelIds) {
-    const input = { primary: "gemini", autoFallback: true, qwenModel, geminiModel, budgetUsd: 0.25 };
+    const input = { primary: "gemini", autoFallback: true, qwenModel, geminiModel, budgetUsd: 5 };
     assert.deepEqual(providerSettingsSchema.parse(input), input);
     const stored = { ...input, updatedAt: verified.email_confirmed_at };
     assert.deepEqual(readStoredProviderSettings(stored), stored);
@@ -214,10 +221,15 @@ test("selected models use compatible reasoning levels and preserve legacy defaul
   for (const geminiModel of models.geminiModelIds) {
     const expected = geminiModel === "gemini-4-argon" ? "high" : geminiModel === "gemini-3.8-flash" ? "low" : "minimal";
     assert.equal(models.geminiThinkingOptions(geminiModel).google.thinkingConfig.thinkingLevel, expected);
+    // Thinking shares maxOutputTokens with the answer, so search never uses a heavy level that could crowd out the query.
+    assert.notEqual(models.geminiThinkingOptions(geminiModel, "search").google.thinkingConfig.thinkingLevel, "high");
     assert.equal(models.selectedModel("gemini", { geminiModel }), geminiModel);
   }
-  assert.equal(models.researchModels["qwen3.8-max"].thinking, true);
-  assert.equal(models.researchModels["qwen3.8-flash"].thinking, false);
+  assert.equal(models.geminiThinkingOptions("gemini-4-argon", "search").google.thinkingConfig.thinkingLevel, "low");
+  // DashScope supports json_schema output only in non-thinking mode.
+  for (const qwenModel of models.qwenModelIds) assert.deepEqual(models.qwenThinkingFields(qwenModel, "structured"), { enable_thinking: false });
+  assert.deepEqual(models.qwenThinkingFields("qwen3.8-max", "search"), { enable_thinking: true, thinking_budget: 1024 });
+  assert.deepEqual(models.qwenThinkingFields("qwen3.8-flash", "search"), { enable_thinking: false });
 });
 
 test("model pricing applies published future price changes rather than an expired promotion", () => {
@@ -261,7 +273,7 @@ test("research dispatches saved models, reasoning controls, usage IDs, and fallb
     };
     const engine = loadModule("../lib/research-engine.ts", {
       "server-only": {},
-      "ai": { Output: { object: ({ schema }) => schema }, generateText: async options => {
+      "ai": { NoObjectGeneratedError: noObject, Output: { object: ({ schema }) => schema }, generateText: async options => {
         calls.push(options);
         if (failPrimary && calls.length === 1) throw Object.assign(new Error("TRANSIENT_PROVIDER"), { statusCode: 429 });
         return { output: { ok: true }, totalUsage: { inputTokens: 100, outputTokens: 25 } };
@@ -275,10 +287,11 @@ test("research dispatches saved models, reasoning controls, usage IDs, and fallb
       "@/lib/provider-settings": {},
       "@/lib/provider-settings-core": settingsCore,
       "@/lib/research-models": models,
+      "@/lib/research-budget": budget,
       "@/lib/workspace-schema": {},
       "@/lib/research-core": { errorCode, researchErrors: {}, researchPolicy: researchCore.researchPolicy, reportLanguage: researchCore.reportLanguage },
     }, {}, "\nexport { structured };\n");
-    assert.deepEqual(await engine.structured(context, "discovery", z.object({ ok: z.boolean() }), "Research prompt", models.researchModelPricing("qwen3.8-max")), { ok: true });
+    assert.deepEqual(await engine.structured(context, "discovery", z.object({ ok: z.boolean() }), value => value, "Research prompt", models.researchModelPricing("qwen3.8-max")), { ok: true });
     const expected = primary === "qwen" ? ["qwen3.8-max", "gemini-4-argon"] : ["gemini-4-argon", "qwen3.8-max"];
     assert.deepEqual(calls.map(call => call.model.modelId), expected.slice(0, failPrimary ? 2 : 1));
     assert.deepEqual(reservations.map(item => item.p_model), calls.map(call => call.model.modelId));
@@ -302,7 +315,7 @@ test("research checkpoints retain the saved policy, legacy compatibility, and bo
   assert.doesNotMatch(source, /active_provider: provider, fallback_pricing: pricing/);
 });
 
-function researchFixture({ settings = { primary: "gemini", autoFallback: true, qwenModel: "qwen3.8-max", geminiModel: "gemini-4-argon" }, spent = 0.051042, generate = async () => ({ output: { ok: true }, totalUsage: { inputTokens: 100, outputTokens: 25 } }), evidence = [], checkpoints = new Map() } = {}) {
+function researchFixture({ settings = { primary: "gemini", autoFallback: true, qwenModel: "qwen3.8-max", geminiModel: "gemini-4-argon" }, spent = 0.051042, generate = async () => ({ output: { ok: true }, totalUsage: { inputTokens: 100, outputTokens: 25 } }), evidence = [], checkpoints = new Map(), search = {}, fetchSource, verify = {}, providerSettings, budgetUsd = 0.25 } = {}) {
   const context = { runId: "run", userId: "user", workflowId: "workflow" };
   const setup = { provider_settings: settings, active_provider: settings.primary === "gemini" ? "google-gemini" : "dashscope-beijing", pricing: models.researchModelPricing(settings.qwenModel), fallback_pricing: models.researchModelPricing(settings.geminiModel), brief: { ...workspaceSchema.emptyBrief, name: "Regression research" }, profile: workspaceSchema.emptyProfile };
   checkpoints.set("setup", setup);
@@ -312,7 +325,7 @@ function researchFixture({ settings = { primary: "gemini", autoFallback: true, q
     let patch;
     const query = {
       select: () => query, eq: (key, value) => { filters[key] = value; return query; },
-      single: async () => ({ data: table === "research_runs" ? { status: "running", workflow_id: "workflow" } : { output: checkpoints.get(filters.stage_key) }, error: null }),
+      single: async () => ({ data: table === "research_runs" ? { status: "running", workflow_id: "workflow", configuration: { brief: setup.brief, profile: setup.profile }, budget_usd: budgetUsd } : { output: checkpoints.get(filters.stage_key) }, error: null }),
       maybeSingle: async () => ({ data: checkpoints.has(filters.stage_key) ? { output: checkpoints.get(filters.stage_key) } : null, error: null }),
       upsert: async value => { checkpoints.set(value.stage_key, value.output); return { error: null }; },
       update: value => { patch = value; return query; },
@@ -324,12 +337,12 @@ function researchFixture({ settings = { primary: "gemini", autoFallback: true, q
     return query;
   }
   const engine = loadModule("../lib/research-engine.ts", {
-    "server-only": {}, "ai": { Output: { object: ({ schema }) => schema }, generateText: async options => { calls.push(options); return generate(options); } },
-    "@/lib/qwen-provider": { qwenModel: model => ({ modelId: model }) },
-    "@/lib/gemini-provider": { geminiModel: model => ({ modelId: model }) },
+    "server-only": {}, "ai": { NoObjectGeneratedError: noObject, Output: { object: ({ schema }) => schema }, generateText: async options => { calls.push(options); return generate(options); } },
+    "@/lib/qwen-provider": { qwenModel: model => ({ modelId: model }), searchQwen: search.qwen, verifyQwenModel: verify.qwen },
+    "@/lib/gemini-provider": { geminiModel: model => ({ modelId: model }), searchGemini: search.gemini, verifyGeminiModel: verify.gemini },
     "@/lib/qwen-core": { QWEN_PROVIDER: "dashscope-beijing" }, "@/lib/research-fallback-core": fallbackCore,
-    "@/lib/research-source": {}, "@/lib/provider-settings": {}, "@/lib/provider-settings-core": settingsCore,
-    "@/lib/research-models": models, "@/lib/workspace-schema": workspaceSchema, "@/lib/research-core": researchCore,
+    "@/lib/research-source": { fetchResearchSource: fetchSource }, "@/lib/provider-settings": { researchProviderSettings: async () => providerSettings }, "@/lib/provider-settings-core": settingsCore,
+    "@/lib/research-models": models, "@/lib/research-budget": budget, "@/lib/workspace-schema": workspaceSchema, "@/lib/research-core": researchCore,
     "@/lib/supabase/admin": { createAdminClient: () => ({ from, rpc: async (_name, input) => {
       reservations.push(input);
       const committed = spent + records.reduce((sum, record) => sum + (record.status === "completed" ? record.estimated_usd : record.reserved_usd), 0);
@@ -342,16 +355,18 @@ function researchFixture({ settings = { primary: "gemini", autoFallback: true, q
   return { engine, context, setup, reservations, records, calls, checkpoints };
 }
 
-test("the screenshot's Argon reservation falls back without sending the unaffordable request", async () => {
-  const fixture = researchFixture();
+test("an unaffordable Argon reservation falls back without sending the unaffordable request", async () => {
+  // Once most of the budget is spent, Argon's search reservation no longer fits but Qwen Flash's does.
+  const fixture = researchFixture({ spent: 0.2, settings: { primary: "gemini", autoFallback: true, qwenModel: "qwen3.8-flash", geminiModel: "gemini-4-argon" } });
   const executed = [];
   const result = await fixture.engine.providerCall(fixture.context, "retrieval:c1", "Find external sources", fixture.setup.pricing, true, 0, async (provider, model) => {
     executed.push({ provider, model });
     return { value: "evidence", tokens: { inputTokens: 100, outputTokens: 25 }, searchRequests: 1 };
   });
   assert.equal(result, "evidence");
-  assert.deepEqual(executed, [{ provider: "dashscope-beijing", model: "qwen3.8-max" }]);
-  assert.ok(Math.abs(fixture.reservations[0].p_reserved - 0.20448) < 1e-9);
+  assert.deepEqual(executed, [{ provider: "dashscope-beijing", model: "qwen3.8-flash" }]);
+  const argon = budget.reservationFor("gemini-4-argon", models.researchModelPricing("gemini-4-argon"), { promptBytes: Buffer.byteLength("Find external sources"), search: true });
+  assert.ok(Math.abs(fixture.reservations[0].p_reserved - argon.usd) < 1e-9);
   assert.equal(fixture.records.length, 1);
   assert.equal(fixture.checkpoints.get("budget_block").model, "gemini-4-argon");
   assert.equal(fixture.checkpoints.get("setup").active_provider, "dashscope-beijing");
@@ -359,7 +374,7 @@ test("the screenshot's Argon reservation falls back without sending the unafford
 });
 
 test("disabled fallback and two unaffordable providers never send a paid request", async () => {
-  for (const fixture of [researchFixture({ settings: { primary: "gemini", autoFallback: false, qwenModel: "qwen3.8-max", geminiModel: "gemini-4-argon" } }), researchFixture({ spent: 0.24 })]) {
+  for (const fixture of [researchFixture({ spent: 0.2, settings: { primary: "gemini", autoFallback: false, qwenModel: "qwen3.8-max", geminiModel: "gemini-4-argon" } }), researchFixture({ spent: 0.24 })]) {
     let calls = 0;
     await assert.rejects(fixture.engine.providerCall(fixture.context, "retrieval:c1", "Find sources", fixture.setup.pricing, true, 0, async () => { calls++; }), /BUDGET_EXCEEDED/);
     assert.equal(calls, 0);
@@ -369,7 +384,7 @@ test("disabled fallback and two unaffordable providers never send a paid request
 
 test("billed invalid structured output settles known usage without charging its whole reservation", async () => {
   const fixture = researchFixture({ spent: 0, generate: async () => { throw Object.assign(new Error("INVALID_OUTPUT"), { usage: { inputTokens: 100, outputTokens: 50 } }); } });
-  await assert.rejects(fixture.engine.structured(fixture.context, "discovery", z.object({ ok: z.boolean() }), "Prompt", fixture.setup.pricing), /INVALID_OUTPUT/);
+  await assert.rejects(fixture.engine.structured(fixture.context, "discovery", z.object({ ok: z.boolean() }), value => value, "Prompt", fixture.setup.pricing), /INVALID_OUTPUT/);
   assert.equal(fixture.calls.length, 1);
   assert.equal(fixture.records[0].status, "completed");
   assert.equal(fixture.records[0].estimated_usd, 100 * 0.000002 + 50 * 0.00001);
@@ -377,7 +392,7 @@ test("billed invalid structured output settles known usage without charging its 
 
 test("prompt-size protection is not misreported as a budget failure or sent to fallback", async () => {
   const fixture = researchFixture({ spent: 0 });
-  await assert.rejects(fixture.engine.structured(fixture.context, "evaluation", z.object({ ok: z.boolean() }), "研".repeat(26000), fixture.setup.pricing), /RESEARCH_INPUT_TOO_LARGE/);
+  await assert.rejects(fixture.engine.structured(fixture.context, "evaluation", z.object({ ok: z.boolean() }), value => value, "研".repeat(26000), fixture.setup.pricing), /RESEARCH_INPUT_TOO_LARGE/);
   assert.equal(fixture.reservations.length, 0);
   assert.equal(fixture.calls.length, 0);
 });
@@ -433,7 +448,7 @@ test("concurrent dispatches share a durable hook and manual retries get a new id
       hooks.set(options.hook.token, runId);
       return { runId };
     } },
-    "workflow/errors": { HookConflictError: { is: error => error?.conflict === true } },
+    "workflow/errors": { HookConflictError: { is: error => error?.conflict === true }, WorkflowWorldError: { is: error => error?.world === true } },
     "@/workflows/research": { researchWorkflow: () => undefined },
     "@/lib/supabase/admin": { createAdminClient: () => ({ from: () => {
       const filters = {}; let patch;
@@ -515,4 +530,125 @@ test("the actual progress view renders blocked-request costs and a usable recove
   assert.match(html, /Existing progress and costs remain saved/);
   assert.match(html, /Model: Gemini 4 Argon/);
   assert.match(html, /Gemini via Google/);
+});
+
+test("structured output that does not parse is retried once, and each attempt is metered separately", async () => {
+  let attempt = 0;
+  const fixture = researchFixture({ spent: 0, settings: { primary: "qwen", autoFallback: false, qwenModel: "qwen3.8-flash", geminiModel: "gemini-3.5-flash-lite" }, generate: async () => {
+    attempt++;
+    if (attempt === 1) throw unparsable({ inputTokens: 1_000, outputTokens: 7_000 });
+    return { output: { ok: true }, totalUsage: { inputTokens: 1_000, outputTokens: 300 } };
+  } });
+  assert.deepEqual(await fixture.engine.structured(fixture.context, "discovery", z.object({ ok: z.boolean() }), value => value, "Prompt", fixture.setup.pricing), { ok: true });
+  assert.equal(fixture.calls.length, 2);
+  assert.equal(fixture.reservations.length, 2);
+  assert.deepEqual(fixture.records.map(record => record.status), ["completed", "completed"], "the truncated attempt is settled at its real usage, not left reserved");
+  const twice = researchFixture({ spent: 0, settings: { primary: "qwen", autoFallback: false, qwenModel: "qwen3.8-flash", geminiModel: "gemini-3.5-flash-lite" }, generate: async () => { throw unparsable({ inputTokens: 10, outputTokens: 10 }); } });
+  await assert.rejects(twice.engine.structured(twice.context, "discovery", z.object({ ok: z.boolean() }), value => value, "Prompt", twice.setup.pricing), /No object generated/);
+  assert.equal(twice.calls.length, 2, "never more than one retry");
+});
+
+test("a hypothesis whose search finds nothing is skipped without ending the run or moving it to the fallback", async () => {
+  const checkpoints = new Map();
+  checkpoints.set("discovery", { candidates: Array.from({ length: 5 }, (_, i) => ({ key: `c${i + 1}`, title: "Candidate", buyer: "Clinic managers", pain: "Intake", solution: "Automation", advantage: "Network", query: "clinic intake automation buyers" })) });
+  const searched = [];
+  const nothing = () => Object.assign(new Error("RETRIEVAL_UNAVAILABLE"), { usage: { inputTokens: 90, outputTokens: 512 }, searchRequests: 1 });
+  const fixture = researchFixture({ spent: 0, checkpoints, settings: { primary: "qwen", autoFallback: true, qwenModel: "qwen3.8-flash", geminiModel: "gemini-3.5-flash-lite" }, search: {
+    qwen: async () => { searched.push("qwen"); throw nothing(); },
+    gemini: async () => { searched.push("gemini"); throw nothing(); },
+  } });
+  await fixture.engine.executeResearchStage(fixture.context, "retrieval:c1");
+  assert.deepEqual(searched, ["qwen", "gemini"], "the fallback engine gets one chance to find sources");
+  assert.deepEqual(checkpoints.get("retrieval:c1"), { evidence: [], skipped: "RETRIEVAL_UNAVAILABLE" });
+  assert.equal(checkpoints.get("setup").active_provider, "dashscope-beijing", "an empty search is not a provider outage");
+  assert.deepEqual(fixture.records.map(record => record.status), ["completed", "completed"], "both billed searches are settled at real usage");
+  // Unreadable pages are treated the same way, while budget and configuration errors still stop the run.
+  const unreadable = researchFixture({ spent: 0, checkpoints: new Map([["discovery", checkpoints.get("discovery")]]), settings: { primary: "qwen", autoFallback: false, qwenModel: "qwen3.8-flash", geminiModel: "gemini-3.5-flash-lite" },
+    search: { qwen: async () => ({ sources: [{ url: "https://blocked.example.org/a" }], tokens: { inputTokens: 10, outputTokens: 10 }, searchRequests: 1 }) },
+    fetchSource: async () => { throw new Error("UNREADABLE_SOURCE"); } });
+  await unreadable.engine.executeResearchStage(unreadable.context, "retrieval:c2");
+  assert.equal(unreadable.checkpoints.get("retrieval:c2").skipped, "RETRIEVAL_UNAVAILABLE");
+  const broken = researchFixture({ spent: 0, checkpoints: new Map([["discovery", checkpoints.get("discovery")]]), settings: { primary: "qwen", autoFallback: false, qwenModel: "qwen3.8-flash", geminiModel: "gemini-3.5-flash-lite" },
+    search: { qwen: async () => { throw Object.assign(new Error("PROVIDER_CONFIGURATION"), { statusCode: 401 }); } } });
+  await assert.rejects(broken.engine.executeResearchStage(broken.context, "retrieval:c3"), /PROVIDER_CONFIGURATION/);
+});
+
+test("a model that skips a candidate or returns fractional scores no longer fails evaluation", async () => {
+  const checkpoints = new Map();
+  const candidates = Array.from({ length: 5 }, (_, i) => ({ key: `c${i + 1}`, title: "Candidate", buyer: "Clinic managers", pain: "Intake", solution: "Automation", advantage: "Network", query: "clinic intake automation buyers" }));
+  checkpoints.set("discovery", { candidates });
+  const evidence = candidates.slice(0, 2).flatMap(candidate => [0, 1].map(i => ({ source_key: `${candidate.key}-s${i + 1}`, candidate_id: candidate.key, url: `https://publisher${i}.org/${candidate.key}`, title: "Survey", excerpt: "Practice managers report intake paperwork takes nine hours every week.", retrieved_at: "", published_at: null })));
+  checkpoints.set("classification", { items: evidence.map(source => ({ source_key: source.source_key, relevant: true, kind: "pain", reliability: "primary", stance: "supports", quote: "intake paperwork takes nine hours", claim: "Real pain" })) });
+  const fixture = researchFixture({ spent: 0, checkpoints, evidence, settings: { primary: "qwen", autoFallback: false, qwenModel: "qwen3.8-flash", geminiModel: "gemini-3.5-flash-lite" }, generate: async () => ({
+    output: { items: [{ candidate_id: "c2", description: "d", category: "Services", revenue: "Unverified", cost: "Unverified", risk: "r", assumptions: ["a"], validation: ["v1", "v2"], dimensions: { pain: 61.5, demand: 55, economics: 40, feasibility: 70, advantage: 20 }, rationale: "r ".repeat(1200) }] },
+    totalUsage: { inputTokens: 100, outputTokens: 50 },
+  }) });
+  await fixture.engine.executeResearchStage(fixture.context, "evaluation");
+  const items = checkpoints.get("evaluation").items;
+  assert.deepEqual(items.map(item => item.candidate_id), ["c2"]);
+  assert.equal(items[0].dimensions.pain, 62);
+  assert.ok(items[0].rationale.length <= 2000);
+});
+
+test("a run whose models cannot finish within its budget stops before any provider request", async () => {
+  const verified = [];
+  const fixture = researchFixture({ spent: 0, providerSettings: { primary: "gemini", autoFallback: true, qwenModel: "qwen3.8-max", geminiModel: "gemini-4-argon", budgetUsd: 0.25, updatedAt: null },
+    verify: { qwen: async () => { verified.push("qwen"); }, gemini: async () => { verified.push("gemini"); } } });
+  fixture.setup.profile = { ...workspaceSchema.emptyProfile, name: "Founder", skills: "Operations" };
+  fixture.checkpoints.delete("setup");
+  await assert.rejects(fixture.engine.initializeResearch(fixture.context), /BUDGET_EXCEEDED/);
+  assert.deepEqual(verified, []);
+  assert.equal(fixture.reservations.length, 0);
+  assert.equal(fixture.checkpoints.get("budget_block").kind, "estimate");
+  assert.equal(fixture.checkpoints.get("budget_block").model, "gemini-4-argon");
+  // When only the fallback can finish, the run starts on the fallback and keeps no mid-run fallback.
+  const viaFallback = researchFixture({ spent: 0, providerSettings: { primary: "gemini", autoFallback: true, qwenModel: "qwen3.8-flash", geminiModel: "gemini-4-argon", budgetUsd: 0.25, updatedAt: null },
+    verify: { qwen: async () => { verified.push("qwen"); }, gemini: async () => { verified.push("gemini"); } } });
+  viaFallback.setup.profile = fixture.setup.profile;
+  viaFallback.checkpoints.delete("setup");
+  assert.equal(await viaFallback.engine.initializeResearch(viaFallback.context), true);
+  assert.deepEqual(verified, ["qwen"]);
+  assert.equal(viaFallback.checkpoints.get("setup").active_provider, "dashscope-beijing");
+  assert.equal(viaFallback.checkpoints.get("setup").fallback_allowed, false);
+});
+
+test("dispatch falls back to a plain start when the deployment does not support start hooks", async () => {
+  const row = { status: "pending", workflow_id: null, retry_count: 0 };
+  const starts = [];
+  const service = loadModule("../lib/research-service.ts", {
+    "server-only": {},
+    "@/lib/provider-settings": {}, "@/lib/provider-settings-core": settingsCore, "@/lib/research-models": models, "@/lib/qwen-core": { QWEN_PROVIDER: "dashscope-beijing" }, "@/lib/research-fallback-core": fallbackCore,
+    "workflow/api": { start: async (_workflow, _args, options) => {
+      starts.push(options?.hook ? "hook" : "plain");
+      // Mirrors @workflow/core: without WORKFLOW_VERCEL_EXPERIMENTAL_START_HOOK the World refuses and creates no run.
+      if (options?.hook) throw { world: true, code: "WORLD_CONTRACT_ERROR", message: "start({ hook }) requires a World that supports atomic start Hooks" };
+      return { runId: "workflow-plain" };
+    } },
+    "workflow/errors": { HookConflictError: { is: () => false }, WorkflowWorldError: { is: error => error?.world === true } },
+    "@/workflows/research": { researchWorkflow: () => undefined },
+    "@/lib/supabase/admin": { createAdminClient: () => ({ from: () => {
+      const filters = {}; let patch;
+      const query = {
+        select: () => query, eq: (key, value) => { filters[key] = value; return query; }, is: (key, value) => { filters[key] = value; return query; },
+        single: async () => ({ data: { ...row }, error: null }),
+        update: value => { patch = value; return query; },
+        then: resolve => { if (patch && Object.entries(filters).every(([key, value]) => ["id", "user_id"].includes(key) || row[key] === value)) Object.assign(row, patch); resolve({ error: null }); },
+      };
+      return query;
+    } }) },
+  });
+  const warn = console.warn; console.warn = () => {};
+  try { await service.dispatchResearch("run", "owner"); } finally { console.warn = warn; }
+  assert.deepEqual(starts, ["hook", "plain"]);
+  assert.equal(row.workflow_id, "workflow-plain");
+  assert.equal(row.status, "pending", "an unsupported start hook must not mark the run DISPATCH_FAILED");
+  assert.equal(service.startHookUnsupported({ world: true, code: "START_HOOK_ADMISSION_DISABLED" }), true);
+  assert.equal(service.startHookUnsupported({ world: true, code: "TIMEOUT" }), false);
+});
+
+test("saving a primary model the budget cannot pay for is refused with the required amount", async () => {
+  const api = route(verified, async () => { throw Object.assign(new Error("BUDGET_TOO_LOW"), { requiredUsd: 1.4659 }); });
+  const response = await api.PATCH(patch({ primary: "gemini", autoFallback: true, geminiModel: "gemini-4-argon" }));
+  assert.equal(response.status, 409);
+  assert.deepEqual(await response.json(), { code: "BUDGET_TOO_LOW", requiredUsd: 1.4659 });
 });
