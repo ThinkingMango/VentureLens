@@ -312,7 +312,7 @@ test("research checkpoints retain the saved policy, legacy compatibility, and bo
   assert.match(source, /provider_settings: providerSettings/);
   assert.match(source, /setup\.provider_settings \?\? defaultProviderSettings/);
   assert.match(source, /\[QWEN_PROVIDER, GEMINI_PROVIDER\]\.includes/);
-  assert.match(source, /\{ \.\.\.setup, active_provider: provider \}/);
+  assert.match(source, /checkpoint\(ctx, "setup", \{ \.\.\.setup, \.\.\.next \}\)/);
   assert.doesNotMatch(source, /active_provider: provider, fallback_pricing: pricing/);
 });
 
@@ -370,7 +370,9 @@ test("an unaffordable Argon reservation falls back without sending the unafforda
   assert.ok(Math.abs(fixture.reservations[0].p_reserved - argon.usd) < 1e-9);
   assert.equal(fixture.records.length, 1);
   assert.equal(fixture.checkpoints.get("budget_block").model, "gemini-4-argon");
-  assert.equal(fixture.checkpoints.get("setup").active_provider, "dashscope-beijing");
+  // An unaffordable search moves later searches only; structured stages stay on the primary.
+  assert.equal(fixture.checkpoints.get("setup").search_provider, "dashscope-beijing");
+  assert.equal(fixture.checkpoints.get("setup").active_provider, "google-gemini");
   assert.equal(fixture.checkpoints.get("setup").provider_settings.primary, "gemini");
 });
 
@@ -653,4 +655,46 @@ test("saving a primary model the budget cannot pay for is refused with the requi
   const response = await api.PATCH(patch({ primary: "gemini", autoFallback: true, geminiModel: "gemini-4-argon" }));
   assert.equal(response.status, 409);
   assert.deepEqual(await response.json(), { code: "BUDGET_TOO_LOW", requiredUsd: 1.4659 });
+});
+
+test("a slow primary search moves later searches to the fallback while structured stages stay on the primary", async () => {
+  const checkpoints = new Map();
+  checkpoints.set("discovery", { candidates: Array.from({ length: 5 }, (_, i) => ({ key: `c${i + 1}`, title: "Candidate", buyer: "Accounting firm partners", pain: "Compliance checklists", solution: "Automation", advantage: "Network", query: "accounting firm compliance checklist burden survey" })) });
+  const searched = [];
+  const timeout = () => Object.assign(new Error("The operation was aborted due to timeout"), { name: "TimeoutError" });
+  const page = { url: "https://association.example.org/survey", title: "Survey", excerpt: "Partners at small accounting firms report that compliance checklists take hours every week and they pay for outside help." };
+  const fixture = researchFixture({ spent: 0, checkpoints, settings: { primary: "qwen", autoFallback: true, qwenModel: "qwen3.8-flash", geminiModel: "gemini-3.5-flash-lite" }, search: {
+    qwen: async () => { searched.push("qwen"); throw timeout(); },
+    gemini: async () => { searched.push("gemini"); return { sources: [{ url: page.url }], tokens: { inputTokens: 100, outputTokens: 500 }, searchRequests: 1 }; },
+  }, fetchSource: async () => page });
+  await fixture.engine.executeResearchStage(fixture.context, "retrieval:c1");
+  assert.deepEqual(searched, ["qwen", "gemini"]);
+  assert.equal(checkpoints.get("setup").search_provider, "google-gemini");
+  assert.equal(checkpoints.get("setup").active_provider, "dashscope-beijing", "structured stages stay on the cheaper primary");
+  await fixture.engine.executeResearchStage(fixture.context, "retrieval:c2");
+  assert.deepEqual(searched, ["qwen", "gemini", "gemini"], "later searches skip the slow provider instead of waiting for its timeout again");
+  // Structured calls still go to the primary.
+  assert.deepEqual(await fixture.engine.structured(fixture.context, "evaluation", z.object({ ok: z.boolean() }), value => value, "Prompt", fixture.setup.pricing), { ok: true });
+  assert.equal(fixture.calls.at(-1).model.modelId, "qwen3.8-flash");
+});
+
+test("account-level failures move the whole run, empty searches move nothing", async () => {
+  const { providerSwitch } = loadModule("../lib/research-engine.ts", {
+    "server-only": {}, "ai": {}, "@/lib/qwen-provider": {}, "@/lib/gemini-provider": {}, "@/lib/qwen-core": { QWEN_PROVIDER: "dashscope-beijing" },
+    "@/lib/research-fallback-core": fallbackCore, "@/lib/research-source": {}, "@/lib/supabase/admin": {}, "@/lib/provider-settings": {}, "@/lib/provider-settings-core": settingsCore,
+    "@/lib/research-models": models, "@/lib/research-budget": budget, "@/lib/workspace-schema": workspaceSchema, "@/lib/research-core": researchCore,
+  });
+  const g = "google-gemini";
+  assert.equal(providerSwitch(true, "RETRIEVAL_UNAVAILABLE", g), null);
+  assert.deepEqual(providerSwitch(true, "TRANSIENT_PROVIDER", g), { search_provider: g });
+  assert.deepEqual(providerSwitch(true, "BUDGET_EXCEEDED", g), { search_provider: g });
+  for (const code of ["PROVIDER_CONFIGURATION", "PROVIDER_CREDITS_REQUIRED"]) assert.deepEqual(providerSwitch(true, code, g), { active_provider: g, search_provider: g });
+  assert.deepEqual(providerSwitch(false, "TRANSIENT_PROVIDER", g), { active_provider: g, search_provider: g });
+});
+
+test("discovery queries look for evidence of the problem, not for products", () => {
+  const source = readFileSync(new URL("../lib/research-engine.ts", import.meta.url), "utf8");
+  assert.doesNotMatch(source, /naming the buyer, the problem, paid alternatives/, "asking for paid alternatives steered search to vendor pages");
+  assert.match(source, /Do not name products or ask for tools or software\./);
+  assert.match(source, /rather than for software that claims to solve it/);
 });

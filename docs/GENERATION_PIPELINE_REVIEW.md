@@ -122,3 +122,12 @@ After PR #16 was deployed with the research policy **Qwen 3.8 Flash → Gemini 3
 | The browser showed **"Load failed"** although the server created and started the run: Safari's raw `fetch` error after the response was lost. | Fixed: `lib/api-client.ts` re-sends the idempotent start with the same request key, never shows raw browser text, and parses HTML/empty bodies safely. Retry is not re-sent; the run's status decides. |
 | **Advantage was 0 for every opportunity in a combined run**: Flash-Lite applied "In market mode advantage=0" regardless of mode, costing up to 15 points each. | Fixed: the instruction is now mode-specific and market mode is enforced server-side. |
 | **Most evidence came from AI vendors' own sites**, classified as "secondary". | Fixed in the prompts: search prefers independent sources (forums, associations, surveys, news, government, job postings), and any page from a company selling in the space is classified "vendor". This makes the evidence gate stricter, so expect fewer but better-supported opportunities. |
+
+### Second production run (`5b9d0bcc`, after #17)
+
+Completed in 4 min 33 s for $0.288 with **2 opportunities**. Advantage is now scored in combined mode (30 and 40), and vendor classification works (27 of 31 sources marked `vendor`). Two problems remained, both fixed in the follow-up:
+
+| Observed | Cause | Fix |
+|---|---|---|
+| Search still returned mostly vendor pages, so the stricter gate kept only 2 of 8 candidates | Discovery wrote each search query to name "paid alternatives", which points search at products | Queries now ask for evidence of the problem and existing spending (surveys, reports, forums, news) and never name products or tools |
+| The first Qwen search timed out at 90 s again (2 of 2 runs); every run then moved **all** stages to Gemini | DashScope's source-returning search is agent-style and multi-round (Responses API `web_search`; OpenAI-compatible chat does not return sources), and any fallback switched the whole run | The search provider is now tracked separately: a slow or unaffordable search moves only later searches, so the timeout is paid once per run and structured stages stay on Qwen. Credential or credit failures still move the whole run |
