@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { scoringWeights, weightedScore, safeSourceUrl, groundedClassifications, eligibleEvidence, requireExactIds, errorCode } from '../lib/research-core.ts';
+import { scoringWeights, weightedScore, safeSourceUrl, groundedClassifications, eligibleEvidence, errorCode } from '../lib/research-core.ts';
 import { projectSchema, emptyBrief } from '../lib/workspace-schema.ts';
 import { reportEvidenceCount, reportShortlist } from '../lib/report-presentation.ts';
 
@@ -95,10 +95,6 @@ test('invalid duplicate classifications do not hide a later grounded quote',()=>
 test('source URLs reject executable protocols, credentials and local addresses',()=>{
   for(const url of ['javascript:alert(1)','data:text/html,a','http://localhost/x','http://127.0.0.1/x','http://[::1]/','https://user:pass@buyers.org/','https://foo.local']) assert.equal(safeSourceUrl(url),null);
   assert.equal(safeSourceUrl('https://buyers.org/report#part'),'https://buyers.org/report');
-});
-test('stage IDs reject omissions, additions and duplicate candidate outputs',()=>{
-  assert.doesNotThrow(()=>requireExactIds(['c1','c2'],['c2','c1']));
-  for(const ids of [['c1'],['c1','c1'],['c1','c3']]) assert.throws(()=>requireExactIds(['c1','c2'],ids));
 });
 test('Gateway credit restrictions remain actionable across workflow serialization',()=>{
   const message = 'Free tier users do not have access to this model. Upgrade to paid credits.';

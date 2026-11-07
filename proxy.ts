@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { safeReturnPath } from "@/lib/workspace-schema";
 
 export async function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;
@@ -41,7 +42,8 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
   if ((isPrivate && !user) || (isAuth && user)) {
-    const target = new URL(user ? "/dashboard" : "/login", request.url);
+    // A signed-in founder who follows a /login?next=… link lands where the link pointed, not always on the dashboard.
+    const target = new URL(user ? safeReturnPath(request.nextUrl.searchParams.get("next")) : "/login", request.url);
     if (!user) target.searchParams.set("next", path + request.nextUrl.search);
     const redirect = NextResponse.redirect(target);
     response.cookies.getAll().forEach((cookie) => redirect.cookies.set(cookie));

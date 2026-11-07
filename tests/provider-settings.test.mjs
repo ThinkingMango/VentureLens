@@ -320,18 +320,20 @@ function researchFixture({ settings = { primary: "gemini", autoFallback: true, q
   const context = { runId: "run", userId: "user", workflowId: "workflow" };
   const setup = { provider_settings: settings, active_provider: settings.primary === "gemini" ? "google-gemini" : "dashscope-beijing", pricing: models.researchModelPricing(settings.qwenModel), fallback_pricing: models.researchModelPricing(settings.geminiModel), brief: { ...workspaceSchema.emptyBrief, name: "Regression research" }, profile: workspaceSchema.emptyProfile };
   checkpoints.set("setup", setup);
-  const reservations = [], calls = [], records = [];
+  const reservations = [], calls = [], records = [], reads = [];
   function from(table) {
     const filters = {};
     let patch;
     const query = {
       select: () => query, eq: (key, value) => { filters[key] = value; return query; },
+      order: column => { filters.order = column; return query; },
       single: async () => ({ data: table === "research_runs" ? { status: "running", workflow_id: "workflow", configuration: { brief: setup.brief, profile: setup.profile }, budget_usd: budgetUsd } : { output: checkpoints.get(filters.stage_key) }, error: null }),
       maybeSingle: async () => ({ data: checkpoints.has(filters.stage_key) ? { output: checkpoints.get(filters.stage_key) } : null, error: null }),
       upsert: async value => { checkpoints.set(value.stage_key, value.output); return { error: null }; },
       update: value => { patch = value; return query; },
       then: resolve => {
         if (table === "research_usage" && patch) for (const record of records) if (record.id === filters.id && (!filters.status || filters.status === record.status)) Object.assign(record, patch);
+        if (table === "research_evidence" && !patch) reads.push({ order: filters.order });
         return resolve({ data: table === "research_evidence" && !patch ? evidence : null, error: null });
       },
     };
@@ -353,7 +355,7 @@ function researchFixture({ settings = { primary: "gemini", autoFallback: true, q
       return { data: id, error: null };
     } }) },
   }, {}, "\nexport { structured, providerCall };\n");
-  return { engine, context, setup, reservations, records, calls, checkpoints };
+  return { engine, context, setup, reservations, records, calls, checkpoints, reads };
 }
 
 test("an unaffordable Argon reservation falls back without sending the unaffordable request", async () => {
@@ -456,7 +458,8 @@ test("concurrent dispatches share a durable hook and manual retries get a new id
     "@/lib/supabase/admin": { createAdminClient: () => ({ from: () => {
       const filters = {}; let patch;
       const query = {
-        select: () => query, eq: (key, value) => { filters[key] = value; return query; }, is: (key, value) => { filters[key] = value; return query; },
+        select: () => query, eq: (key, value) => { filters[key] = value; return query; },
+      order: column => { filters.order = column; return query; }, is: (key, value) => { filters[key] = value; return query; },
         single: async () => ({ data: { ...row }, error: null }),
         update: value => { patch = value; updates.push(value); return query; },
         then: resolve => {
@@ -487,6 +490,7 @@ test("research detail explains blocked reservations without adding them to spent
     const filters = {};
     const query = {
       select: () => query, eq: (key, value) => { filters[key] = value; return query; },
+      order: column => { filters.order = column; return query; },
       maybeSingle: async () => {
         scopes.push(filters);
         return { data: table === "research_runs" ? run : { output: { model: "gemini-4-argon", required_usd: 0.20448 } }, error: null };
@@ -563,7 +567,7 @@ test("a hypothesis whose search finds nothing is skipped without ending the run 
   } });
   await fixture.engine.executeResearchStage(fixture.context, "retrieval:c1");
   assert.deepEqual(searched, ["qwen", "gemini"], "the fallback engine gets one chance to find sources");
-  assert.deepEqual(checkpoints.get("retrieval:c1"), { evidence: [], skipped: "RETRIEVAL_UNAVAILABLE" });
+  assert.deepEqual(checkpoints.get("retrieval:c1"), { evidence: [], skipped: "RETRIEVAL_UNAVAILABLE", workflow: "workflow" });
   assert.equal(checkpoints.get("setup").active_provider, "dashscope-beijing", "an empty search is not a provider outage");
   assert.deepEqual(fixture.records.map(record => record.status), ["completed", "completed"], "both billed searches are settled at real usage");
   // Unreadable pages are treated the same way, while budget and configuration errors still stop the run.
@@ -575,6 +579,38 @@ test("a hypothesis whose search finds nothing is skipped without ending the run 
   const broken = researchFixture({ spent: 0, checkpoints: new Map([["discovery", checkpoints.get("discovery")]]), settings: { primary: "qwen", autoFallback: false, qwenModel: "qwen3.8-flash", geminiModel: "gemini-3.5-flash-lite" },
     search: { qwen: async () => { throw Object.assign(new Error("PROVIDER_CONFIGURATION"), { statusCode: 401 }); } } });
   await assert.rejects(broken.engine.executeResearchStage(broken.context, "retrieval:c3"), /PROVIDER_CONFIGURATION/);
+});
+
+test("a manual retry searches skipped hypotheses again, but a platform retry or a started classification does not", async () => {
+  const discovery = { candidates: Array.from({ length: 5 }, (_, i) => ({ key: `c${i + 1}`, title: "Candidate", buyer: "Clinic managers", pain: "Intake", solution: "Automation", advantage: "Network", query: "clinic intake automation buyers" })) };
+  const settings = { primary: "qwen", autoFallback: false, qwenModel: "qwen3.8-flash", geminiModel: "gemini-3.5-flash-lite" };
+  const found = { sources: [{ url: "https://buyers.org/thread" }], tokens: { inputTokens: 10, outputTokens: 10 }, searchRequests: 1 };
+  const page = async url => ({ url, title: "Thread", excerpt: "Clinic managers describe intake backlogs every week.".repeat(3) });
+  // Same workflow (a platform retry of the step): the skipped checkpoint stands and nothing is paid again.
+  let searches = 0;
+  const same = researchFixture({ spent: 0, settings, checkpoints: new Map([["discovery", discovery], ["retrieval:c1", { evidence: [], skipped: "RETRIEVAL_UNAVAILABLE", workflow: "workflow" }]]), search: { qwen: async () => { searches++; return found; } }, fetchSource: page });
+  await same.engine.executeResearchStage(same.context, "retrieval:c1");
+  assert.equal(searches, 0);
+  // A new workflow (manual retry), including checkpoints written before the workflow was recorded: search again.
+  for (const skipped of [{ evidence: [], skipped: "RETRIEVAL_UNAVAILABLE", workflow: "earlier-workflow" }, { evidence: [], skipped: "RETRIEVAL_UNAVAILABLE" }]) {
+    const retry = researchFixture({ spent: 0, settings, checkpoints: new Map([["discovery", discovery], ["retrieval:c1", skipped]]), search: { qwen: async () => { searches++; return found; } }, fetchSource: page });
+    await retry.engine.executeResearchStage(retry.context, "retrieval:c1");
+    assert.equal(retry.checkpoints.get("retrieval:c1").evidence.length, 1);
+  }
+  assert.equal(searches, 2);
+  // Once classification has started, new evidence could never be classified, so the skip stands.
+  const late = researchFixture({ spent: 0, settings, checkpoints: new Map([["discovery", discovery], ["retrieval:c1", { evidence: [], skipped: "RETRIEVAL_UNAVAILABLE", workflow: "earlier-workflow" }], ["classification:batch:0", { items: [] }]]), search: { qwen: async () => { searches++; return found; } }, fetchSource: page });
+  await late.engine.executeResearchStage(late.context, "retrieval:c1");
+  assert.equal(searches, 2);
+});
+
+test("evidence is read in a stable order so resumed classification batches line up with their checkpoints", async () => {
+  const candidates = Array.from({ length: 5 }, (_, i) => ({ key: `c${i + 1}`, title: "Candidate", buyer: "Buyer", pain: "Pain", solution: "Solution", advantage: "Edge", query: "independent buyer research" }));
+  const evidence = [{ source_key: "c1-s1", candidate_id: "c1", url: "https://a.org/1", title: "A", excerpt: "Buyers report weekly intake backlogs.", retrieved_at: "2026-11-07T00:00:00Z", published_at: null }];
+  const fixture = researchFixture({ spent: 0, evidence, checkpoints: new Map([["discovery", { candidates }]]), settings: { primary: "qwen", autoFallback: false, qwenModel: "qwen3.8-flash", geminiModel: "gemini-3.5-flash-lite" },
+    generate: async () => ({ output: { items: [] }, totalUsage: { inputTokens: 10, outputTokens: 10 } }) });
+  await fixture.engine.executeResearchStage(fixture.context, "classification");
+  assert.deepEqual(fixture.reads, [{ order: "source_key" }]);
 });
 
 test("a model that skips a candidate or returns fractional scores no longer fails evaluation", async () => {
@@ -633,7 +669,8 @@ test("dispatch falls back to a plain start when the deployment does not support 
     "@/lib/supabase/admin": { createAdminClient: () => ({ from: () => {
       const filters = {}; let patch;
       const query = {
-        select: () => query, eq: (key, value) => { filters[key] = value; return query; }, is: (key, value) => { filters[key] = value; return query; },
+        select: () => query, eq: (key, value) => { filters[key] = value; return query; },
+      order: column => { filters.order = column; return query; }, is: (key, value) => { filters[key] = value; return query; },
         single: async () => ({ data: { ...row }, error: null }),
         update: value => { patch = value; return query; },
         then: resolve => { if (patch && Object.entries(filters).every(([key, value]) => ["id", "user_id"].includes(key) || row[key] === value)) Object.assign(row, patch); resolve({ error: null }); },
@@ -697,4 +734,35 @@ test("discovery queries look for evidence of the problem, not for products", () 
   assert.doesNotMatch(source, /naming the buyer, the problem, paid alternatives/, "asking for paid alternatives steered search to vendor pages");
   assert.match(source, /Do not name products or ask for tools or software\./);
   assert.match(source, /rather than for software that claims to solve it/);
+});
+
+test("a failed start is never reported as a model-output or provider failure", () => {
+  const research = loadModule("../app/api/research/route.ts", {
+    "next/server": { NextResponse: { json: (value, init) => new Response(JSON.stringify(value), init) } },
+    "@/lib/supabase/server": {}, "@/lib/supabase/admin": {}, "next-intl/server": {}, "@/lib/research-service": {},
+    "@/lib/workspace-schema": workspaceSchema, "@/lib/research-core": researchCore, "@/i18n/errors": { feedbackSource: code => code },
+  });
+  assert.equal(research.startFailureCode(new Error("DEV_QUOTA_EXCEEDED")), "DEV_QUOTA_EXCEEDED");
+  assert.equal(research.startFailureCode(new Error("RUN_ALREADY_ACTIVE")), "RUN_ALREADY_ACTIVE");
+  for (const message of ["connection terminated unexpectedly", "fetch failed", "value too long for type character varying"]) {
+    assert.equal(research.startFailureCode(new Error(message)), "START_FAILED");
+  }
+});
+
+test("a signed-in founder following a login link with a return path lands on that page", async () => {
+  const { NextRequest } = require("next/server");
+  const proxyFor = user => loadModule("../proxy.ts", {
+    "@supabase/ssr": { createServerClient: () => ({ auth: { getUser: async () => ({ data: { user } }) } }) },
+    "@/lib/workspace-schema": workspaceSchema,
+  }, { NEXT_PUBLIC_SUPABASE_URL: "https://project.supabase.co", NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "test-only" });
+  const location = async (proxy, url) => {
+    const target = new URL((await proxy.proxy(new NextRequest(url))).headers.get("location"));
+    return target.pathname + target.search;
+  };
+  const signedIn = proxyFor({ id: "user" });
+  assert.equal(await location(signedIn, "https://venturelens.test/login?next=%2Fresearch%2Fnew"), "/research/new");
+  assert.equal(await location(signedIn, "https://venturelens.test/login?next=https%3A%2F%2Fevil.test"), "/dashboard");
+  assert.equal(await location(signedIn, "https://venturelens.test/signup"), "/dashboard");
+  const signedOut = proxyFor(null);
+  assert.equal(await location(signedOut, "https://venturelens.test/saved"), "/login?next=%2Fsaved");
 });

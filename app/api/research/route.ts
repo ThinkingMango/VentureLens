@@ -5,7 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getLocale } from "next-intl/server";
 import { researchRequestSchema, profileSchema } from "@/lib/workspace-schema";
 import { reportLanguage } from "@/lib/research-core";
-import { researchErrors, errorCode } from "@/lib/research-core";
+import { feedbackSource } from "@/i18n/errors";
 import { dispatchResearch, researchDetail } from "@/lib/research-service";
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -18,6 +18,14 @@ const inputSchema = z.discriminatedUnion("action", [
   }),
   z.object({ action: z.literal("retry"), id: z.uuid() }),
 ]);
+// Only the access and concurrency rules raised by enqueue_research/retry_research are meaningful to the founder here.
+// Anything else (a database or network failure) is reported as START_FAILED, never as a model-output or
+// provider failure: no model request is made by this route.
+const startFailures = ["DEV_ACCESS_REQUIRED", "DEV_QUOTA_EXCEEDED", "RUN_ALREADY_ACTIVE"] as const;
+export function startFailureCode(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  return startFailures.find(code => message.includes(code)) ?? "START_FAILED";
+}
 function json(value: unknown, status = 200) {
   return NextResponse.json(value, {
     status,
@@ -108,9 +116,9 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     if (error instanceof SyntaxError || error instanceof TypeError)
       return json({ code: "INVALID_INPUT", error: "请求格式不正确。" }, 400);
-    const code = errorCode(error);
+    const code = startFailureCode(error);
     return json(
-      { code, error: researchErrors[code] },
+      { code, error: feedbackSource(code, "START_FAILED") },
       ["DEV_ACCESS_REQUIRED", "DEV_QUOTA_EXCEEDED"].includes(code)
         ? 403
         : code === "RUN_ALREADY_ACTIVE"

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { qwenOrigin, parseQwenSearch, qwenPricing } from '../lib/qwen-core.ts';
-import { isPublicAddress, sourceUrl, sourceExcerpt } from '../lib/research-source.ts';
+import { isPublicAddress, sourceUrl, sourceExcerpt, decodeHtml } from '../lib/research-source.ts';
 import { errorCode } from '../lib/research-core.ts';
 import { researchModels } from '../lib/research-models.ts';
 
@@ -60,6 +60,14 @@ test('only original page text becomes evidence; scripts and navigation are remov
   assert.ok(!result.excerpt.includes('Ignore previous instructions'));
   assert.ok(!result.excerpt.includes('Invent false revenue'));
   assert.throws(() => sourceExcerpt('<html><body><p>Too short</p></body></html>'), /EMPTY_SOURCE/);
+});
+test('pages are decoded in their declared character set, not forced to UTF-8', () => {
+  const gbk = Buffer.from([0xd6, 0xd0, 0xce, 0xc4]); // 中文 in GBK
+  assert.equal(decodeHtml(gbk, 'text/html; charset=GBK'), '中文');
+  const big5 = Buffer.concat([Buffer.from('<html><head><meta charset="big5"></head><body>'), Buffer.from([0xa4, 0xa4, 0xa4, 0xe5]), Buffer.from('</body></html>')]);
+  assert.ok(decodeHtml(big5, 'text/html').includes('中文'));
+  assert.equal(decodeHtml(Buffer.from('café'), 'text/html'), 'café');
+  assert.equal(decodeHtml(Buffer.from('café'), 'text/html; charset=not-a-charset'), 'café');
 });
 test('DashScope billing failures map to safe actionable codes', () => {
   for (const message of ['Arrearage','Access denied: account overdue','insufficient_quota','InsufficientQuota']) assert.equal(errorCode(new Error(message)),'PROVIDER_CREDITS_REQUIRED');

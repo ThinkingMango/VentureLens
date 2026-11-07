@@ -231,8 +231,10 @@ async function retrieve(ctx: Context, candidate: Candidate, pricing: Pricing) {
   }).slice(0, 10);
   seen.clear();
   let unreadable = 0;
-  for (let index = 0; index < sources.length && evidence.length < 4; index += 2) {
-    const pages = await Promise.all(sources.slice(index, index + 2).map(async item => {
+  // Pages are read four at a time: the step has to fit both searches and the page reads inside one function run,
+  // and sequential pairs could take five 15-second rounds when several pages are slow or unreadable.
+  for (let index = 0; index < sources.length && evidence.length < 4; index += 4) {
+    const pages = await Promise.all(sources.slice(index, index + 4).map(async item => {
       try { return await fetchResearchSource(item.url); } catch { unreadable++; return null; }
     }));
     for (const page of pages) {
@@ -248,12 +250,30 @@ async function retrieve(ctx: Context, candidate: Candidate, pricing: Pricing) {
   checked(await db().from("research_evidence").upsert(evidence.map(e => ({ ...e, run_id: ctx.runId, user_id: ctx.userId })), { onConflict: "run_id,source_key" }));
   return evidence;
 }
+async function stageExists(ctx: Context, key: string) {
+  return !!checked(await db().from("research_stages").select("stage_key").eq("run_id", ctx.runId).eq("user_id", ctx.userId).eq("stage_key", key).maybeSingle());
+}
+/**
+ * A hypothesis skipped by an earlier attempt is searched again by a manual retry (a new workflow) as long as
+ * classification has not started. Otherwise a retry of RETRIEVAL_UNAVAILABLE would replay the same empty checkpoints
+ * and fail again without sending a single search. A platform retry of the same workflow keeps the checkpoint.
+ */
+async function searchAgain(ctx: Context, key: string, output: unknown) {
+  const skipped = output as { skipped?: unknown; workflow?: unknown } | null;
+  if (!key.startsWith("retrieval:") || !skipped?.skipped || skipped.workflow === ctx.workflowId) return false;
+  return !(await stageExists(ctx, "classification:batch:0") || await stageExists(ctx, "classification"));
+}
 export async function executeResearchStage(ctx: Context, key: string): Promise<string[]> {
   const client = db();
   const run = checked(await client.from("research_runs").select("status,workflow_id").eq("id", ctx.runId).eq("user_id", ctx.userId).single());
+  // A platform retry of the final step after finish_research committed has nothing left to do.
+  if (run?.status === "completed" && key === "finalizing" && run.workflow_id === ctx.workflowId) return [];
   if (!run || run.status !== "running" || run.workflow_id !== ctx.workflowId) throw new Error("WORKFLOW_INTERRUPTED");
   const cached = checked(await client.from("research_stages").select("output").eq("run_id", ctx.runId).eq("user_id", ctx.userId).eq("stage_key", key).maybeSingle());
-  if (cached) return key === "discovery" ? discoverySchema.parse(cached.output).candidates.map(c => c.key) : [];
+  if (cached) {
+    if (key === "discovery") return discoverySchema.parse(cached.output).candidates.map(c => c.key);
+    if (!await searchAgain(ctx, key, cached.output)) return [];
+  }
   const stage = key.split(":")[0];
   checked(await client.from("research_runs").update({ stage }).eq("id", ctx.runId).eq("user_id", ctx.userId).eq("workflow_id", ctx.workflowId).eq("status", "running"));
   const setup = await previous<{ brief: z.infer<typeof researchRequestSchema>; profile: z.infer<typeof profileSchema>; pricing: Pricing }>(ctx, "setup");
@@ -278,11 +298,12 @@ export async function executeResearchStage(ctx: Context, key: string): Promise<s
       // The run still fails at classification when no hypothesis produced any evidence.
       if (errorCode(error) !== "RETRIEVAL_UNAVAILABLE") throw error;
       log("warn", "hypothesis skipped: no retrievable evidence", ctx, { candidate: candidate.key });
-      await checkpoint(ctx, key, { evidence: [], skipped: "RETRIEVAL_UNAVAILABLE" });
+      await checkpoint(ctx, key, { evidence: [], skipped: "RETRIEVAL_UNAVAILABLE", workflow: ctx.workflowId });
     }
     return [];
   }
-  const evidence = checked(await client.from("research_evidence").select("source_key,candidate_id,url,title,excerpt,retrieved_at,published_at").eq("run_id", ctx.runId).eq("user_id", ctx.userId)) as Evidence[];
+  // Classification batches are checkpointed by offset, so a resumed stage must see the evidence in the same order.
+  const evidence = checked(await client.from("research_evidence").select("source_key,candidate_id,url,title,excerpt,retrieved_at,published_at").eq("run_id", ctx.runId).eq("user_id", ctx.userId).order("source_key")) as Evidence[];
   if (!evidence.length) throw new Error("RETRIEVAL_UNAVAILABLE");
   if (key === "classification") {
     const classified: z.infer<typeof classificationSchema>["items"] = [];

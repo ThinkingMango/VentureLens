@@ -24,6 +24,19 @@ export function sourceExcerpt(html: string) {
   if (excerpt.length < 80) throw new Error("EMPTY_SOURCE");
   return { title, excerpt };
 }
+/**
+ * Decodes a page body in its declared character set. Many Chinese, Japanese and Korean sites still serve GBK, Big5,
+ * Shift_JIS or EUC-KR; decoding those as UTF-8 produces mojibake that is then quoted as "verbatim" evidence.
+ * The Content-Type header wins, then a <meta> declaration in the first 2 KB, then UTF-8.
+ */
+export function decodeHtml(body: Buffer, contentType = ""): string {
+  const declared = /charset\s*=\s*["']?([\w.:-]+)/i.exec(contentType)?.[1]
+    ?? /<meta[^>]+charset\s*=\s*["']?([\w.:-]+)/i.exec(body.subarray(0, 2048).toString("latin1"))?.[1];
+  if (declared) {
+    try { return new TextDecoder(declared).decode(body); } catch { /* Unknown label: fall back to UTF-8. */ }
+  }
+  return new TextDecoder("utf-8").decode(body);
+}
 export async function fetchResearchSource(value: string) {
   const signal = AbortSignal.timeout(15000);
   let url = sourceUrl(value);
@@ -37,7 +50,7 @@ export async function fetchResearchSource(value: string) {
     ]);
     if (!addresses.length || addresses.some(result => !isPublicAddress(result.address))) throw new Error("UNSAFE_SOURCE");
     const address = addresses[0];
-    const result = await new Promise<{ html?: string; redirect?: string }>((resolve, reject) => {
+    const result = await new Promise<{ html?: Buffer; type?: string; redirect?: string }>((resolve, reject) => {
       const send = url.protocol === "https:" ? httpsRequest : httpRequest;
       const req = send(url, {
         signal, agent: false, family: address.family,
@@ -57,7 +70,7 @@ export async function fetchResearchSource(value: string) {
           if (bytes > 2_000_000) response.destroy(new Error("SOURCE_TOO_LARGE"));
           else chunks.push(chunk);
         });
-        response.on("end", () => resolve({ html: Buffer.concat(chunks).toString("utf8") }));
+        response.on("end", () => resolve({ html: Buffer.concat(chunks), type: String(response.headers["content-type"] ?? "") }));
         response.on("error", reject);
         response.on("aborted", () => reject(new Error("SOURCE_INTERRUPTED")));
       });
@@ -65,7 +78,7 @@ export async function fetchResearchSource(value: string) {
       req.end();
     });
     if (result.redirect) { url = sourceUrl(new URL(result.redirect, url).href); continue; }
-    return { url: url.href, ...sourceExcerpt(result.html!) };
+    return { url: url.href, ...sourceExcerpt(decodeHtml(result.html!, result.type)) };
   }
   throw new Error("SOURCE_REDIRECT_LIMIT");
 }

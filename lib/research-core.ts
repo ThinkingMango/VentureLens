@@ -2,7 +2,6 @@ import { z } from "zod";
 import { getDomain } from "tldts";
 import { reportLanguageSchema, type ReportLanguage } from "./workspace-schema.ts";
 
-export const RESEARCH_MODEL = "qwen3.8-flash";
 export const methodology = "evidence-driven-v1";
 // Runs created before report language was recorded were generated in Simplified Chinese.
 export const LEGACY_REPORT_LANGUAGE: ReportLanguage = "zh-Hans";
@@ -304,9 +303,6 @@ export function weightedScore(dimensions: Evaluation['dimensions'], mode: Mode, 
   const weights = scoringWeights[mode];
   const raw = Object.entries(weights).reduce((sum, [key, weight]) => sum + dimensions[key as keyof typeof dimensions] * weight, 0);
   return Math.max(0, Math.min(evidenceCount >= 3 ? 85 : 70, Math.round(raw - penalty)));
-}
-export function requireExactIds(expected: string[], actual: string[]) {
-  if (new Set(actual).size !== actual.length || actual.length !== expected.length || actual.some(id => !expected.includes(id))) throw new Error('INVALID_OUTPUT');
 }
 export const researchErrors: Record<string, string> = {
   DEV_ACCESS_REQUIRED: "此账号没有有效的开发研究权限。尚未启用付费研究。",
