@@ -32,8 +32,8 @@ test('HTML, empty and non-object responses parse to an empty body instead of thr
   assert.deepEqual(parseJsonObject('{"code":"RUN_ALREADY_ACTIVE"}'), { code: 'RUN_ALREADY_ACTIVE' });
 });
 
-test('the research form and run page use the resilient client, not raw fetch', () => {
-  for (const file of ['../components/research-config.tsx', '../components/research-run.tsx']) {
+test('the research form, run page and workspace saves use the resilient client, not raw fetch', () => {
+  for (const file of ['../components/research-config.tsx', '../components/research-run.tsx', '../components/demo-provider.tsx']) {
     const source = readFileSync(new URL(file, import.meta.url), 'utf8');
     assert.doesNotMatch(source, /await fetch\(|response\.json\(\)/, file);
   }
@@ -49,4 +49,19 @@ test('the evaluation prompt asks for a zero advantage only in market mode', () =
   const source = readFileSync(new URL('../lib/research-engine.ts', import.meta.url), 'utf8');
   assert.doesNotMatch(source, /In market mode advantage=0\./, 'the unconditional instruction made Flash-Lite zero advantage in combined runs');
   assert.match(source, /mode === "market" \? "This is market mode: set advantage to 0\."/);
+});
+
+test('an edited brief never reuses the idempotency key of an earlier start', () => {
+  const source = readFileSync(new URL('../components/research-config.tsx', import.meta.url), 'utf8');
+  assert.match(source, /requestKey\.current\?\.payload !== payload/);
+  assert.doesNotMatch(source, /requestKey\.current \?\?=/);
+});
+
+test('run polling stops on auth and missing-run answers and the error page refreshes server data', () => {
+  const run = readFileSync(new URL('../components/research-run.tsx', import.meta.url), 'utf8');
+  assert.match(run, /shouldRetryOnError: retryStatus/);
+  assert.match(run, /\[401, 403, 404\]/);
+  assert.match(run, /login\?next=/);
+  const errorPage = readFileSync(new URL('../app/error.tsx', import.meta.url), 'utf8');
+  assert.match(errorPage, /onClick=\{retry \?\? reset\}/);
 });

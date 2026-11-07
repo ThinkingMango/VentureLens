@@ -41,7 +41,9 @@ export function ResearchConfig() {
   const { run, setRun, profile, isDemo, href, busy, refresh, data } = useDemo();
   const [draft, setDraft] = useState(run);
   const [submitting, setSubmitting] = useState(false);
-  const requestKey = useRef<string | null>(null);
+  // The idempotency key belongs to one exact request: any edit (or a language change) starts a fresh run,
+  // while re-sending the unchanged brief after a dropped connection returns the run it already created.
+  const requestKey = useRef<{ payload: string; key: string } | null>(null);
   const [nameError, setNameError] = useState("");
   const [formError, setFormError] = useState("");
   const router = useRouter();
@@ -118,15 +120,15 @@ export function ResearchConfig() {
                   await setRun(brief);
                   router.push("/research");
                 } else {
-                  requestKey.current ??= crypto.randomUUID();
-                  // The request key makes a start idempotent: re-sending after a dropped connection returns
-                  // the run the first attempt created instead of a second run.
+                  const request = { ...brief, language: locale };
+                  const payload = JSON.stringify(request);
+                  if (requestKey.current?.payload !== payload) requestKey.current = { payload, key: crypto.randomUUID() };
                   let result;
                   try {
                     result = await postJson("/api/research", {
                       action: "start",
-                      brief: { ...brief, language: locale },
-                      requestKey: requestKey.current,
+                      brief: request,
+                      requestKey: requestKey.current.key,
                     }, { networkRetries: 2 });
                   } catch (error) {
                     if (!(error instanceof ApiNetworkError)) throw error;

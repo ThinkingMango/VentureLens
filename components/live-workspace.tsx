@@ -161,7 +161,8 @@ export function LiveDashboard() {
   const copy = useCopy();
   const { data, profile } = useDemo();
   if (!data) return null;
-  const firstRun = data.runs[0];
+  // The "latest research" card shows the newest brief, so its status and link must come from that brief's run.
+  const firstRun = data.runs.find((run) => run.project_id === data.projects[0]?.id);
   const completedRuns = data.runs.filter((run) => run.status === "completed").length;
   const checklist = [
     {

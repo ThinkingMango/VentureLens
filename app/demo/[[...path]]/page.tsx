@@ -13,7 +13,7 @@ export default async function DemoPage({
   searchParams,
 }: {
   params: Promise<{ path?: string[] }>;
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string | string[] }>;
 }) {
   const [{ path = [] }, query] = await Promise.all([params, searchParams]);
   if (!path.length) redirect("/demo/dashboard");
@@ -33,7 +33,7 @@ export default async function DemoPage({
     const opportunity = opportunities.find((item) => item.id === path[1]);
     if (opportunity)
       content = (
-        <OpportunityDetail opportunity={opportunity} initialTab={query.tab} />
+        <OpportunityDetail opportunity={opportunity} initialTab={typeof query.tab === "string" ? query.tab : undefined} />
       );
   }
   if (!content) notFound();

@@ -50,12 +50,18 @@ const stages = [
   "review",
   "finalizing",
 ];
+type RunStatusError = Error & { status: number };
 async function fetchRun(url: string): Promise<ResearchDetail> {
   const result = await getJson(url).catch(() => null);
-  if (!result?.ok)
-    throw new Error(feedbackSource(result?.body.code, "STATUS_UNAVAILABLE"));
+  if (!result?.ok) {
+    // An expired session cannot recover by polling: send the founder to log in and back to this run.
+    if (result?.status === 401) window.location.assign(`/login?next=${encodeURIComponent(window.location.pathname)}`);
+    throw Object.assign(new Error(feedbackSource(result?.body.code, "STATUS_UNAVAILABLE")), { status: result?.status ?? 0 }) as RunStatusError;
+  }
   return result.body as unknown as ResearchDetail;
 }
+// Auth and missing-run answers are final; only transient failures are retried (with SWR's default backoff).
+const retryStatus = (error: Error) => ![401, 403, 404].includes((error as Partial<RunStatusError>).status ?? 0);
 export function ResearchRunView({
   initialData,
 }: {
@@ -63,7 +69,7 @@ export function ResearchRunView({
 }) {
   const copy = useCopy();
   const format = useFormats();
-  const { refresh } = useDemo();
+  const { refresh, data: workspace } = useDemo();
   const [retrying, setRetrying] = useState(false);
   const [executionOpen, setExecutionOpen] = useState(false);
   const [retryError, setRetryError] = useState("");
@@ -78,6 +84,7 @@ export function ResearchRunView({
     onSuccess: (latest) => {
       if (["completed", "failed"].includes(latest.status)) void refresh();
     },
+    shouldRetryOnError: retryStatus,
   });
   const active = ["pending", "running"].includes(data.status);
   const completed = data.status === "completed" && !!data.report;
@@ -93,6 +100,15 @@ export function ResearchRunView({
       "INVALID_OUTPUT",
       "RETRIEVAL_UNAVAILABLE",
     ].includes(data.error_code ?? "");
+  // retry_research also needs a free research slot and no other active run; say so instead of offering a
+  // button the server will refuse.
+  const retryBlocked = !workspace
+    ? null
+    : workspace.runs.some((run) => run.id !== data.id && ["pending", "running"].includes(run.status))
+      ? "Retry is unavailable while another research run is in progress."
+      : !workspace.access.enabled
+        ? "Retry is unavailable because you have no research runs left. Your saved progress is kept."
+        : null;
   async function retry() {
     setRetrying(true);
     setRetryError("");
@@ -158,9 +174,7 @@ export function ResearchRunView({
       </div>
       {error && (
         <p role="alert" className="text-sm text-muted-foreground">
-          {copy(
-            "Research status could not refresh. Showing the last server record.",
-          )}{" "}
+          {copy(error instanceof Error && error.message ? error.message : feedbackSource("STATUS_UNAVAILABLE"))}{" "}
           <button
             className="ml-2 min-h-11 underline"
             onClick={() => { void mutate().catch(() => undefined); }}
@@ -279,12 +293,15 @@ export function ResearchRunView({
                   {" "}{copy("Ask an administrator to choose a lower-cost model before creating another run. Existing progress and costs remain saved.")}
                 </p>
               )}
-              {!retryable && (
+              {retryable && retryBlocked && (
+                <p className="max-w-prose text-sm leading-relaxed text-muted-foreground">{copy(retryBlocked)}</p>
+              )}
+              {(!retryable || retryBlocked) && (
                 <Button variant="outline" className="w-fit" asChild>
                   <Link href="/research/new">{copy("New research")}</Link>
                 </Button>
               )}
-              {retryable && (
+              {retryable && !retryBlocked && (
                 <Button
                   variant="outline"
                   className="w-fit"

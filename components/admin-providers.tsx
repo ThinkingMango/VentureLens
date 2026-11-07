@@ -31,6 +31,7 @@ export function AdminProviders({ initialData }: { initialData: ProviderSettingsR
   const { data = initialData, error: loadError, mutate, isValidating } = useSWR(endpoint, loadSettings, { fallbackData: initialData });
   const [draft, setDraft] = useState<ProviderSettings | null>(null);
   const [saving, setSaving] = useState(false);
+  const [budgetText, setBudgetText] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<"saveFailed" | "notConfigured" | "accessExpired" | "budgetTooLowSaved" | null>(null);
   const settings = draft ?? data.settings;
   const changed = settings.primary !== data.settings.primary || settings.autoFallback !== data.settings.autoFallback || settings.qwenModel !== data.settings.qwenModel || settings.geminiModel !== data.settings.geminiModel || settings.budgetUsd !== data.settings.budgetUsd;
@@ -104,8 +105,10 @@ export function AdminProviders({ initialData }: { initialData: ProviderSettingsR
                   <FieldLabel htmlFor="research-budget">{t("budget")}</FieldLabel>
                   <input
                     id="research-budget" type="number" inputMode="decimal" step="0.05" min={MIN_RESEARCH_BUDGET_USD} max={MAX_RESEARCH_BUDGET_USD}
-                    value={settings.budgetUsd} disabled={saving || !!loadError} aria-describedby="budget-help"
-                    onChange={event => { const value = Number(event.target.value); if (Number.isFinite(value)) change({ budgetUsd: Math.min(MAX_RESEARCH_BUDGET_USD, Math.max(MIN_RESEARCH_BUDGET_USD, Math.round(value * 100) / 100)) }); }}
+                    value={budgetText ?? settings.budgetUsd} disabled={saving || !!loadError} aria-describedby="budget-help"
+                    // Clamping on every keystroke rewrote "0." to 0.05; the typed text is kept until the field loses focus.
+                    onChange={event => { setBudgetText(event.target.value); const value = Number(event.target.value); if (event.target.value.trim() && Number.isFinite(value)) change({ budgetUsd: Math.min(MAX_RESEARCH_BUDGET_USD, Math.max(MIN_RESEARCH_BUDGET_USD, Math.round(value * 100) / 100)) }); }}
+                    onBlur={() => setBudgetText(null)}
                     className="h-12 w-full rounded-md border bg-card px-3 text-base text-foreground md:max-w-xs"
                   />
                   <FieldDescription id="budget-help">{t("budgetHelp", { min: MIN_RESEARCH_BUDGET_USD, max: MAX_RESEARCH_BUDGET_USD })}</FieldDescription>

@@ -3,7 +3,8 @@ import { useCopy } from "@/i18n/use-copy";
 
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-export default function ErrorPage({ reset }: { reset: () => void }) {
+// `retry` (Next 16) refreshes the server payload and then resets; `reset` alone re-renders the same failed payload.
+export default function ErrorPage({ reset, retry }: { reset: () => void; retry?: () => void }) {
   const copy = useCopy();
   return (
     <main className="mx-auto flex min-h-screen max-w-lg flex-col justify-center gap-5 p-6">
@@ -15,7 +16,7 @@ export default function ErrorPage({ reset }: { reset: () => void }) {
           "Please try again. If your session expired, log in again. Your saved records have not been removed.",
         )}
       </p>
-      <Button onClick={reset}>{copy("Try again")}</Button>
+      <Button onClick={retry ?? reset}>{copy("Try again")}</Button>
       <Button variant="outline" asChild>
         <Link href="/login">{copy("Back to log in")}</Link>
       </Button>

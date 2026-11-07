@@ -1,6 +1,7 @@
 "use client";
 import { useCopy } from "@/i18n/use-copy";
 import { feedbackSource } from "@/i18n/errors";
+import { getJson, postJson } from "@/lib/api-client";
 
 import { createContext, useContext, useMemo, useState } from "react";
 import useSWR from "swr";
@@ -87,14 +88,14 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
     </WorkspaceContext.Provider>
   );
 }
+// Uses the resilient client: a dropped connection or an HTML error page never reaches the founder as raw text.
 async function fetchWorkspace(url: string): Promise<WorkspaceData> {
-  const response = await fetch(url, { cache: "no-store" });
-  const result = await response.json();
-  if (!response.ok) {
-    if (response.status === 401) window.location.assign("/login");
-    throw new Error(feedbackSource(result.code, "WORKSPACE_UNAVAILABLE"));
+  const result = await getJson(url).catch(() => null);
+  if (!result?.ok) {
+    if (result?.status === 401) window.location.assign("/login");
+    throw new Error(feedbackSource(result?.body.code, "WORKSPACE_UNAVAILABLE"));
   }
-  return result;
+  return result.body as unknown as WorkspaceData;
 }
 export function WorkspaceProvider({
   initialData,
@@ -121,17 +122,18 @@ export function WorkspaceProvider({
   async function persist(payload: unknown) {
     setBusy(true);
     try {
-      const response = await fetch("/api/workspace", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const result = await response.json();
-      if (!response.ok) {
-        if (response.status === 401) window.location.assign("/login");
-        throw new Error(feedbackSource(result.code));
+      // Not re-sent: a save is not idempotent for checklist toggles.
+      let result;
+      try {
+        result = await postJson("/api/workspace", payload);
+      } catch {
+        throw new Error(feedbackSource("SAVE_FAILED"));
       }
-      await mutate(result, { revalidate: false });
+      if (!result.ok) {
+        if (result.status === 401) window.location.assign("/login");
+        throw new Error(feedbackSource(result.body.code));
+      }
+      await mutate(result.body as unknown as WorkspaceData, { revalidate: false });
     } finally {
       setBusy(false);
     }

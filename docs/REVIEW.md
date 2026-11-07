@@ -218,13 +218,13 @@ Gross margin on AI cost alone is >90 %. The real cost drivers will be **failed r
 | P1 | ~~`app_settings` table; move provider settings and budget cap (B5, B8)~~ **done 2026-11-05** (migration `app_settings_and_role_admin`); pricing still in code | — | — |
 | P1 | ~~Admin by `app_metadata.role` only; drop email constant from client (B6)~~ **done 2026-11-05** | — | — |
 | P1 | Realistic retrieval reservation + async usage reconciliation (B7) | 1 d | research |
-| P1 | CI workflow (typecheck, test, build, db reset) | 0.5 d | infra |
+| P1 | ~~CI workflow (typecheck, test, build)~~ **done 2026-11-07** (`.github/workflows/ci.yml`); `supabase db reset` against a disposable DB still open | — | — |
 | P1 | Live opportunity tabs to demo parity; disclaimer consolidation | 1.5 d | frontend |
 | P1 | Prettier + split `research-engine.ts` (B18) | 1 d | research |
 | P2 | Entitlements ledger replacing `research_dev_access` (pre-Stripe) | 2 d | backend |
 | P2 | Observability + metrics dashboard | 2 d | infra |
 | P2 | i18n: commit merge script, lint non-English sources, prune stale keys (B16) | 1 d | frontend |
-| P2 | CSP header, idempotency-key regeneration, `next` on login redirect (B17, B9, B14) | 1 d | frontend |
+| P2 | ~~Idempotency-key regeneration, `next` on login redirect (B9, B14)~~ **done 2026-11-07**; CSP partly done (`frame-ancestors`, `base-uri`, `object-src` on every route); a nonce-based `script-src` is still open (B17) | 0.5 d | frontend |
 | P3 | Dark mode, illustrations, report export | 3 d | frontend |
 
 ---
@@ -240,3 +240,41 @@ Gross margin on AI cost alone is >90 %. The real cost drivers will be **failed r
 | Playwright screenshots, `/`, `/pricing`, `/login`, `/demo/*` at 1366 px and 390 px | Captured before/after; reviewed visually |
 | `pnpm test:integration`, `pnpm test:research:e2e` | **Not run** (require Supabase and provider credentials) |
 | Authenticated live workspace screens | **Not rendered** (no Supabase in this environment); logic reviewed and type-checked only |
+
+---
+
+## 10. Follow-up review (2026-11-07)
+
+> **Scope:** full re-read of the research engine, workflow, API routes, proxy, migrations and providers, plus an independent review of `components/`, `app/` and `i18n/`. Every finding below was verified against the code. **Executed:** `pnpm typecheck`, `pnpm test` (118 pass), `pnpm build`, and a Playwright check of `/` and `/demo/*` on the production build (pages render and hydrate under the new CSP, no console errors). **Not executed:** integration and live research E2E tests (they need credentials).
+
+### 10.1 Fixed
+
+| # | Finding | Where | Consequence before the fix |
+| --- | --- | --- | --- |
+| F1 | A manual retry replayed `{ evidence: [], skipped }` retrieval checkpoints | `lib/research-engine.ts` | A retry of `RETRIEVAL_UNAVAILABLE`, which `retry_research` explicitly allows, failed again without sending a search. That used up the founder's only retry. Skipped checkpoints now record their workflow, and a new workflow searches them again until classification starts. |
+| F2 | Evidence was read with no `ORDER BY`, but classification batches are checkpointed by offset | `lib/research-engine.ts` | A resumed classification step could match a cached batch to different sources, and `matchIds` would then drop them silently. |
+| F3 | Source pages were always decoded as UTF-8 | `lib/research-source.ts` | GBK, Big5, Shift_JIS and EUC-KR pages became mojibake, which was then stored and shown as "verbatim" evidence. |
+| F4 | Pages were read in sequential pairs | `lib/research-engine.ts` | Worst case was five 15 s rounds inside a step that also runs up to two 90 s searches. Pages are now read four at a time. |
+| F5 | A platform retry of `finalizing` after commit threw `WORKFLOW_INTERRUPTED` | `lib/research-engine.ts` | A spurious `failure` checkpoint was written on a completed run. |
+| F6 | `POST /api/research` mapped unknown errors through `errorCode` | `app/api/research/route.ts` | A database outage told the founder the "model output failed verification". It is now `START_FAILED`. |
+| F7 | Signed-in founders opening `/login?next=…` were always sent to `/dashboard` | `proxy.ts` | Lost destination (B14). |
+| F8 | `X-Frame-Options` was set on only some routes, and there was no CSP | `next.config.ts` | `/`, `/admin`, `/auth/confirm` and `/demo` could be framed (B17, partial). |
+| F9 | The error page's "Try again" called `reset`, not `retry` | `app/error.tsx` | After a transient server error, the page re-rendered the same failed payload until a manual reload. |
+| F10 | Workspace reads and saves used raw `fetch` + `response.json()` | `components/demo-provider.tsx` | "Failed to fetch", "Load failed" or a JSON parse error was shown untranslated. |
+| F11 | The idempotency key survived edits after a network error or a 5xx | `components/research-config.tsx` | A resubmitted, edited brief silently returned the old run (B9). The key is now bound to the exact request payload. |
+| F12 | Run polling treated 401 and 404 as transient | `components/research-run.tsx` | An expired session left a dead "Refresh status" prompt and retried forever. Now 401 goes to login with `next`, 401, 403 and 404 stop retrying, and the real message is shown. |
+| F13 | The dashboard's "latest research" card used the newest brief but the newest run of *any* brief | `components/live-workspace.tsx` | A saved brief with no run was labelled with another brief's status and link. |
+| F14 | The admin budget input clamped on every keystroke | `components/admin-providers.tsx` | The field could not be cleared, and typing `0.3` became `0.05`. |
+| F15 | A repeated `?tab=` crashed the demo opportunity page | `app/demo/[[...path]]/page.tsx` | Returned HTTP 500 (`string[].toLowerCase`). |
+| F16 | Retry was offered when `retry_research` would refuse it (no free slot, or another run active) | `components/research-run.tsx` | The founder clicked and got a generic refusal. The reason is now shown instead of the button. |
+| — | Dead code (`RESEARCH_MODEL`, `requireExactIds`) | `lib/research-core.ts` | — |
+
+### 10.2 Verified but not fixed here (needs a decision or a migration)
+
+| # | Finding | Why it was not fixed here | Recommendation |
+| --- | --- | --- | --- |
+| O1 | Checklist progress and "saved" share one `saved_opportunities` row. Ticking a task silently saves the opportunity, and unsaving deletes the progress. | Needs a schema change. | Add `saved boolean` (or a `validation_tasks` table) and have "unsave" clear the flag. |
+| O2 | Email-link sign-in always lands on `/dashboard`. The templates link to `/auth/confirm` without `next`, so `emailRedirectTo` is unused. (The code path keeps `next`.) | Templates are configured in the Supabase dashboard. | Use `{{ .RedirectTo }}` in the templates and set `emailRedirectTo` to `/auth/confirm?next=…`. |
+| O3 | A retry keeps only the original run's *remaining* budget, with no pre-flight check. | Product decision. | Either re-run the pre-flight estimate for the remaining stages on retry, or top up the budget by the uncharged amount. |
+| O4 | `GET`/`POST /api/workspace` return every opportunity payload, including evidence excerpts, on every save or checkbox toggle. | API shape change. | Return a slim workspace (ids, titles, scores) and fetch payloads per opportunity page. |
+| O5 | Classification, evaluation and review run up to 4 model calls inside one workflow step. | Already tracked in `GENERATION_PIPELINE_REVIEW.md` §6. | Make each batch its own step. |

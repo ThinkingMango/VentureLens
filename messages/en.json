@@ -1036,7 +1036,9 @@
     "mble3nh": "Gemini via Google",
     "mvcofaf": "A complete {model} run is estimated to need a budget of at least {required}, but this run's budget is {remaining}. The run stopped before sending any provider request.",
     "m1lnpcxt": "The connection dropped before the server replied. Your research may already have started: check My research before trying again.",
-    "m1aq5q7j": "Research could not start right now. Please try again."
+    "m1aq5q7j": "Research could not start right now. Please try again.",
+    "m1ddfya9": "Retry is unavailable while another research run is in progress.",
+    "m1mel72": "Retry is unavailable because you have no research runs left. Your saved progress is kept."
   },
   "language": {
     "label": "Interface language",
