@@ -228,14 +228,56 @@ export function safeSourceUrl(value: string): string | null {
     return url.href;
   } catch { return null; }
 }
+// Typographic variants a model commonly swaps when it copies a quote; both sides are folded before matching.
+const quoteFold: Record<string, string> = {
+  "\u2018": "'", "\u2019": "'", "\u201A": "'", "\u201B": "'", "\u2032": "'",
+  "\u201C": '"', "\u201D": '"', "\u201E": '"', "\u201F": '"', "\u2033": '"',
+  "\u2012": "-", "\u2013": "-", "\u2014": "-", "\u2212": "-",
+};
+/** Folds quote marks and dashes and collapses whitespace, remembering each kept character's original index. */
+function foldWithMap(text: string) {
+  let folded = "";
+  const map: number[] = [];
+  for (let i = 0; i < text.length; i++) {
+    let ch = quoteFold[text[i]] ?? text[i];
+    if (/\s/.test(ch)) {
+      if (!folded.length || folded.endsWith(" ")) continue;
+      ch = " ";
+    }
+    folded += ch;
+    map.push(i);
+  }
+  return { folded: folded.trimEnd(), map };
+}
+const ELLIPSIS = /\s*(?:\.\.\.|\u2026)\s*/;
+/**
+ * Finds a model-supplied quote in the source excerpt and returns the excerpt's own text for it, or null.
+ * Tolerates swapped quote marks and dashes, different whitespace, a leading or trailing ellipsis, and an elided
+ * middle (the longest fragment is used). Nothing is paraphrased: the result is always a verbatim slice of the excerpt.
+ */
+export function locateQuote(excerpt: string, quote: string): string | null {
+  const fragments = quote.trim().split(ELLIPSIS).map(part => part.trim()).filter(Boolean);
+  const longest = fragments.sort((a, b) => b.length - a.length)[0] ?? "";
+  const { folded: source, map } = foldWithMap(excerpt);
+  const candidates = [longest, longest.replace(/^["']+|["']+$/g, "").trim()];
+  for (const candidate of candidates) {
+    const needle = foldWithMap(candidate).folded;
+    if (needle.length < 12) continue;
+    const at = source.indexOf(needle);
+    if (at >= 0) return excerpt.slice(map[at], map[at + needle.length - 1] + 1);
+  }
+  return null;
+}
 export function groundedClassifications(evidence: Evidence[], items: Classification[]) {
   const byKey = new Map(evidence.map(e => [e.source_key, e]));
   const seen = new Set<string>();
-  return items.filter(item => {
+  return items.flatMap(item => {
     const source = byKey.get(item.source_key);
-    if (!source || seen.has(item.source_key) || item.quote.trim().length < 12 || !source.excerpt.includes(item.quote)) return false;
+    if (!source || seen.has(item.source_key)) return [];
+    const quote = locateQuote(source.excerpt, item.quote);
+    if (!quote) return [];
     seen.add(item.source_key);
-    return true;
+    return [{ ...item, quote }];
   });
 }
 export function eligibleEvidence(candidate: string, evidence: Evidence[], classifications: Classification[]) {

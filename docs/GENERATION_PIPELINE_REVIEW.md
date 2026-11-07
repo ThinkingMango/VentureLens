@@ -131,3 +131,12 @@ Completed in 4 min 33 s for $0.288 with **2 opportunities**. Advantage is now sc
 |---|---|---|
 | Search still returned mostly vendor pages, so the stricter gate kept only 2 of 8 candidates | Discovery wrote each search query to name "paid alternatives", which points search at products | Queries now ask for evidence of the problem and existing spending (surveys, reports, forums, news) and never name products or tools |
 | The first Qwen search timed out at 90 s again (2 of 2 runs); every run then moved **all** stages to Gemini | DashScope's source-returning search is agent-style and multi-round (Responses API `web_search`; OpenAI-compatible chat does not return sources), and any fallback switched the whole run | The search provider is now tracked separately: a slow or unaffordable search moves only later searches, so the timeout is paid once per run and structured stages stay on Qwen. Credential or credit failures still move the whole run |
+
+### Third production run (`31df1534`, after #18): insufficient evidence
+
+#18 worked as intended: problem-focused queries, searches on Gemini after the Qwen timeout, and classification on Qwen at about $0.001 per batch. But **no candidate passed the evidence gate** ($0.27 spent; the run slot was returned). There were two causes, both fixed in the follow-up:
+
+| Observed | Cause | Fix |
+|---|---|---|
+| A professional body (aicpa-cima.com), trade press (hrotoday.com) and a news site (familywealthreport.com) were all labelled `vendor` | #17's rule, "any company that sells a product or service in this space", was too broad for the classifier | An explicit taxonomy: primary = first-hand data; secondary = news, trade publications, professional bodies, associations, analyst/research firms, forums; vendor = a company marketing a solution to this specific pain; a news report of a vendor-commissioned study is secondary |
+| A genuine quote was discarded because the model appended "..." | Grounding required an exact substring match | `locateQuote` folds quote marks, dashes and whitespace and ignores leading, trailing or mid-quote ellipses (using the longest fragment), then stores the excerpt's own text. A quote with words that are not in the source (the HRO Today case) is still rejected |

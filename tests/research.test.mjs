@@ -152,3 +152,35 @@ test('report narratives are localized, count correctly, and flag short lists', (
   assert.equal(confidenceLevel(2), 'limited');
   assert.equal(confidenceLevel(3), 'moderate');
 });
+
+test('quotes are matched despite typographic changes and still returned verbatim from the source', async () => {
+  const { locateQuote } = await import('../lib/research-core.ts');
+  // Production run 31df1534, Family Wealth Report: the model appended "..." to an otherwise exact quote.
+  const wealth = 'to cope. "Typical" fund managers incur $6 million of "avoidable" costs in onboarding customers, a study says. The figures come from a survey published yesterday by TABB Group, that was commissioned by Clarient Global, which is a joint venture';
+  assert.equal(locateQuote(wealth, '"Typical" fund managers incur $6 million of "avoidable" costs in onboarding customers, a study says. The figures come from a survey published yesterday by TABB Group, that was commissioned by Clarient Global...'),
+    '"Typical" fund managers incur $6 million of "avoidable" costs in onboarding customers, a study says. The figures come from a survey published yesterday by TABB Group, that was commissioned by Clarient Global');
+  // Curly and straight quotes, dashes and whitespace may differ; the returned text is the source's own characters.
+  const hr = 'HR as the “traffic controller.” “Being a ‘traffic controller’ means HR has quietly become the team responsible for moving all processes along,” she says. This is most noticeable—every week.';
+  assert.equal(locateQuote(hr, `"Being a 'traffic controller' means HR has quietly   become the team responsible`), '“Being a ‘traffic controller’ means HR has quietly become the team responsible');
+  assert.equal(locateQuote(hr, 'This is most noticeable - every week.'), null, 'a dash replaced by spaced hyphen changes the text');
+  assert.equal(locateQuote(hr, 'This is most noticeable-every week.'), 'This is most noticeable—every week.');
+  // An elided middle grounds on the longest verbatim fragment.
+  assert.equal(locateQuote(hr, 'HR as the “traffic… has quietly become the team responsible for moving all processes along'), 'has quietly become the team responsible for moving all processes along');
+  // Production run 31df1534, HRO Today: the model attached a clause that is not in the excerpt. Still rejected.
+  assert.equal(locateQuote(hr, '“Being a ‘traffic controller’ means HR has quietly become the team responsible for moving all processes along,” she says—not by design, but by default.'), null);
+  for (const invented of ['Invented quote from nowhere at all', 'too short', '...', '']) assert.equal(locateQuote(hr, invented), null);
+});
+
+test('grounded classifications store the verbatim source text, not the model copy', () => {
+  const source = { source_key: 'c1-s1', candidate_id: 'c1', url: 'https://assoc.example.org/a', title: 'Survey', excerpt: 'Members said “intake paperwork takes nine hours a week” in the 2026 survey.', retrieved_at: '', published_at: null };
+  const item = { source_key: 'c1-s1', relevant: true, kind: 'pain', reliability: 'secondary', stance: 'supports', quote: '"intake paperwork takes nine hours a week"...', claim: 'Real pain' };
+  assert.deepEqual(groundedClassifications([source], [item]).map(c => c.quote), ['“intake paperwork takes nine hours a week”']);
+});
+
+test('the classifier is told that associations, trade press and news are independent, and who counts as a vendor', async () => {
+  const { readFileSync } = await import('node:fs');
+  const source = readFileSync(new URL('../lib/research-engine.ts', import.meta.url), 'utf8');
+  assert.doesNotMatch(source, /sells a product or service in this space/, 'the broad rule labelled a professional body, trade press and news as vendors');
+  assert.match(source, /"secondary" = independent reporting or analysis \(news outlets, trade publications, professional bodies and industry associations/);
+  assert.match(source, /"vendor" = a company marketing a product or service that solves this specific pain/);
+});
