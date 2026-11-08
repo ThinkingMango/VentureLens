@@ -273,7 +273,7 @@ Gross margin on AI cost alone is >90 %. The real cost drivers will be **failed r
 
 | # | Finding | Why it was not fixed here | Recommendation |
 | --- | --- | --- | --- |
-| O1 | Checklist progress and "saved" share one `saved_opportunities` row. Ticking a task silently saves the opportunity, and unsaving deletes the progress. | Needs a schema change. | Add `saved boolean` (or a `validation_tasks` table) and have "unsave" clear the flag. |
+| O1 | ~~Checklist progress and "saved" share one `saved_opportunities` row. Ticking a task silently saves the opportunity, and unsaving deletes the progress.~~ | **Fixed 2026-11-08** by migration `20261108090000_saved_opportunity_flag` plus `app/api/workspace/route.ts` and `lib/workspace.ts`. The migration must be applied before the deploy. | — |
 | O2 | Email-link sign-in always lands on `/dashboard`. The templates link to `/auth/confirm` without `next`, so `emailRedirectTo` is unused. (The code path keeps `next`.) | Templates are configured in the Supabase dashboard. | Use `{{ .RedirectTo }}` in the templates and set `emailRedirectTo` to `/auth/confirm?next=…`. |
 | O3 | A retry keeps only the original run's *remaining* budget, with no pre-flight check. | Product decision. | Either re-run the pre-flight estimate for the remaining stages on retry, or top up the budget by the uncharged amount. |
 | O4 | `GET`/`POST /api/workspace` return every opportunity payload, including evidence excerpts, on every save or checkbox toggle. | API shape change. | Return a slim workspace (ids, titles, scores) and fetch payloads per opportunity page. |

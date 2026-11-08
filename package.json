@@ -7,7 +7,7 @@
     "dev": "next dev --hostname 0.0.0.0",
     "build": "next build",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-strip-types --test tests/workspace.test.mjs tests/research.test.mjs tests/qwen.test.mjs tests/research-fallback.test.mjs tests/research-budget.test.mjs tests/api-client.test.mjs tests/i18n.test.mjs tests/email-auth.test.mjs tests/provider-settings.test.mjs",
+    "test": "node --experimental-strip-types --test tests/workspace.test.mjs tests/research.test.mjs tests/qwen.test.mjs tests/research-fallback.test.mjs tests/research-budget.test.mjs tests/api-client.test.mjs tests/i18n.test.mjs tests/email-auth.test.mjs tests/provider-settings.test.mjs tests/saved-progress.test.mjs",
     "test:integration": "node --env-file-if-exists=/vercel/share/.env.project --env-file-if-exists=.env.development.local tests/supabase.integration.mjs",
     "test:research:e2e": "node --experimental-strip-types --env-file-if-exists=/vercel/share/.env.project --env-file-if-exists=.env.development.local tests/research.e2e.mjs"
   },

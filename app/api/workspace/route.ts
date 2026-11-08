@@ -125,22 +125,22 @@ export async function POST(request: NextRequest) {
           404,
         );
       if (input.action === "save") {
-        if (input.saved) {
-          const { error } = await supabase
-            .from("saved_opportunities")
-            .upsert(
-              { user_id: user.id, opportunity_id: input.id },
-              { onConflict: "user_id,opportunity_id", ignoreDuplicates: true },
-            );
-          if (error) throw error;
-        } else {
-          const { error } = await supabase
-            .from("saved_opportunities")
-            .delete()
-            .eq("user_id", user.id)
-            .eq("opportunity_id", input.id);
-          if (error) throw error;
-        }
+        // Saving and checklist progress live on the same row but are independent: saving only sets the flag
+        // (an upsert updates just the columns it names), and unsaving clears it instead of deleting the row,
+        // so validation progress survives unsave and re-save.
+        const { error } = input.saved
+          ? await supabase
+              .from("saved_opportunities")
+              .upsert(
+                { user_id: user.id, opportunity_id: input.id, saved: true },
+                { onConflict: "user_id,opportunity_id" },
+              )
+          : await supabase
+              .from("saved_opportunities")
+              .update({ saved: false })
+              .eq("user_id", user.id)
+              .eq("opportunity_id", input.id);
+        if (error) throw error;
       } else {
         const { data: saved, error: savedError } = await supabase
           .from("saved_opportunities")
@@ -154,13 +154,26 @@ export async function POST(request: NextRequest) {
         const completed_tasks = input.completed
           ? Array.from(new Set([...current, taskKey]))
           : current.filter((key) => key !== taskKey);
-        const { error } = await supabase
-          .from("saved_opportunities")
-          .upsert(
-            { user_id: user.id, opportunity_id: input.id, completed_tasks },
-            { onConflict: "user_id,opportunity_id" },
-          );
-        if (error) throw error;
+        // A tick records progress without saving the opportunity: an existing row keeps its saved flag, and a
+        // new row starts unsaved.
+        const { error } = saved
+          ? await supabase
+              .from("saved_opportunities")
+              .update({ completed_tasks })
+              .eq("user_id", user.id)
+              .eq("opportunity_id", input.id)
+          : await supabase
+              .from("saved_opportunities")
+              .insert({ user_id: user.id, opportunity_id: input.id, completed_tasks, saved: false });
+        // A concurrent request created the row first: record the progress on it instead.
+        if (error?.code === "23505") {
+          const retry = await supabase
+            .from("saved_opportunities")
+            .update({ completed_tasks })
+            .eq("user_id", user.id)
+            .eq("opportunity_id", input.id);
+          if (retry.error) throw retry.error;
+        } else if (error) throw error;
       }
     }
     return json(await readWorkspace(supabase, user));

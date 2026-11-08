@@ -15,6 +15,7 @@ Read from `supabase_migrations.schema_migrations` on the live project:
 | `20261105155412` | `signup_free_run_and_quota_release` | `supabase/migrations/20261105155412_signup_free_run_and_quota_release.sql` | identical (applied with `apply_migration`, file renamed to the assigned version) |
 | `20261105161832` | `app_settings_and_role_admin` | `supabase/migrations/20261105161832_app_settings_and_role_admin.sql` | identical (applied with `apply_migration`, file renamed to the assigned version) |
 | `20261106141806` | `research_dev_access_max_runs_limit` | `supabase/migrations/20261106141806_research_dev_access_max_runs_limit.sql` | identical (applied with `apply_migration`, file renamed to the assigned version) |
+| `20261108090000` | `saved_opportunity_flag` | `supabase/migrations/20261108090000_saved_opportunity_flag.sql` | **not yet applied** (see notes below) |
 
 "Identical" means the MD5 of the SQL with all whitespace removed matches between the repository file and the `statements` column of the applied migration.
 
@@ -41,6 +42,19 @@ After this change `supabase migration list` shows local and remote in sync, and 
 3. **Verify before merging.** Compare `md5(regexp_replace(array_to_string(statements, E'\n'), '\s+', '', 'g'))` on the project against the local file.
 4. **Keep RLS invariants.** New tables use `enable` + `force row level security`, composite `(id, user_id)` foreign keys, `revoke all … from anon, authenticated`, and explicit `grant` statements, as in the existing files.
 5. **Business parameters live in `public.app_settings`, not in check constraints.** The per-run budget is read by `public.research_budget_usd()` from the `research` row (bounded 0.05–5 USD). `research_dev_access.max_runs` is bounded 1–100 by a check constraint (raised from 3 on 2026-11-06); the grant size itself is set per account by an operator until the entitlement ledger exists.
+
+## Notes on `20261108090000_saved_opportunity_flag`
+
+- Adds `saved_opportunities.saved boolean not null default true` and a partial index `(user_id, created_at desc) where saved`.
+- A row now holds two independent things: the saved flag and the validation-checklist progress (`completed_tasks`). Before, the row's existence meant "saved", so ticking a checklist step silently saved the opportunity and unsaving deleted the progress.
+- Existing rows were all shown as saved, so they keep `saved = true`. The default stays `true` so the code before this change (which inserts a row only to save) keeps its meaning. The migration and the deploy can therefore happen in either order **only in this direction: apply the migration first.** The new code selects `saved` and fails to load the workspace if the column is missing.
+- The API sets `saved = false` when a checklist tick creates the row, and unsaving updates the flag instead of deleting.
+- Verified on a fresh Postgres 16 built from every migration in this folder:
+  - The migration is idempotent.
+  - Legacy rows read as saved.
+  - Tick, save and unsave behave as above under RLS as `authenticated`.
+  - Another user can neither see nor change the rows.
+- **Apply with:** `supabase db push`, or `apply_migration` with the name `saved_opportunity_flag`. If `apply_migration` assigns a different version, rename the file to that version before merging (rule 1).
 
 ## Notes on `20261106141806_research_dev_access_max_runs_limit`
 
