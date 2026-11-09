@@ -333,7 +333,7 @@ export function AppShell({
         >
           {children}
           <footer className="flex flex-wrap items-center justify-between gap-2 border-t pt-5 text-sm text-muted-foreground">
-            <p>{copy("Thoughtful research. Better decisions.")}</p>
+            <p className="hidden sm:block">{copy("Thoughtful research. Better decisions.")}</p>
             <nav aria-label={copy("Legal and help")} className="flex flex-wrap items-center gap-4">
               <NextLink href="/support" className="hover:text-primary">
                 {copy("Support")}

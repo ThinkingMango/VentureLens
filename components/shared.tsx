@@ -97,7 +97,7 @@ export function SectionTitle({
 }) {
   const copy = useCopy();
   return (
-    <div className="flex items-center justify-between gap-4">
+    <div className="flex flex-col items-start justify-between gap-2 sm:flex-row sm:items-center sm:gap-4">
       <div>
         <h2 className="text-lg font-semibold">{copy(title)}</h2>
         {description && (

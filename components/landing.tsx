@@ -1,5 +1,6 @@
 "use client";
 
+import { MobileDisclosure } from "@/components/mobile-disclosure";
 import { useCopy } from "@/i18n/use-copy";
 import Link from "next/link";
 import {
@@ -200,7 +201,9 @@ export function Landing() {
                 </li>
               </ul>
             </div>
-            <EvidencePreview />
+            <MobileDisclosure title={copy("Preview a sample report")}>
+              <EvidencePreview />
+            </MobileDisclosure>
           </div>
         </section>
         <section className="border-y bg-background">

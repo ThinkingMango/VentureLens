@@ -1,4 +1,5 @@
 "use client";
+import { MobileDisclosure } from "@/components/mobile-disclosure";
 import { useCopy } from "@/i18n/use-copy";
 
 import { useState } from "react";
@@ -112,49 +113,58 @@ export function ResearchResults({
           {copy("Export demo brief")}
         </Button>
       </PageHeader>
-      <div className="flex flex-col gap-3 border-y py-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <Badge variant="secondary">{copy("Demonstration report")}</Badge>
-          {!savedOnly && (
-            <p className="text-sm text-muted-foreground">
-              {copy(run.sector)} · {copy(run.model)} · {copy(run.geography)}
-            </p>
-          )}
-        </div>
-        <DemoNote />
-        <details className="text-sm text-muted-foreground">
-          <summary className="w-fit rounded-sm underline-offset-4 hover:text-primary hover:underline">
-            {copy("How to interpret this report")}
-          </summary>
-          <p className="mt-2 max-w-3xl">
-            {copy(
-              "Scores and confidence labels compare invented scenarios; they do not measure verified demand. These fixed examples do not change with your research configuration. All amounts are monthly USD assumptions per customer, not forecasts.",
+      <DemoNote short />
+      <MobileDisclosure title={copy("About this report")}>
+        <div className="flex flex-col gap-3 border-y py-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <Badge variant="secondary">{copy("Demonstration report")}</Badge>
+            {!savedOnly && (
+              <p className="text-sm text-muted-foreground">
+                {copy(run.sector)} · {copy(run.model)} · {copy(run.geography)}
+              </p>
             )}
-          </p>
-        </details>
-      </div>
-      {!savedOnly && (
-        <section
-          aria-labelledby="research-summary"
-          className="surface flex flex-col gap-4 p-5 md:p-6"
-        >
-          <h2 id="research-summary" className="text-lg font-semibold">
-            {copy("Research summary")}
-          </h2>
-          <p className="max-w-3xl leading-relaxed">
-            {copy(
-              "Proposal preparation leads this four-workflow demo. Buyer access, review effort, and willingness to pay remain unvalidated for every opportunity.",
-            )}
-          </p>
-          <div className="flex border-t pt-4">
-            <Button variant="link" asChild className="h-auto justify-start p-0">
-              <Link href="/opportunities/proposal-copilot">
-                {copy("Review leading hypothesis")}
-                <ArrowRight data-icon="inline-end" />
-              </Link>
-            </Button>
           </div>
-        </section>
+          <DemoNote />
+          <details className="text-sm text-muted-foreground">
+            <summary className="w-fit rounded-sm underline-offset-4 hover:text-primary hover:underline">
+              {copy("How to interpret this report")}
+            </summary>
+            <p className="mt-2 max-w-3xl">
+              {copy(
+                "Scores and confidence labels compare invented scenarios; they do not measure verified demand. These fixed examples do not change with your research configuration. All amounts are monthly USD assumptions per customer, not forecasts.",
+              )}
+            </p>
+          </details>
+        </div>
+      </MobileDisclosure>
+      {!savedOnly && (
+        <MobileDisclosure title={copy("Research summary")}>
+          <section
+            aria-labelledby="research-summary"
+            className="surface flex flex-col gap-4 p-5 md:p-6"
+          >
+            <h2 id="research-summary" className="text-lg font-semibold">
+              {copy("Research summary")}
+            </h2>
+            <p className="max-w-3xl leading-relaxed">
+              {copy(
+                "Proposal preparation leads this four-workflow demo. Buyer access, review effort, and willingness to pay remain unvalidated for every opportunity.",
+              )}
+            </p>
+            <div className="flex border-t pt-4">
+              <Button
+                variant="link"
+                asChild
+                className="h-auto justify-start p-0"
+              >
+                <Link href="/opportunities/proposal-copilot">
+                  {copy("Review leading hypothesis")}
+                  <ArrowRight data-icon="inline-end" />
+                </Link>
+              </Button>
+            </div>
+          </section>
+        </MobileDisclosure>
       )}
       <section className="flex flex-col gap-5">
         <div className="flex flex-wrap items-center justify-between gap-4">
@@ -210,41 +220,52 @@ export function ResearchResults({
               onChange={(e) => setQuery(e.target.value)}
             />
           </Field>
-          <Field className="md:w-52 md:shrink-0">
-            <FieldLabel htmlFor="confidence-filter">
-              {copy("Demo confidence")}
-            </FieldLabel>
-            <select
-              id="confidence-filter"
-              className="field-select"
-              value={confidence}
-              onChange={(e) => setConfidence(e.target.value)}
-            >
-              {["All confidence levels", "Higher", "Medium", "Lower"].map(
-                (v) => (
-                  <option key={v} value={v}>
-                    {v === "All confidence levels"
-                      ? copy("All levels")
-                      : copy(v)}
-                  </option>
-                ),
-              )}
-            </select>
-          </Field>
-          <Field className="md:w-44 md:shrink-0">
-            <FieldLabel htmlFor="opportunity-sort">
-              {copy("Sort by")}
-            </FieldLabel>
-            <select
-              id="opportunity-sort"
-              className="field-select"
-              value={sort}
-              onChange={(e) => setSort(e.target.value)}
-            >
-              <option value="Highest score">{copy("Highest score")}</option>
-              <option value="Alphabetical">{copy("Alphabetical")}</option>
-            </select>
-          </Field>
+          <MobileDisclosure
+            className="col-span-2 md:shrink-0"
+            title={
+              confidence !== "All confidence levels" || sort !== "Highest score"
+                ? copy("Filters and sorting (modified)")
+                : copy("Filters and sorting")
+            }
+          >
+            <div className="grid grid-cols-2 gap-4 md:flex">
+              <Field className="md:w-52 md:shrink-0">
+                <FieldLabel htmlFor="confidence-filter">
+                  {copy("Demo confidence")}
+                </FieldLabel>
+                <select
+                  id="confidence-filter"
+                  className="field-select"
+                  value={confidence}
+                  onChange={(e) => setConfidence(e.target.value)}
+                >
+                  {["All confidence levels", "Higher", "Medium", "Lower"].map(
+                    (v) => (
+                      <option key={v} value={v}>
+                        {v === "All confidence levels"
+                          ? copy("All levels")
+                          : copy(v)}
+                      </option>
+                    ),
+                  )}
+                </select>
+              </Field>
+              <Field className="md:w-44 md:shrink-0">
+                <FieldLabel htmlFor="opportunity-sort">
+                  {copy("Sort by")}
+                </FieldLabel>
+                <select
+                  id="opportunity-sort"
+                  className="field-select"
+                  value={sort}
+                  onChange={(e) => setSort(e.target.value)}
+                >
+                  <option value="Highest score">{copy("Highest score")}</option>
+                  <option value="Alphabetical">{copy("Alphabetical")}</option>
+                </select>
+              </Field>
+            </div>
+          </MobileDisclosure>
         </FieldGroup>
         {list.length === 0 ? (
           <div className="surface flex flex-col items-center gap-4 p-12 text-center">

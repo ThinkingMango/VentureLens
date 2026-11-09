@@ -1,4 +1,5 @@
 "use client";
+import { MobileDisclosure } from "@/components/mobile-disclosure";
 import { useCopy } from "@/i18n/use-copy";
 import { feedbackSource } from "@/i18n/errors";
 import { postJson, ApiNetworkError } from "@/lib/api-client";
@@ -31,9 +32,15 @@ import {
 } from "@/components/ui/field";
 const pipeline = [
   ["Discover", "Up to eight narrow hypotheses from your brief and profile."],
-  ["Retrieve", "Live web search for buyer pain, spending, competitors, and counter-evidence."],
+  [
+    "Retrieve",
+    "Live web search for buyer pain, spending, competitors, and counter-evidence.",
+  ],
   ["Classify", "Every excerpt is tagged by kind, reliability, and stance."],
-  ["Score & review", "Weighted scoring, then an adversarial pass that can only deduct."],
+  [
+    "Score & review",
+    "Weighted scoring, then an adversarial pass that can only deduct.",
+  ],
   ["Save", "A private report with linked sources you can reopen any time."],
 ];
 export function ResearchConfig() {
@@ -123,21 +130,29 @@ export function ResearchConfig() {
                   // the run the first attempt created instead of a second run.
                   let result;
                   try {
-                    result = await postJson("/api/research", {
-                      action: "start",
-                      brief: { ...brief, language: locale },
-                      requestKey: requestKey.current,
-                    }, { networkRetries: 2 });
+                    result = await postJson(
+                      "/api/research",
+                      {
+                        action: "start",
+                        brief: { ...brief, language: locale },
+                        requestKey: requestKey.current,
+                      },
+                      { networkRetries: 2 },
+                    );
                   } catch (error) {
                     if (!(error instanceof ApiNetworkError)) throw error;
                     await refresh().catch(() => undefined);
                     throw new Error(feedbackSource("NETWORK_ERROR"));
                   }
-                  const id = typeof result.body.id === "string" ? result.body.id : null;
+                  const id =
+                    typeof result.body.id === "string" ? result.body.id : null;
                   if (!result.ok || !id) {
                     // The server answered and created nothing, so an edited brief may start fresh.
-                    if (result.status >= 400 && result.status < 500) requestKey.current = null;
-                    throw new Error(feedbackSource(result.body.code, "START_FAILED"));
+                    if (result.status >= 400 && result.status < 500)
+                      requestKey.current = null;
+                    throw new Error(
+                      feedbackSource(result.body.code, "START_FAILED"),
+                    );
                   }
                   await refresh().catch(() => undefined);
                   router.push(`/research/${id}`);
@@ -145,7 +160,9 @@ export function ResearchConfig() {
                 router.refresh();
               } catch (error) {
                 setFormError(
-                  error instanceof Error && error.message ? error.message : feedbackSource("START_FAILED"),
+                  error instanceof Error && error.message
+                    ? error.message
+                    : feedbackSource("START_FAILED"),
                 );
               } finally {
                 setSubmitting(false);
@@ -346,9 +363,13 @@ export function ResearchConfig() {
                 ) : (
                   <>
                     <Clock3 className="size-4" />
-                    {copy("Usually 5–10 minutes · Uses one research run, returned if the run fails")}
+                    {copy(
+                      "Usually 5–10 minutes · Uses one research run, returned if the run fails",
+                    )}
                     {" · "}
-                    {copy("Report in {language}", { language: localeNames[locale] })}
+                    {copy("Report in {language}", {
+                      language: localeNames[locale],
+                    })}
                   </>
                 )}
               </span>
@@ -371,40 +392,47 @@ export function ResearchConfig() {
         </section>
         <aside className="flex flex-col gap-5">
           {!isDemo && <ResearchAccessCard compact />}
-          <section className="surface flex flex-col gap-4 p-6">
-            <div className="flex items-center gap-2">
-              <UserRound className="size-5 text-primary" />
-              <h2 className="font-semibold">{copy("Your founder context")}</h2>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              {isDemo
-                ? copy(
-                    "Reference your experience while exploring. Profile changes do not personalize demo results.",
-                  )
-                : copy(
-                    "A snapshot of your profile is saved with each run. Founder-advantage and combined modes use it; market-first does not.",
-                  )}
-            </p>
-            <dl className="flex flex-col gap-4">
-              {[
-                ["Experience", profile.industry],
-                [
-                  "Time available",
-                  copy("{hours} / week", { hours: copy(profile.hours) }),
-                ],
-                ["Starting budget", profile.budget],
-              ].map(([k, v]) => (
-                <div key={k}>
-                  <dt className="text-sm text-muted-foreground">{copy(k)}</dt>
-                  <dd className="mt-1 font-medium">{copy(v)}</dd>
-                </div>
-              ))}
-            </dl>
-            <Link href="/profile" className="text-sm font-medium text-primary">
-              {copy("Edit founder profile")}
-              <ArrowRight className="ml-1 inline size-4" />
-            </Link>
-          </section>
+          <MobileDisclosure title={copy("Your founder context")}>
+            <section className="surface flex flex-col gap-4 p-6">
+              <div className="flex items-center gap-2">
+                <UserRound className="size-5 text-primary" />
+                <h2 className="font-semibold">
+                  {copy("Your founder context")}
+                </h2>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {isDemo
+                  ? copy(
+                      "Reference your experience while exploring. Profile changes do not personalize demo results.",
+                    )
+                  : copy(
+                      "A snapshot of your profile is saved with each run. Founder-advantage and combined modes use it; market-first does not.",
+                    )}
+              </p>
+              <dl className="flex flex-col gap-4">
+                {[
+                  ["Experience", profile.industry],
+                  [
+                    "Time available",
+                    copy("{hours} / week", { hours: copy(profile.hours) }),
+                  ],
+                  ["Starting budget", profile.budget],
+                ].map(([k, v]) => (
+                  <div key={k}>
+                    <dt className="text-sm text-muted-foreground">{copy(k)}</dt>
+                    <dd className="mt-1 font-medium">{copy(v)}</dd>
+                  </div>
+                ))}
+              </dl>
+              <Link
+                href="/profile"
+                className="text-sm font-medium text-primary"
+              >
+                {copy("Edit founder profile")}
+                <ArrowRight className="ml-1 inline size-4" />
+              </Link>
+            </section>
+          </MobileDisclosure>
           <section className="flex flex-col gap-4 rounded-xl bg-secondary p-6 text-foreground">
             <Telescope className="size-6 text-primary" />
             <h2 className="font-semibold">
@@ -439,7 +467,9 @@ export function ResearchConfig() {
                     </span>
                     <span>
                       <span className="font-medium">{copy(title)}</span>
-                      <span className="block text-muted-foreground">{copy(text)}</span>
+                      <span className="block text-muted-foreground">
+                        {copy(text)}
+                      </span>
                     </span>
                   </li>
                 ))}

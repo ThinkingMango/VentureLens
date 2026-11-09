@@ -11,10 +11,12 @@ The interface helps founders compare opportunities, inspect evidence, and decide
 
 ## Mobile behavior
 
-- At phone widths, opportunity cards stack vertically and retain buyer, pricing, risk, score, and save action. Report buttons span the card width.
+- At phone widths, opportunity cards stack vertically with title, buyer, score, save, and full-width report actions visible. Pricing, risks, validation, and confidence expand on demand. Overviews show two opportunities with a link to the full results.
 - Research history uses linked cards on phones and a table on desktop. Search matches title and localized industry, trims whitespace, and includes an inline clear action.
 - The workspace header keeps navigation, page context, and the language picker visible; secondary header controls move out of the narrow layout. Help remains accessible in the drawer.
-- Primary landing actions span the available phone width. Preview selection buttons stack, and the evidence detail follows the selection list. No page-level horizontal scrolling is intended at 320px and above.
+- Primary landing actions span the available phone width. The sample report expands on demand. No page-level horizontal scrolling is intended at 320px and above.
+- Statistics, activity, setup checklists, founder context, and results filters expand on demand on phones. Desktop supporting content stays visible. Filter selections persist when collapsed.
+- Profile setup shows one step heading and progress indicator on phones. Skill examples and the final recap expand on demand; required inputs remain visible.
 - Maintain 44px primary controls, visible keyboard focus, drawer focus restoration, reduced-motion support, and all three interface languages.
 
 ## Guidance and references
