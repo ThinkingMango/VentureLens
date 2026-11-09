@@ -155,21 +155,58 @@ This is better than the screenshot originally proposed: a static image goes stal
 
 The notes that mark individual sources and buyer hypotheses as synthetic were kept on purpose. On an evidence product, they say exactly which claims are invented. Accessible names still say "Demo score".
 
-## 5. Still recommended (prioritised)
+## 5. Follow-ups completed (third pass)
+
+Items 4–6 of the backlog.
+
+### 5.1 Research run page (was item 4)
+
+| Change | Detail |
+| --- | --- |
+| Per-hypothesis progress | `GET /api/research/[id]` now returns `candidates` for runs without a report: each hypothesis from discovery, with `state` (`searching`, `done`, `skipped`) and a source count. It reads only candidate keys and titles (`output->candidates`) and evidence `candidate_id`s, so the 3-second poll stays small. A failed read leaves the stage list unchanged instead of failing the status call. |
+| Hypothesis list | The run page lists each hypothesis with "Searching…" (only the first unfinished one, since retrieval is sequential), "Waiting", "N sources", "No usable sources" or "Not searched" (for a stopped run). A line under the heading explains that hypotheses without usable sources are dropped, not filled in. |
+| Technical details | Estimated cost, committed budget, tokens, search requests and the hosting note move under a collapsed "Technical details" section. It opens by default only when a run stopped on its budget, because that is when the numbers matter. The completed-run summary shows the candidate count instead of a four-decimal dollar figure. |
+| Tests | `candidateProgress` (pure helper in `lib/report-presentation.ts`) has two unit tests. A render test covers the hypothesis list and checks that technical details are collapsed while a run is healthy and open after a budget stop. |
+
+This could only be checked with a fixture (a temporary route that was not committed). A real running job needs Supabase and provider credentials.
+
+### 5.2 Empty states (was item 5)
+
+A shared `EmptyState` replaces four different patterns. Each shows a context icon, what is missing and why, and one next step. Its text is a status region, so a filter that empties the list is announced.
+
+| Where | Before | After |
+| --- | --- | --- |
+| My research, no briefs (live) | Empty table with its header row, a status line inside, and a detached button below | One empty state: "No research yet", a sentence on what a run does, "New research", and a link to the demo report. The header "New research" button hides so the action is not offered twice. |
+| My research, search with no match | Same empty table | The search stays and the table is replaced by "No matching research" with "Clear search" |
+| Saved (demo) | Centred card with a different layout | Same component (Bookmark icon); "Clear filters" when a filter emptied the list |
+| Saved and results (live) | Generic telescope icon for every case; the results description came from a Chinese source string | Bookmark, FileSearch or SearchX for each case; English-source description |
+
+The library search also showed two "×" controls (the browser's plus the app's); the browser's is now hidden on that input.
+
+### 5.3 Landing page (was item 6)
+
+- **Labels:** two remain, the hero positioning line and "Honest by design" on the rules band. The "What you get", "How it works", "Who it's for" and "Questions" labels repeated their headings. Section `id`s and nav anchors are unchanged.
+- **Hero pill:** the decorative dot and the unused `.demo-dot` rule are gone.
+- **Dark band:** the landing rules band and sign-in panel sit on deep ink `#0f2a33` instead of the old navy `#0f1d3f`, matching the teal palette (white text 15:1).
+
+### Verified
+
+- `pnpm typecheck` passes, `pnpm test` passes 115/115, and `pnpm build` passes.
+- axe still reports 0 violations across the 64 page contexts.
+- The demo empty states were checked in light and dark: "Clear search" restores the rows and the table hides on no match.
+
+## 6. Still recommended (prioritised)
 
 | # | Recommendation | Why | Effort | Skill |
 | --- | --- | --- | --- | --- |
-| 4 | **Run page:** move token counts and USD costs under "Technical details"; show per-candidate retrieval progress. | Carried over from REVIEW §6.3 item 6. | M | `design:ux-copy` |
-| 5 | **Empty states** for Saved and My research, with a single action each. | A blank list should invite the next step. | S | `design:ux-copy` |
-| 6 | **Landing-page template tells (remaining):** the codex redesign already left-aligned the hero and dropped the gradient accent; still left are an all-caps eyebrow label above five sections and a decorative dot in the hero pill. Reduce eyebrows to at most two. | These are patterns the design skills identify as signs of a generated page, and they weaken the "checkable, not convincing" brand. | S | `frontend-design`, `design-taste-frontend` |
 | 7 | **Stat tiles on mobile** take a full screen. Use a compact 2×2 without detail lines below `sm`, or a horizontal strip. | Pushes opportunities below the fold on phones. | S | `dataviz` |
 | 8 | **Manual theme toggle** (system / light / dark) in the header menu, stored per viewer. | Dark mode follows the OS only. Some users want to override it. | S | n/a |
 | 9 | **Em and en dashes in copy** (7 in `messages/en.json`, more in Chinese where they are idiomatic). | Optional. Some style guides now treat em dashes as a sign of AI-written text; plain punctuation reads more direct. Do not change the Chinese catalogues. | S | `design:ux-copy` |
-| 10 | **Document the design tokens** (colour, radius, shadow, the ScoreRing and Confidence primitives) as a short design-system page. | Prevents hard-coded colours from creeping back in and breaking dark mode. | S | `design:design-system` |
+| 10 | **Document the design tokens** (colour, radius, shadow, and the ScoreRing, Confidence, ScoreBreakdown and EmptyState primitives) as a short design-system page. | Prevents hard-coded colours from creeping back in and breaking dark mode. | S | `design:design-system` |
 
 ---
 
-## 6. How to keep the UI from regressing
+## 7. How to keep the UI from regressing
 
 1. **Use tokens, never hex values, in components.** `grep -rnE "#[0-9a-f]{3,6}|bg-white|text-black" components` should return only the fixed-brand surfaces documented in `app/globals.css`.
 2. **Check both schemes.** In Chrome DevTools → Rendering → "Emulate CSS prefers-color-scheme", or with Playwright: `browser.newContext({ colorScheme: "dark" })`.
