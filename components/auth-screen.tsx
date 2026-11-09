@@ -338,10 +338,24 @@ export function AuthScreen() {
           <p className="rounded-lg bg-secondary p-3 text-center text-sm text-foreground">
             {copy("One free research run on sign-up. No card, no subscription, nothing to cancel.")}
           </p>
+          <p className="text-center text-xs text-muted-foreground">
+            {copy("By continuing, you acknowledge how we handle your information:")}{" "}
+            <Link href="/privacy" className="font-medium text-primary underline-offset-4 hover:underline">
+              {copy("Privacy Policy")}
+            </Link>
+          </p>
         </div>
-        <p className="text-sm text-muted-foreground">
-          {copy("Secure authentication · Your workspace stays private.")}
-        </p>
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 text-sm text-muted-foreground">
+          <p>{copy("Secure authentication · Your workspace stays private.")}</p>
+          <nav aria-label={copy("Legal and help")} className="flex gap-4">
+            <Link href="/privacy" className="hover:text-primary">
+              {copy("Privacy Policy")}
+            </Link>
+            <Link href="/support" className="hover:text-primary">
+              {copy("Support")}
+            </Link>
+          </nav>
+        </div>
       </section>
       <section className="band-dark relative hidden flex-col justify-center gap-10 overflow-hidden p-16 lg:flex">
         <div className="grid-bg pointer-events-none absolute inset-0 opacity-40" aria-hidden="true" />

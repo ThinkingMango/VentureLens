@@ -4,7 +4,8 @@ Evidence-first opportunity research for founders exploring GenAI-enabled, recurr
 
 A founder describes their experience, constraints and goals; VentureLens discovers narrow opportunity hypotheses, retrieves real web evidence for each one, classifies and scores it, runs an adversarial review, and saves a private report with linked sources and a validation plan. Candidates without independent evidence are dropped rather than dressed up.
 
-- **Live app routes:** `/`, `/pricing`, `/login`, `/signup`, `/onboarding`, `/dashboard`, `/research`, `/research/new`, `/research/[id]`, `/research/results`, `/opportunities/[id]`, `/saved`, `/profile`, `/billing`, `/admin`
+- **Live app routes:** `/`, `/pricing`, `/privacy`, `/support`, `/login`, `/signup`, `/onboarding`, `/dashboard`, `/research`, `/research/new`, `/research/[id]`, `/research/results`, `/opportunities/[id]`, `/saved`, `/profile`, `/billing`, `/admin`
+- **Contact:** product help at `support@smartmango.ai`, privacy and data requests at `privacy@smartmango.ai` (`lib/contact.ts`). The Privacy Policy (`components/privacy.tsx`) describes the real data flows; update it and `privacyUpdatedAt` whenever a provider, cookie, or stored field changes.
 - **Synthetic demo:** everything under `/demo/*` runs on fixed fixtures with no account and no AI calls.
 - **Languages:** English, Simplified Chinese, Traditional Chinese (interface). Source excerpts are kept in their original language.
 - **Status:** beta. Every confirmed account receives one free research run (`research_dev_access`, granted by a database trigger); failed runs are returned automatically; payments are not connected. See [`plan.md`](./plan.md) for the roadmap and [`docs/REVIEW.md`](./docs/REVIEW.md) for the current holistic review.

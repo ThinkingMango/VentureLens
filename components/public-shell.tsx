@@ -7,6 +7,7 @@ import { Menu, X, ArrowUpRight } from "lucide-react";
 import { Brand } from "@/components/shared";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { Button } from "@/components/ui/button";
+import { mailto, supportEmail } from "@/lib/contact";
 const links = [
   { href: "/#whats-inside", label: "What you get" },
   { href: "/#how-it-works", label: "How it works" },
@@ -101,8 +102,8 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
       </header>
       {children}
       <footer className="border-t bg-background">
-        <div className="mx-auto grid max-w-7xl gap-10 px-5 py-12 md:grid-cols-[1.4fr_1fr_1fr] md:px-8">
-          <div className="flex flex-col gap-3">
+        <div className="mx-auto grid max-w-7xl gap-10 px-5 py-12 sm:grid-cols-2 md:grid-cols-[1.4fr_1fr_1fr_1fr] md:px-8">
+          <div className="flex flex-col gap-3 sm:col-span-2 md:col-span-1">
             <Brand />
             <p className="max-w-sm text-sm text-muted-foreground">
               {copy(
@@ -156,6 +157,18 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
                 "Every confirmed account includes one free research run. Pricing shown is planned, and no payments are collected yet.",
               )}
             </p>
+          </div>
+          <div className="flex flex-col gap-2 text-sm">
+            <p className="font-semibold">{copy("Help")}</p>
+            <Link href="/support" className="text-muted-foreground hover:text-primary">
+              {copy("Support")}
+            </Link>
+            <Link href="/privacy" className="text-muted-foreground hover:text-primary">
+              {copy("Privacy Policy")}
+            </Link>
+            <a href={mailto(supportEmail)} className="mt-2 break-all text-muted-foreground hover:text-primary">
+              {supportEmail}
+            </a>
           </div>
         </div>
         <div className="border-t">

@@ -2,6 +2,8 @@
 import { useCopy } from "@/i18n/use-copy";
 
 import Link from "@/components/workspace-link";
+import NextLink from "next/link";
+import { mailto, supportEmail } from "@/lib/contact";
 import { usePathname } from "next/navigation";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
@@ -332,13 +334,21 @@ export function AppShell({
           {children}
           <footer className="flex flex-wrap items-center justify-between gap-2 border-t pt-5 text-sm text-muted-foreground">
             <p>{copy("Thoughtful research. Better decisions.")}</p>
-            <Link
-              href="/"
-              className="flex items-center gap-1 hover:text-primary"
-            >
-              VentureLens AI
-              <ArrowUpRight className="size-3.5" />
-            </Link>
+            <nav aria-label={copy("Legal and help")} className="flex flex-wrap items-center gap-4">
+              <NextLink href="/support" className="hover:text-primary">
+                {copy("Support")}
+              </NextLink>
+              <NextLink href="/privacy" className="hover:text-primary">
+                {copy("Privacy Policy")}
+              </NextLink>
+              <NextLink
+                href="/"
+                className="flex items-center gap-1 hover:text-primary"
+              >
+                VentureLens AI
+                <ArrowUpRight className="size-3.5" />
+              </NextLink>
+            </nav>
           </footer>
         </main>
       </div>
@@ -374,6 +384,19 @@ export function AppShell({
                   "Your records are private to your verified session. Authorized development accounts can run Qwen research with external retrieval. Payments are not connected. Demo opportunities and balances never enter your account.",
                 )}
           </p>
+          <div className="flex flex-col gap-2 rounded-lg border p-4 text-sm">
+            <p className="text-muted-foreground">
+              {copy("Need a hand? Email our support team or visit the Support page.")}
+            </p>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+              <a href={mailto(supportEmail)} className="font-medium text-primary underline-offset-4 hover:underline">
+                {supportEmail}
+              </a>
+              <NextLink href="/support" className="font-medium text-primary underline-offset-4 hover:underline" onClick={() => setHelp(false)}>
+                {copy("Support page")}
+              </NextLink>
+            </div>
+          </div>
           <Button asChild onClick={() => setHelp(false)}>
             <Link href="/research/new">
               {isDemo
