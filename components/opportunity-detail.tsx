@@ -409,7 +409,7 @@ export function OpportunityDetail({
                       type="checkbox"
                       checked={completed.includes(`${o.id}-${i}`)}
                       onChange={() => toggleTask(`${o.id}-${i}`)}
-                      className="mt-1 size-5 shrink-0"
+                      className="mt-0.5 size-6 shrink-0"
                     />
                     <span className="flex flex-col gap-2">
                       <span className="font-medium">{copy(t.title)}</span>

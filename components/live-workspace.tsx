@@ -535,7 +535,7 @@ export function LiveOpportunityDetail({
             {tasks.map((task, index) => (
               <label key={task} className="flex cursor-pointer items-center gap-3 border-t py-4">
                 <input
-                  className="size-5"
+                  className="size-6 shrink-0"
                   type="checkbox"
                   disabled={busy}
                   checked={completed.includes(`${item.id}-${index}`)}

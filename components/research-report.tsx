@@ -150,7 +150,7 @@ export function ResearchReportView({ report }: { report: ResearchReport }) {
                 type="checkbox"
                 checked={savedOnly}
                 onChange={(event) => setSavedOnly(event.target.checked)}
-                className="size-4"
+                className="size-6"
               />
               {copy("Saved only")}
             </label>

@@ -135,6 +135,9 @@ export function Onboarding({ editing = false }: { editing?: boolean }) {
           </p>
         </div>
         <form
+          // The app reports errors inline (aria-invalid + linked message) in the
+          // interface language; native validation would pre-empt that.
+          noValidate
           className="flex flex-col gap-8"
           onSubmit={async (e) => {
             e.preventDefault();

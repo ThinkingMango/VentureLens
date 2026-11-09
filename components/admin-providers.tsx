@@ -116,7 +116,7 @@ export function AdminProviders({ initialData }: { initialData: ProviderSettingsR
                     id="automatic-fallback" type="checkbox" checked={settings.autoFallback}
                     onChange={event => change({ autoFallback: event.target.checked })}
                     disabled={saving || !!loadError} aria-describedby="fallback-help"
-                    className="size-5 shrink-0 accent-primary"
+                    className="size-6 shrink-0 accent-primary"
                   />
                   <FieldContent>
                     <FieldLabel htmlFor="automatic-fallback">{t("fallback")}</FieldLabel>

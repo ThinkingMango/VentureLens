@@ -258,7 +258,7 @@ export function AppShell({
       >
         {copy("Skip to content")}
       </a>
-      <aside className="workspace-sidebar fixed inset-y-0 left-0 z-30 hidden w-64 flex-col overflow-y-auto border-r bg-card lg:flex">
+      <aside aria-label={copy("Workspace")} className="workspace-sidebar fixed inset-y-0 left-0 z-30 hidden w-64 flex-col overflow-y-auto border-r bg-card lg:flex">
         {sidebar}
       </aside>
       <Dialog open={open} onOpenChange={setOpen}>

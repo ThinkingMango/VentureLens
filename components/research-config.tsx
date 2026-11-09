@@ -95,6 +95,9 @@ export function ResearchConfig() {
       <div className="grid gap-6 xl:grid-cols-[1.6fr_1fr]">
         <section className="surface p-6 md:p-8">
           <form
+            // The app reports errors inline (aria-invalid + linked message) in the
+            // interface language; native validation would pre-empt that.
+            noValidate
             className="flex flex-col gap-7"
             onSubmit={async (e) => {
               e.preventDefault();

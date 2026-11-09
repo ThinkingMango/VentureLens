@@ -323,14 +323,14 @@ export function ResearchResults({
               <tbody>
                 {list.map((o) => (
                   <tr key={o.id} className="border-b last:border-b-0">
-                    <td className="max-w-56 px-5 py-5">
+                    <th scope="row" className="max-w-56 px-5 py-5 text-left font-normal">
                       <Link
                         className="font-medium text-primary hover:underline"
                         href={`/opportunities/${o.id}`}
                       >
                         {o.title}
                       </Link>
-                    </td>
+                    </th>
                     <td className="px-5 py-5 font-semibold">{o.score}/100</td>
                     <td className="max-w-48 px-5 py-5 text-sm text-muted-foreground">
                       {o.buyer}
