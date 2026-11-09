@@ -346,7 +346,7 @@ export function AuthScreen() {
       <section className="band-dark relative hidden flex-col justify-center gap-10 overflow-hidden p-16 lg:flex">
         <div className="grid-bg pointer-events-none absolute inset-0 opacity-40" aria-hidden="true" />
         <div className="relative flex flex-col gap-6">
-          <ShieldCheck className="size-12 text-[#9fb7ff]" strokeWidth={1.3} />
+          <ShieldCheck className="size-12 text-[#8bdfd6]" strokeWidth={1.3} />
           <h2 className="max-w-md text-4xl font-semibold leading-tight">
             {copy("The next great business")}
             <br />
@@ -367,7 +367,7 @@ export function AuthScreen() {
             ["Explore and save opportunities", "Read sample reports, save a shortlist, and plan your first buyer conversations."],
           ].map(([title, text], index) => (
             <li key={title} className="flex gap-4 rounded-xl border border-white/10 bg-white/5 p-4">
-              <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-white/10 text-sm font-semibold text-[#9fb7ff]">
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-white/10 text-sm font-semibold text-[#8bdfd6]">
                 {index + 1}
               </span>
               <span className="flex flex-col gap-1">
@@ -384,7 +384,7 @@ export function AuthScreen() {
             "A practical path to customer validation",
           ].map((text) => (
             <li className="flex items-center gap-3" key={text}>
-              <Check className="size-4 text-[#9fb7ff]" />
+              <Check className="size-4 text-[#8bdfd6]" />
               {copy(text)}
             </li>
           ))}

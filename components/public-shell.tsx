@@ -20,6 +20,12 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
   const menuTrigger = useRef<HTMLButtonElement>(null);
   return (
     <div className="min-h-screen bg-card text-foreground">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 focus:rounded-md focus:bg-card focus:p-3"
+      >
+        {copy("Skip to content")}
+      </a>
       <header
         className="sticky top-0 z-40 border-b bg-card/85 backdrop-blur"
         onKeyDown={(event) => {
@@ -106,35 +112,57 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
           </div>
           <div className="flex flex-col gap-2 text-sm">
             <p className="font-semibold">{copy("Product")}</p>
-            <Link href="/#whats-inside" className="text-muted-foreground hover:text-primary">
+            <Link
+              href="/#whats-inside"
+              className="text-muted-foreground hover:text-primary"
+            >
               {copy("What you get")}
             </Link>
-            <Link href="/#how-it-works" className="text-muted-foreground hover:text-primary">
+            <Link
+              href="/#how-it-works"
+              className="text-muted-foreground hover:text-primary"
+            >
               {copy("How it works")}
             </Link>
-            <Link href="/pricing" className="text-muted-foreground hover:text-primary">
+            <Link
+              href="/pricing"
+              className="text-muted-foreground hover:text-primary"
+            >
               {copy("Pricing")}
             </Link>
-            <Link href="/demo/dashboard" className="text-muted-foreground hover:text-primary">
+            <Link
+              href="/demo/dashboard"
+              className="text-muted-foreground hover:text-primary"
+            >
               {copy("Explore demo")}
             </Link>
           </div>
           <div className="flex flex-col gap-2 text-sm">
             <p className="font-semibold">{copy("Account")}</p>
-            <Link href="/login" className="text-muted-foreground hover:text-primary">
+            <Link
+              href="/login"
+              className="text-muted-foreground hover:text-primary"
+            >
               {copy("Log in")}
             </Link>
-            <Link href="/signup" className="text-muted-foreground hover:text-primary">
+            <Link
+              href="/signup"
+              className="text-muted-foreground hover:text-primary"
+            >
               {copy("Create a free account")}
             </Link>
             <p className="mt-2 text-muted-foreground">
-              {copy("Every confirmed account includes one free research run. Pricing shown is planned, and no payments are collected yet.")}
+              {copy(
+                "Every confirmed account includes one free research run. Pricing shown is planned, and no payments are collected yet.",
+              )}
             </p>
           </div>
         </div>
         <div className="border-t">
           <p className="mx-auto max-w-7xl px-5 py-5 text-xs text-muted-foreground md:px-8">
-            {copy("VentureLens AI · Research output is a starting point for your own validation, not financial or investment advice.")}
+            {copy(
+              "VentureLens AI · Research output is a starting point for your own validation, not financial or investment advice.",
+            )}
           </p>
         </div>
       </footer>

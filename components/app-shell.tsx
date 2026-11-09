@@ -41,7 +41,13 @@ const nav = [
   { title: "Saved opportunities", href: "/saved", icon: Bookmark },
   { title: "Founder profile", href: "/profile", icon: UserRound },
 ];
-export function AppShell({ children, isAdmin = false }: { children: React.ReactNode; isAdmin?: boolean }) {
+export function AppShell({
+  children,
+  isAdmin = false,
+}: {
+  children: React.ReactNode;
+  isAdmin?: boolean;
+}) {
   const copy = useCopy();
   const pathname = usePathname();
   const path = pathname.startsWith("/demo/") ? pathname.slice(5) : pathname;
@@ -62,17 +68,20 @@ export function AppShell({ children, isAdmin = false }: { children: React.ReactN
       setSigningOut(false);
     }
   }
-  const title = path === "/admin" ? "AI providers" : path.startsWith("/opportunities")
-    ? "Opportunity detail"
-    : path === "/research/new"
-      ? "New research"
-      : path === "/research/results"
-        ? "Research results"
-        : path === "/billing"
-          ? "Credits & billing"
-          : /^\/research\/[^/]+$/.test(path)
-            ? "Research run & report"
-            : nav.find((n) => n.href === path)?.title || "Workspace";
+  const title =
+    path === "/admin"
+      ? "AI providers"
+      : path.startsWith("/opportunities")
+        ? "Opportunity detail"
+        : path === "/research/new"
+          ? "New research"
+          : path === "/research/results"
+            ? "Research results"
+            : path === "/billing"
+              ? "Credits & billing"
+              : /^\/research\/[^/]+$/.test(path)
+                ? "Research run & report"
+                : nav.find((n) => n.href === path)?.title || "Workspace";
   const sidebar = (
     <>
       <div className="flex h-20 items-center justify-between px-6">
@@ -111,7 +120,14 @@ export function AppShell({ children, isAdmin = false }: { children: React.ReactN
               key={n.href}
               href={n.href}
               onClick={() => setOpen(false)}
-              aria-current={path === n.href ? "page" : undefined}
+              aria-current={
+                path === n.href ||
+                (n.href === "/research" &&
+                  (path.startsWith("/research/") ||
+                    path.startsWith("/opportunities/")))
+                  ? "page"
+                  : undefined
+              }
               className={cn(
                 "nav-link",
                 (path === n.href ||
@@ -129,7 +145,12 @@ export function AppShell({ children, isAdmin = false }: { children: React.ReactN
             </Link>
           ))}
           {isAdmin && !isDemo && (
-            <Link href="/admin" onClick={() => setOpen(false)} aria-current={path === "/admin" ? "page" : undefined} className={cn("nav-link", path === "/admin" && "active")}>
+            <Link
+              href="/admin"
+              onClick={() => setOpen(false)}
+              aria-current={path === "/admin" ? "page" : undefined}
+              className={cn("nav-link", path === "/admin" && "active")}
+            >
               <ShieldCheck className="size-[18px]" aria-hidden="true" />
               {copy("Admin")}
             </Link>
@@ -220,9 +241,7 @@ export function AppShell({ children, isAdmin = false }: { children: React.ReactN
           {profile.name.slice(0, 1)}
         </span>
         <div className="flex-1">
-          <p className="font-medium">
-            {profile.name}
-          </p>
+          <p className="font-medium">{profile.name}</p>
           <p className="max-w-40 truncate text-sm text-muted-foreground">
             {isDemo ? copy("Demo founder") : data?.email}
           </p>
@@ -239,7 +258,7 @@ export function AppShell({ children, isAdmin = false }: { children: React.ReactN
       >
         {copy("Skip to content")}
       </a>
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col overflow-y-auto border-r bg-card lg:flex">
+      <aside className="workspace-sidebar fixed inset-y-0 left-0 z-30 hidden w-64 flex-col overflow-y-auto border-r bg-card lg:flex">
         {sidebar}
       </aside>
       <Dialog open={open} onOpenChange={setOpen}>
@@ -248,7 +267,7 @@ export function AppShell({ children, isAdmin = false }: { children: React.ReactN
             event.preventDefault();
             navTrigger.current?.focus();
           }}
-          className="left-0 top-0 flex h-dvh w-72 max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-y-auto rounded-none border-0 bg-card p-0 text-foreground sm:rounded-none [&>button]:hidden"
+          className="workspace-sidebar left-0 top-0 flex h-dvh w-72 max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-y-auto rounded-none border-0 bg-card p-0 text-foreground sm:rounded-none [&>button]:hidden"
         >
           <DialogTitle className="sr-only">
             {copy("Workspace navigation")}
@@ -262,7 +281,7 @@ export function AppShell({ children, isAdmin = false }: { children: React.ReactN
         </DialogContent>
       </Dialog>
       <div className="lg:pl-64">
-        <header className="flex min-h-16 items-center justify-between gap-2 border-b bg-card px-3 py-2 sm:min-h-20 sm:gap-3 sm:px-4 sm:py-3 md:px-8">
+        <header className="sticky top-0 z-20 flex min-h-16 items-center justify-between gap-2 border-b bg-card/95 px-3 py-2 backdrop-blur sm:min-h-20 sm:gap-3 sm:px-4 sm:py-3 md:px-8">
           <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             <Button
               variant="ghost"
