@@ -83,3 +83,16 @@ test("safe return path rejects external and malformed redirects", () => {
   ])
     assert.equal(safeReturnPath(path), path);
 });
+
+test("profile accepts expanded and custom answers within database limits", () => {
+  const profile = {...emptyProfile, name: "Alice", skills: "Still exploring my strengths"};
+  const parsed = profileSchema.parse({...profile, role: "  Student or recent graduate  ", industry: "Marine conservation", goal: "Build tools for local coastal businesses"});
+  assert.equal(parsed.role, "Student or recent graduate");
+  assert.equal(parsed.industry, "Marine conservation");
+  for (const [field, limit] of [["role", 100], ["industry", 100], ["goal", 150]]) {
+    assert.equal(profileSchema.safeParse({...profile, [field]: "  "}).success, false);
+    assert.equal(profileSchema.safeParse({...profile, [field]: "x".repeat(limit)}).success, true);
+    assert.equal(profileSchema.safeParse({...profile, [field]: "x".repeat(limit + 1)}).success, false);
+  }
+  assert.equal(profileSchema.safeParse({...profile, industry: "Other"}).success, true);
+});
