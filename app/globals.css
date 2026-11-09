@@ -233,13 +233,6 @@ button {
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
-.demo-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 100%;
-  background: var(--primary);
-  display: inline-block;
-}
 /* Marketing surfaces */
 .hero-bg {
   /* #f0f6f5 in light; follows the dark canvas in dark mode. */
@@ -289,7 +282,7 @@ button {
       color-mix(in srgb, #40a7a5 40%, transparent),
       transparent 70%
     ),
-    #0f1d3f;
+    #0f2a33; /* deep ink (docs/UI_DESIGN.md); white text 15:1 */
   color: #fff;
 }
 .band-dark .muted-on-dark {

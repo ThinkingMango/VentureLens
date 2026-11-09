@@ -156,7 +156,6 @@ export function Landing() {
           <div className="hero-layout relative mx-auto max-w-7xl px-5 py-14 md:px-8 md:py-20">
             <div className="hero-copy">
               <div className="flex items-center gap-2 rounded-full border bg-card/80 px-3.5 py-1.5 text-sm text-muted-foreground shadow-card backdrop-blur">
-                <span className="demo-dot" />
                 {copy("Evidence-first opportunity research for founders")}
               </div>
               <h1 className="max-w-4xl text-balance text-4xl font-semibold leading-[1.08] tracking-[-0.045em] sm:text-5xl md:text-6xl">
@@ -221,7 +220,6 @@ export function Landing() {
           className="mx-auto max-w-7xl px-5 py-20 md:px-8"
         >
           <div className="flex flex-col gap-4 md:max-w-2xl">
-            <p className="eyebrow">{copy("What you get")}</p>
             <h2 className="text-balance text-3xl font-semibold md:text-4xl">
               {copy("Inside every research report")}
             </h2>
@@ -252,7 +250,6 @@ export function Landing() {
           <div className="mx-auto max-w-7xl px-5 py-20 md:px-8">
             <div className="flex flex-col justify-between gap-5 md:flex-row md:items-end">
               <div className="flex flex-col gap-4">
-                <p className="eyebrow">{copy("How it works")}</p>
                 <h2 className="max-w-xl text-balance text-3xl font-semibold md:text-4xl">
                   {copy("A better question than")}
                   <br />
@@ -325,7 +322,6 @@ export function Landing() {
         </section>
         <section className="mx-auto max-w-7xl px-5 py-20 md:px-8">
           <div className="flex flex-col gap-4 md:max-w-2xl">
-            <p className="eyebrow">{copy("Who it’s for")}</p>
             <h2 className="text-balance text-3xl font-semibold md:text-4xl">
               {copy("Built for people who would rather test than guess")}
             </h2>
@@ -348,7 +344,6 @@ export function Landing() {
         <section id="faq" className="border-t bg-background">
           <div className="mx-auto grid max-w-7xl gap-10 px-5 py-20 md:grid-cols-[1fr_1.6fr] md:px-8">
             <div className="flex flex-col gap-4">
-              <p className="eyebrow">{copy("Questions")}</p>
               <h2 className="text-balance text-3xl font-semibold md:text-4xl">
                 {copy("Straight answers before you start")}
               </h2>
