@@ -3,7 +3,11 @@ import { getDomain } from "tldts";
 import { reportLanguageSchema, type ReportLanguage } from "./workspace-schema.ts";
 
 export const RESEARCH_MODEL = "qwen3.8-flash";
-export const methodology = "evidence-driven-v1";
+// v2: the adversarial review deducts at most 15 points and no longer deducts again for evidence gaps the evaluation
+// already priced in (v1 allowed 30), and each opportunity records its score before review and its evidence cap.
+export const methodology = "evidence-driven-v2";
+/** The most the adversarial review may deduct from an opportunity's weighted rating. */
+export const REVIEW_MAX_PENALTY = 15;
 // Runs created before report language was recorded were generated in Simplified Chinese.
 export const LEGACY_REPORT_LANGUAGE: ReportLanguage = "zh-Hans";
 export const reportLanguageNames: Record<ReportLanguage, string> = {
@@ -110,6 +114,7 @@ export const evaluationSchema = z.object({ items: z.array(evaluationItemSchema).
 export type Evaluation = z.infer<typeof evaluationSchema>["items"][number];
 const reviewItemSchema = z.object({
   candidate_id: z.string(), reject: z.boolean(), critique: short,
+  // Stored reviews from methodology v1 could deduct up to 30; new reviews are clamped to REVIEW_MAX_PENALTY.
   penalty: z.number().int().min(0).max(30), falsification: short,
 });
 export const reviewSchema = z.object({ items: z.array(reviewItemSchema).min(1).max(8) });
@@ -139,7 +144,7 @@ export const evaluationDraftSchema = z.object({ items: z.array(z.object({
   rationale: prose(2000),
 })) });
 export const reviewDraftSchema = z.object({ items: z.array(z.object({
-  candidate_id: z.string(), reject: z.boolean(), critique: prose(800), penalty: score(30), falsification: prose(800),
+  candidate_id: z.string(), reject: z.boolean(), critique: prose(800), penalty: score(REVIEW_MAX_PENALTY), falsification: prose(800),
 })) });
 
 /** Shortens text to `max` characters, preferring a sentence or word boundary, and marks the cut with an ellipsis. */
@@ -209,7 +214,7 @@ export function normalizeReview(draft: z.infer<typeof reviewDraftSchema>, candid
   // A candidate without a review is excluded at finalizing, the conservative outcome.
   return { items: matchIds(candidateIds, draft.items, item => item.candidate_id).map(item => reviewItemSchema.parse({
     candidate_id: item.candidate_id, reject: item.reject, critique: clipText(item.critique, 800),
-    penalty: clampInt(item.penalty, 0, 30), falsification: clipText(item.falsification, 800),
+    penalty: clampInt(item.penalty, 0, REVIEW_MAX_PENALTY), falsification: clipText(item.falsification, 800),
   })) };
 }
 export type Mode = "founder" | "market" | "combined";
@@ -321,10 +326,19 @@ export function evidenceGate(candidate: string, evidence: Evidence[], classifica
 export function eligibleEvidence(candidate: string, evidence: Evidence[], classifications: Classification[]) {
   return evidenceGate(candidate, evidence, classifications).sources;
 }
-export function weightedScore(dimensions: Evaluation['dimensions'], mode: Mode, evidenceCount: number, penalty = 0) {
+/**
+ * How an opportunity's score is reached: the weighted rating of its five dimensions, minus the adversarial review's
+ * deduction, capped at 70 with fewer than three independent supporting sources and 85 otherwise.
+ */
+export function scoreParts(dimensions: Evaluation['dimensions'], mode: Mode, evidenceCount: number, penalty = 0) {
   const weights = scoringWeights[mode];
   const raw = Object.entries(weights).reduce((sum, [key, weight]) => sum + dimensions[key as keyof typeof dimensions] * weight, 0);
-  return Math.max(0, Math.min(evidenceCount >= 3 ? 85 : 70, Math.round(raw - penalty)));
+  const beforeReview = Math.round(raw);
+  const cap = evidenceCount >= 3 ? 85 : 70;
+  return { beforeReview, cap, score: Math.max(0, Math.min(cap, beforeReview - penalty)) };
+}
+export function weightedScore(dimensions: Evaluation['dimensions'], mode: Mode, evidenceCount: number, penalty = 0) {
+  return scoreParts(dimensions, mode, evidenceCount, penalty).score;
 }
 export function requireExactIds(expected: string[], actual: string[]) {
   if (new Set(actual).size !== actual.length || actual.length !== expected.length || actual.some(id => !expected.includes(id))) throw new Error('INVALID_OUTPUT');

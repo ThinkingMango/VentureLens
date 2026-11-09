@@ -73,6 +73,9 @@ export const opportunitySchema = z.object({
   critique: z.string().optional(),
   falsification: z.string().optional(),
   penalty: z.number().optional(),
+  // From methodology v2: the weighted rating before the review deduction, and the evidence cap that applied.
+  score_before_review: z.number().min(0).max(100).optional(),
+  score_cap: z.union([z.literal(70), z.literal(85)]).optional(),
 });
 export type WorkspaceOpportunity = z.infer<typeof opportunitySchema>;
 export type ResearchAccess = {

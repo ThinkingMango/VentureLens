@@ -109,7 +109,7 @@ try {
   assert.ok(detail.report.models?.length > 0 && detail.report.models.every(model => allowedModels.includes(model)));
   assert.ok(detail.report.providers?.length > 0 && detail.report.providers.every(provider => allowedProviders.includes(provider)));
   assert.equal(detail.report.mode, "combined");
-  assert.equal(detail.report.methodology, "evidence-driven-v1");
+  assert.equal(detail.report.methodology, "evidence-driven-v2");
   const opportunities = detail.report.opportunities.map(item => opportunitySchema.parse(item));
   assert.ok(opportunities.length >= 1 && opportunities.length <= 8, "不得凑数或超出机会数量限制");
 

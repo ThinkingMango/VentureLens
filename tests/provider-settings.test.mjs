@@ -465,6 +465,10 @@ test("finalizing counts only supporting evidence and saves counter-evidence with
   const [c1] = report.opportunities;
   assert.equal(c1.confidence, "limited", "Two supporting domains are limited confidence, whatever else is attached");
   assert.equal(c1.score, 70, "The 85 cap needs three independent supporting domains");
+  // The breakdown is stored so the report can show how the score was reached: a perfect rating, cut to 70 by the cap.
+  assert.equal(c1.score_before_review, 100);
+  assert.equal(c1.score_cap, 70);
+  assert.equal(workspaceSchema.opportunitySchema.parse(c1).score_before_review, 100, "the breakdown survives the workspace read path");
   assert.deepEqual(c1.evidence.map(e => [e.source_key, e.stance]), [["c1-s1", "supports"], ["c1-s2", "supports"], ["c1-s3", "contradicts"]]);
   // The stance survives the workspace read path, so the report can label counter-evidence.
   assert.deepEqual(workspaceSchema.opportunitySchema.parse(c1).evidence.map(e => e.stance), ["supports", "supports", "contradicts"]);
@@ -751,6 +755,28 @@ test("account-level failures move the whole run, empty searches move nothing", a
   assert.deepEqual(providerSwitch(true, "BUDGET_EXCEEDED", g), { search_provider: g });
   for (const code of ["PROVIDER_CONFIGURATION", "PROVIDER_CREDITS_REQUIRED"]) assert.deepEqual(providerSwitch(true, code, g), { active_provider: g, search_provider: g });
   assert.deepEqual(providerSwitch(false, "TRANSIENT_PROVIDER", g), { active_provider: g, search_provider: g });
+});
+
+test("the adversarial review deducts at most 15 points and is told not to deduct again for evidence gaps", async () => {
+  const checkpoints = new Map();
+  const candidates = Array.from({ length: 5 }, (_, i) => ({ key: `c${i + 1}`, title: "Candidate", buyer: "Clinics", pain: "Billing", solution: "Assistant", advantage: "Network", query: "clinic billing time survey report" }));
+  checkpoints.set("discovery", { candidates });
+  const evidence = ["c1", "c2"].flatMap(id => [1, 2].map(i => ({ source_key: `${id}-s${i}`, candidate_id: id, url: `https://pub${i}.org/${id}`, title: "Source", excerpt: "Clinics report that billing takes many hours every single week.", retrieved_at: "2026-11-09T00:00:00.000Z", published_at: null })));
+  checkpoints.set("classification", { items: evidence.map(e => ({ source_key: e.source_key, relevant: true, kind: "pain", reliability: "secondary", stance: "supports", quote: e.excerpt, claim: "Pain" })) });
+  checkpoints.set("evaluation", { items: ["c1", "c2"].map(id => ({ candidate_id: id, description: "d", category: "c", revenue: "Assumed, unverified", cost: "Assumed, unverified", risk: "r", assumptions: ["a"], validation: ["v"], dimensions: { pain: 80, demand: 70, economics: 70, feasibility: 70, advantage: 60 }, rationale: "r" })) });
+  let prompt = "";
+  const fixture = researchFixture({ spent: 0, evidence, checkpoints, settings: { primary: "qwen", autoFallback: false, qwenModel: "qwen3.8-flash", geminiModel: "gemini-3.5-flash-lite" }, generate: async options => {
+    prompt = options.prompt;
+    // A model that ignores the new limit is clamped rather than trusted.
+    return { output: { items: ["c1", "c2"].map(id => ({ candidate_id: id, reject: false, critique: "Incumbents exist", penalty: 25, falsification: "Run a pilot" })) }, totalUsage: { inputTokens: 100, outputTokens: 50 } };
+  } });
+  await fixture.engine.executeResearchStage(fixture.context, "review");
+  assert.match(prompt, /give an integer penalty of 0–15, deductions only/);
+  assert.match(prompt, /already reflect missing or thin evidence, so do not deduct again for evidence gaps/);
+  assert.doesNotMatch(prompt, /0–30/);
+  assert.deepEqual(checkpoints.get("review").items.map(item => item.penalty), [15, 15]);
+  // A review stored by an older run (methodology v1, up to 30) still loads, so a run in flight during a deploy finishes.
+  assert.equal(researchCore.reviewSchema.parse({ items: [{ candidate_id: "c1", reject: false, critique: "x", penalty: 25, falsification: "y" }] }).items[0].penalty, 25);
 });
 
 test("discovery asks for evidence searches in the target market's own language", async () => {
