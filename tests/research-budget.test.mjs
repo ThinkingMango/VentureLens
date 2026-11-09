@@ -93,7 +93,8 @@ test('evaluation and review clamp scores, cap lists and drop unusable items inst
   assert.ok(evaluation.items[0].rationale.length <= 2000);
   assert.doesNotThrow(() => evaluationSchema.parse(evaluation));
   const review = normalizeReview({ items: [{ candidate_id: 'c1', reject: false, critique: 'c', penalty: 44.4, falsification: 'f' }, { candidate_id: 'c3', reject: true, critique: 'c', penalty: 0, falsification: 'f' }] }, ['c1', 'c2']);
-  assert.deepEqual(review.items.map(item => [item.candidate_id, item.penalty]), [['c1', 30]]);
+  // Methodology v2: a review deduction is clamped to 15 (it was 30), the most the review may take.
+  assert.deepEqual(review.items.map(item => [item.candidate_id, item.penalty]), [['c1', 15]]);
 });
 
 test('clipping prefers sentence boundaries, keeps short text and stays within the limit', () => {

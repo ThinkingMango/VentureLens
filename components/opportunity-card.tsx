@@ -13,7 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Confidence } from "@/components/shared";
 import { type WorkspaceOpportunity } from "@/lib/workspace-schema";
-import { reportEvidenceCount } from "@/lib/report-presentation";
+import { reportEvidenceCount, scoreBand } from "@/lib/report-presentation";
 import { useDemo } from "@/components/demo-provider";
 import { cn } from "@/lib/utils";
 import { useCopy } from "@/i18n/use-copy";
@@ -45,6 +45,8 @@ export function OpportunityCard({
               <span className="text-sm text-muted-foreground">/100</span>
             </p>
             <Confidence level={o.confidence} />
+            {/* What the number means; scores are strict, so a raw 55 alone reads as worse than it is. */}
+            <span className="text-sm font-medium text-muted-foreground">{copy(scoreBand(o.score).label)}</span>
           </div>
           <Button
             variant="ghost"

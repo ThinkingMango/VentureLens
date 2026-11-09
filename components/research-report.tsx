@@ -13,8 +13,9 @@ import {
 } from "@/lib/report-presentation";
 import { useCopy, useFormats } from "@/i18n/use-copy";
 import { localeNames } from "@/i18n/config";
-import { reportLanguage } from "@/lib/research-core";
+import { REVIEW_MAX_PENALTY, reportLanguage } from "@/lib/research-core";
 import { ModelTag } from "@/components/model-tag";
+import { ScoreScale } from "@/components/score-scale";
 const dimensions: Record<string, string> = {
   pain: "Buyer pain",
   demand: "Demand",
@@ -86,6 +87,7 @@ export function ResearchReportView({ report }: { report: ResearchReport }) {
             {copy("{date} UTC", { date: format.date(report.generated_at, true) })}
           </time>
         </div>
+        <ScoreScale methodology={report.methodology} />
         <p className="text-sm text-muted-foreground">
           {copy("Report language: {language}", {
             language: localeNames[reportLanguage(report.language)],
@@ -119,9 +121,14 @@ export function ResearchReportView({ report }: { report: ResearchReport }) {
               ))}
             </dl>
             <p className="text-sm text-muted-foreground">
-              {copy(
-                "Scores are capped at 70 with limited evidence and 85 otherwise. Adversarial review can only deduct points.",
-              )}
+              {report.methodology === "evidence-driven-v1"
+                ? copy(
+                    "Scores are capped at 70 with limited evidence and 85 otherwise. Adversarial review can only deduct points.",
+                  )
+                : copy(
+                    "Scores are capped at 70 with limited evidence and 85 otherwise. Adversarial review can only deduct points, at most {points}, and not again for evidence gaps the ratings already reflect.",
+                    { points: REVIEW_MAX_PENALTY },
+                  )}
             </p>
             <p className="text-sm text-muted-foreground">
               {copy("Research model: {model}", { model: report.model })}

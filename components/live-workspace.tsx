@@ -24,7 +24,7 @@ import { OpportunityCard } from "@/components/opportunity-card";
 import { Input } from "@/components/ui/input";
 import type { WorkspaceOpportunity } from "@/lib/workspace-schema";
 import { stageLabels } from "@/lib/research-core";
-import { reportEvidenceCount } from "@/lib/report-presentation";
+import { reportEvidenceCount, scoreBand, scoreBreakdown } from "@/lib/report-presentation";
 import { OpportunityEvidence } from "@/components/opportunity-evidence";
 import { cn } from "@/lib/utils";
 import { ResearchAccessCard } from "@/components/research-access-card";
@@ -432,6 +432,7 @@ export function LiveOpportunityDetail({
     completed.includes(`${item.id}-${i}`),
   ).length;
   const sources = reportEvidenceCount([item]);
+  const breakdown = scoreBreakdown(item);
   return (
     <>
       <Link
@@ -571,6 +572,7 @@ export function LiveOpportunityDetail({
               </span>
               <span className="text-sm text-muted-foreground">/ 100</span>
             </div>
+            <p className="font-medium">{copy(scoreBand(item.score).label)}</p>
             <Confidence level={item.confidence} />
             <dl className="flex flex-col gap-4 border-t pt-5">
               {liveDimensionLabels.map((label, i) => (
@@ -591,13 +593,36 @@ export function LiveOpportunityDetail({
                 </div>
               ))}
             </dl>
-            {typeof item.penalty === "number" && item.penalty > 0 && (
-              <p className="text-sm text-muted-foreground">
-                {copy("Review deduction: {points} points", {
-                  points: item.penalty,
-                })}
-              </p>
-            )}
+            <section aria-labelledby="score-steps-title" className="flex flex-col gap-3 border-t pt-5">
+              <h3 id="score-steps-title" className="text-sm font-semibold">
+                {copy("How this score was reached")}
+              </h3>
+              <dl className="flex flex-col gap-2 text-sm">
+                <div className="flex justify-between gap-3">
+                  <dt className="min-w-0 text-muted-foreground">{copy("Weighted rating before review")}</dt>
+                  <dd className="shrink-0 whitespace-nowrap font-medium tabular-nums">{breakdown.beforeReview}</dd>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <dt className="min-w-0 text-muted-foreground">{copy("Adversarial review deduction")}</dt>
+                  <dd className="shrink-0 whitespace-nowrap font-medium tabular-nums">{breakdown.deduction > 0 ? `−${breakdown.deduction}` : "0"}</dd>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <dt className="min-w-0 text-muted-foreground">
+                    {copy(breakdown.cap === 85 ? "Evidence cap (3+ independent supporting sources)" : "Evidence cap (fewer than 3 independent supporting sources)")}
+                  </dt>
+                  <dd className="shrink-0 whitespace-nowrap font-medium tabular-nums">{breakdown.cap}</dd>
+                </div>
+                <div className="flex justify-between gap-3 border-t pt-2">
+                  <dt className="min-w-0 font-medium">{copy("Score")}</dt>
+                  <dd className="shrink-0 whitespace-nowrap font-semibold tabular-nums">{breakdown.score}</dd>
+                </div>
+              </dl>
+              {breakdown.capped && (
+                <p className="text-sm text-muted-foreground">
+                  {copy("The evidence cap set this score. More independent supporting sources would raise the cap.")}
+                </p>
+              )}
+            </section>
             <p className="text-sm text-muted-foreground">
               {copy(
                 "Scores compare hypotheses, not success probabilities. Validate with buyers.",

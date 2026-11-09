@@ -18,7 +18,7 @@ import {
   discoveryDraftSchema, classificationDraftSchema, evaluationDraftSchema, reviewDraftSchema,
   normalizeDiscovery, normalizeClassification, normalizeEvaluation, normalizeReview,
   groundedClassifications, eligibleEvidence, evidenceGate, weightedScore, safeSourceUrl,
-  scoringWeights, researchErrors, errorCode, researchPolicy, reportLanguage, reportNarrative, confidenceLevel,
+  scoringWeights, scoreParts, REVIEW_MAX_PENALTY, researchErrors, errorCode, researchPolicy, reportLanguage, reportNarrative, confidenceLevel,
   type Candidate, type Evidence, type Mode,
 } from "@/lib/research-core";
 
@@ -326,7 +326,7 @@ export async function executeResearchStage(ctx: Context, key: string): Promise<s
       const ids = batch.map(item => item.candidate_id);
       const sources = evidence.filter(source => batch.some(item => item.candidate_id === source.candidate_id));
       const classifications = classes.filter(item => sources.some(source => source.source_key === item.source_key));
-      const output = await structuredBatch(ctx, `${key}:batch:${offset / 2}`, reviewDraftSchema, draft => normalizeReview(draft, ids), `Independent adversarial review; exactly one item per candidate_id. Actively surface free alternatives, competitors, regulatory risk, flawed causality, vendor bias, assumed revenue, and evidence gaps. Set reject=true when the conclusion cannot be supported by the evidence; otherwise give an integer penalty of 0–30, deductions only. "critique" must be specific; "falsification" must describe one concrete experiment that could disprove this opportunity; keep each under 800 characters. Evaluations=${JSON.stringify({ items: batch })}; evidence classifications=${JSON.stringify(classifications)}; sources=${JSON.stringify(sources.map(source => ({ ...source, excerpt: source.excerpt.slice(0, 900) })))}`, pricing);
+      const output = await structuredBatch(ctx, `${key}:batch:${offset / 2}`, reviewDraftSchema, draft => normalizeReview(draft, ids), `Independent adversarial review; exactly one item per candidate_id. Actively surface free alternatives, competitors, regulatory risk, flawed causality, vendor bias, assumed revenue, and evidence gaps in the critique. Set reject=true when the conclusion cannot be supported by the evidence; otherwise give an integer penalty of 0–${REVIEW_MAX_PENALTY}, deductions only. The evaluation's dimension scores already reflect missing or thin evidence, so do not deduct again for evidence gaps; deduct only for risks those scores did not price in, such as free alternatives, entrenched competitors, regulatory blockers, flawed causality or vendor bias. "critique" must be specific; "falsification" must describe one concrete experiment that could disprove this opportunity; keep each under 800 characters. Evaluations=${JSON.stringify({ items: batch })}; evidence classifications=${JSON.stringify(classifications)}; sources=${JSON.stringify(sources.map(source => ({ ...source, excerpt: source.excerpt.slice(0, 900) })))}`, pricing);
       if (output.items.length < ids.length) log("warn", "review omitted candidates", ctx, { batch: offset / 2, expected: ids, received: output.items.map(item => item.candidate_id) });
       items.push(...output.items);
     }
@@ -342,8 +342,9 @@ export async function executeResearchStage(ctx: Context, key: string): Promise<s
       // Confidence and the score cap follow independent supporting domains only; counter-evidence is shown, never counted.
       const { sources, supportingDomains } = evidenceGate(e.candidate_id, evidence, classes);
       if (!sources.length) return [];
-      const score = weightedScore(e.dimensions, mode, supportingDomains, review.penalty);
-      return [opportunitySchema.parse({ id: crypto.randomUUID(), candidate_id: candidate.key, title: candidate.title, category: e.category, description: e.description, buyer: candidate.buyer, pain: candidate.pain, score, confidence: confidenceLevel(supportingDomains), revenue: e.revenue, cost: e.cost, risk: e.risk, scores: Object.values(e.dimensions), icon: "workflow", evidence: sources, assumptions: e.assumptions, validation: e.validation, rationale: e.rationale, critique: review.critique, falsification: review.falsification, penalty: review.penalty })];
+      // Kept on the opportunity so the report can show how the score was reached.
+      const { score, beforeReview, cap } = scoreParts(e.dimensions, mode, supportingDomains, review.penalty);
+      return [opportunitySchema.parse({ id: crypto.randomUUID(), candidate_id: candidate.key, title: candidate.title, category: e.category, description: e.description, buyer: candidate.buyer, pain: candidate.pain, score, confidence: confidenceLevel(supportingDomains), revenue: e.revenue, cost: e.cost, risk: e.risk, scores: Object.values(e.dimensions), icon: "workflow", evidence: sources, assumptions: e.assumptions, validation: e.validation, rationale: e.rationale, critique: review.critique, falsification: review.falsification, penalty: review.penalty, score_before_review: beforeReview, score_cap: cap })];
     }).sort((a, b) => b.score - a.score);
     if (!opportunities.length) throw new Error("INSUFFICIENT_EVIDENCE");
     const attempts = checked(await client.from("research_usage").select("model,provider").eq("run_id", ctx.runId).eq("user_id", ctx.userId));
