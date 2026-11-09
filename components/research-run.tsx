@@ -267,7 +267,9 @@ export function ResearchRunView({
                 )}
               </p>
               <p className="text-sm text-muted-foreground">
-                {copy("This run did not use up a research run: your allowance was restored. A retry takes the slot again until it completes.")}
+                {data.quota_released === false
+                  ? copy("This run used one of your research runs because your account has reached its limit of returned failed runs. Retrying this run, where offered, does not use another one.")
+                  : copy("This run did not use up a research run: your allowance was restored. A retry takes the slot again until it completes.")}
               </p>
               {data.error_code === "BUDGET_EXCEEDED" && (
                 <p className="max-w-prose text-sm leading-relaxed text-muted-foreground">

@@ -158,8 +158,8 @@ export function Pricing() {
           <section className="grid gap-5 md:grid-cols-3">
             {[
               {
-                title: "Failed runs do not cost a run",
-                text: "If retrieval fails, the model output is rejected, or the evidence is too thin to support a report, the run stops and your run is returned automatically. The same rule will apply to paid credits.",
+                title: "Failed runs are returned",
+                text: "If a run fails on our side, or stops before any paid request, your run is always returned. If retrieval fails, the model output is rejected, or the evidence is too thin to support a report, your run is also returned, up to a limit per account that prevents abuse. The same rule will apply to paid credits.",
               },
               {
                 title: "Your first run is free",

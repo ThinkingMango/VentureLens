@@ -5,10 +5,10 @@ Evidence-first opportunity research for founders exploring GenAI-enabled, recurr
 A founder describes their experience, constraints and goals; VentureLens discovers narrow opportunity hypotheses, retrieves real web evidence for each one, classifies and scores it, runs an adversarial review, and saves a private report with linked sources and a validation plan. Candidates without independent evidence are dropped rather than dressed up.
 
 - **Live app routes:** `/`, `/pricing`, `/privacy`, `/support`, `/login`, `/signup`, `/onboarding`, `/dashboard`, `/research`, `/research/new`, `/research/[id]`, `/research/results`, `/opportunities/[id]`, `/saved`, `/profile`, `/billing`, `/admin`
-- **Contact:** product help at `support@smartmango.ai`, privacy and data requests at `privacy@smartmango.ai` (`lib/contact.ts`). The Privacy Policy (`components/privacy.tsx`) describes the real data flows; update it and `privacyUpdatedAt` whenever a provider, cookie, or stored field changes.
+- **Contact:** product help at `support@smartmango.ai`, privacy and data requests at `privacy@smartmango.ai` (`lib/contact.ts`). The Privacy Policy (`components/privacy.tsx`) describes the real data flows. Its AI-provider paragraphs, processor list and international-transfer clause, and the Support page's "Which AI model runs my research?" answer, are generated on every request from the research policy in `public.app_settings` (`lib/provider-disclosure.ts`), so saving a change at `/admin` updates them immediately; if the policy cannot be read they disclose every provider. Update the static text and `privacyUpdatedAt` whenever a cookie, stored field, or non-AI processor changes.
 - **Synthetic demo:** everything under `/demo/*` runs on fixed fixtures with no account and no AI calls.
 - **Languages:** English, Simplified Chinese, Traditional Chinese (interface). Source excerpts are kept in their original language.
-- **Status:** beta. Every confirmed account receives one free research run (`research_dev_access`, granted by a database trigger); failed runs are returned automatically; payments are not connected. See [`plan.md`](./plan.md) for the roadmap and [`docs/REVIEW.md`](./docs/REVIEW.md) for the November 2026 holistic review (a historical snapshot; §8 there records what has since been fixed).
+- **Status:** beta. Every confirmed account receives one free research run (`research_dev_access`, granted by a database trigger); failed runs are returned automatically (failures on our side and runs that spent nothing always; other failed runs up to `max_refunds` per account, default 3); payments are not connected. See [`plan.md`](./plan.md) for the roadmap and [`docs/REVIEW.md`](./docs/REVIEW.md) for the November 2026 holistic review (a historical snapshot; §8 there records what has since been fixed).
 
 ## Stack
 
@@ -60,6 +60,8 @@ update public.research_dev_access set max_runs = 20, expires_at = now() + interv
 where user_id = '<auth.users.id>';
 ```
 
+A failed run hands its slot back when the failure was on our side (dispatch, workflow, provider outage, configuration or credits) or when it spent nothing. Any other failed run, such as one whose evidence was too thin, is returned only while `runs_refunded < max_refunds` (default 3, bounded 0–100), so one account cannot start paid runs without limit. A failed run that keeps its slot can still be retried at no extra cost. Raise `max_refunds` for an account the same way as `max_runs`.
+
 ## Administrators and settings
 
 Administrator access is granted only by a server-managed claim in `app_metadata`, set with the service role or in the Supabase dashboard: `app_metadata.role = "admin"` (use this one), or the legacy `app_metadata.is_admin = true`, which `lib/admin-access.ts` still accepts. Either also requires a confirmed email; no email address is special, and `user_metadata` never grants access. Administrators manage the research policy (primary provider, fallback, models, per-run budget cap) at `/admin`, which is stored in the service-role-only `public.app_settings` table under the key `research`. The page shows what a complete run is expected to cost and refuses a primary model that the per-run budget cannot pay for. At the $0.25 default only Qwen 3.8 Flash can finish a run; Gemini Flash-Lite needs about $0.40 because Google Search grounding is billed per query. See [`docs/GENERATION_PIPELINE_REVIEW.md`](./docs/GENERATION_PIPELINE_REVIEW.md).
@@ -78,6 +80,8 @@ pnpm test                # unit tests (no network)
 pnpm build               # production build
 pnpm test:integration    # Supabase RLS/integration test — needs credentials and a test project
 pnpm test:research:e2e   # runs a real research job — incurs provider cost
+TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:5432/postgres pnpm test:sql
+                         # runs every migration on a throwaway database and tests the run-quota SQL
 ```
 
 ## Repository layout
@@ -100,7 +104,7 @@ docs/             reviews and operating documentation
 3. Stages run in order with a checkpoint after each: `discovery` → `retrieval:cN` (one per candidate) → `classification` → `evaluation` → `scoring` → `review` → `finalizing`.
 4. Before the first request, `initializeResearch` checks that the configured models can finish a run within its budget (`lib/research-budget.ts`); if none can, the run stops uncharged. Every model or search call then reserves budget through `reserve_research_usage`; the run stops with `BUDGET_EXCEEDED` if a reservation does not fit.
    Models answer against lenient draft schemas that the server normalises (`lib/research-core.ts`), so a length overrun or a skipped id no longer fails a run; a hypothesis whose search finds nothing is skipped.
-5. `finish_research` writes the report and `opportunities` rows only when at least one candidate survives the evidence gate (two independent domains, one non-vendor supporting source) and the review.
+5. `finish_research` writes the report and `opportunities` rows only when at least one candidate survives the evidence gate (supporting sources from two independent domains, one of them non-vendor pain or demand evidence) and the review. Contradicting and neutral sources are saved with their stance and shown as counter-evidence, but never help a candidate pass, and confidence and the score cap follow independent supporting domains only.
 
 The report is written in the language recorded on the run (`configuration.brief.language`, defaulting to the interface language at submission). Source excerpts are always kept verbatim in their original language.
 

@@ -32,7 +32,7 @@ const narratives: Record<ReportLanguage, {
     short: " Evidence did not support 5–8 opportunities; the list was not padded.",
     limitations: [
       "Web excerpts are not full due diligence, and search indexes can lag.",
-      "An opportunity is included only with evidence from at least two independent domains, including non-vendor pain or demand signals.",
+      "An opportunity is included only when supporting evidence comes from at least two independent domains, including non-vendor pain or demand signals. Contradicting sources are shown but never raise confidence.",
       "No buyer interviews were conducted; willingness to pay and real revenue are unverified.",
       "Usage is estimated and excludes Vercel hosting and Workflow fees.",
     ],
@@ -42,7 +42,7 @@ const narratives: Record<ReportLanguage, {
     short: "证据不足以支持 5–8 个机会，没有凑数。",
     limitations: [
       "网页摘录并非完整尽调，检索索引可能滞后。",
-      "至少两个独立域名且含非供应商的痛点/需求证据才纳入报告。",
+      "至少两个独立域名的支持性证据（含非供应商的痛点/需求证据）才纳入报告；相反证据会列出，但不会提高可信度。",
       "未开展买方访谈，未验证支付意愿或真实收入。",
       "用量为估算，不包含 Vercel 托管和 Workflow 费用。",
     ],
@@ -52,7 +52,7 @@ const narratives: Record<ReportLanguage, {
     short: "證據不足以支持 5–8 個機會，沒有湊數。",
     limitations: [
       "網頁摘錄並非完整盡職調查，檢索索引可能滯後。",
-      "至少兩個獨立網域且含非供應商的痛點/需求證據才納入報告。",
+      "至少兩個獨立網域的支持性證據（含非供應商的痛點/需求證據）才納入報告；相反證據會列出，但不會提高可信度。",
       "未進行買方訪談，未驗證付費意願或真實收入。",
       "用量為估算，不包含 Vercel 託管和 Workflow 費用。",
     ],
@@ -280,25 +280,46 @@ export function groundedClassifications(evidence: Evidence[], items: Classificat
     return [{ ...item, quote }];
   });
 }
-export function eligibleEvidence(candidate: string, evidence: Evidence[], classifications: Classification[]) {
+export type GatedEvidence = Evidence & { stance: Classification["stance"] };
+/**
+ * The evidence gate for one candidate.
+ *
+ * A source counts as support only when the classifier marked it relevant and "supports" the candidate. Contradicting
+ * and neutral sources stay attached so the reader can see them, but they never help a candidate pass the gate and
+ * never raise its confidence or score cap: counter-evidence must not read as corroboration.
+ *
+ * A candidate passes when supporting sources come from at least two independent domains (registrable domain, so
+ * subdomains of one publisher count once) and at least one of them is first-hand or independent (non-vendor)
+ * evidence of buyer pain or demand. `supportingDomains` is the number of independent supporting domains, which sets
+ * the confidence level and the score cap.
+ */
+export function evidenceGate(candidate: string, evidence: Evidence[], classifications: Classification[]): { sources: GatedEvidence[]; supportingDomains: number } {
   const byKey = new Map(groundedClassifications(evidence, classifications).map(c => [c.source_key, c]));
-  const domains = new Set<string>();
   const urls = new Set<string>();
-  const relevant = evidence.filter(e => {
-    if (e.candidate_id !== candidate || !byKey.get(e.source_key)?.relevant) return false;
+  const relevant: { source: GatedEvidence; domain: string }[] = [];
+  for (const e of evidence) {
+    const classification = byKey.get(e.source_key);
+    if (e.candidate_id !== candidate || !classification?.relevant) continue;
     const url = safeSourceUrl(e.url);
-    if (!url || urls.has(url)) return false;
+    if (!url || urls.has(url)) continue;
     const domain = getDomain(new URL(url).hostname.replace(/\.$/, ''), { allowPrivateDomains: true });
-    if (!domain) return false;
+    if (!domain) continue;
     urls.add(url);
-    domains.add(domain);
-    return true;
+    relevant.push({ source: { ...e, stance: classification.stance }, domain });
+  }
+  const supporting = relevant.filter(({ source }) => source.stance === 'supports');
+  const supportingDomains = new Set(supporting.map(({ domain }) => domain)).size;
+  const demand = supporting.some(({ source }) => {
+    const c = byKey.get(source.source_key)!;
+    return ['pain', 'demand'].includes(c.kind) && ['primary', 'secondary'].includes(c.reliability);
   });
-  const demand = relevant.some(e => {
-    const c = byKey.get(e.source_key)!;
-    return c.stance === 'supports' && ['pain', 'demand'].includes(c.kind) && ['primary', 'secondary'].includes(c.reliability);
-  });
-  return domains.size >= 2 && demand ? relevant : [];
+  return supportingDomains >= 2 && demand
+    ? { sources: relevant.map(({ source }) => source), supportingDomains }
+    : { sources: [], supportingDomains: 0 };
+}
+/** The sources shown for a candidate that passes the gate (supporting first-class, counter-evidence kept), else none. */
+export function eligibleEvidence(candidate: string, evidence: Evidence[], classifications: Classification[]) {
+  return evidenceGate(candidate, evidence, classifications).sources;
 }
 export function weightedScore(dimensions: Evaluation['dimensions'], mode: Mode, evidenceCount: number, penalty = 0) {
   const weights = scoringWeights[mode];

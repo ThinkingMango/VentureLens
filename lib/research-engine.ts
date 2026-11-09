@@ -16,7 +16,7 @@ import {
   methodology, discoverySchema, classificationSchema, evaluationSchema, reviewSchema,
   discoveryDraftSchema, classificationDraftSchema, evaluationDraftSchema, reviewDraftSchema,
   normalizeDiscovery, normalizeClassification, normalizeEvaluation, normalizeReview,
-  groundedClassifications, eligibleEvidence, weightedScore, safeSourceUrl,
+  groundedClassifications, eligibleEvidence, evidenceGate, weightedScore, safeSourceUrl,
   scoringWeights, researchErrors, errorCode, researchPolicy, reportLanguage, reportNarrative, confidenceLevel,
   type Candidate, type Evidence, type Mode,
 } from "@/lib/research-core";
@@ -316,7 +316,7 @@ export async function executeResearchStage(ctx: Context, key: string): Promise<s
     await checkpoint(ctx, key, { items });
   } else if (key === "scoring") {
     const evaluations = evaluationSchema.parse(await previous(ctx, "evaluation")).items;
-    await checkpoint(ctx, key, { weights: scoringWeights[mode], items: evaluations.map(e => ({ candidate_id: e.candidate_id, score: weightedScore(e.dimensions, mode, eligibleEvidence(e.candidate_id, evidence, classes).length) })) });
+    await checkpoint(ctx, key, { weights: scoringWeights[mode], items: evaluations.map(e => ({ candidate_id: e.candidate_id, score: weightedScore(e.dimensions, mode, evidenceGate(e.candidate_id, evidence, classes).supportingDomains) })) });
   } else if (key === "review") {
     const evaluations = evaluationSchema.parse(await previous(ctx, "evaluation"));
     const items: z.infer<typeof reviewSchema>["items"] = [];
@@ -338,10 +338,11 @@ export async function executeResearchStage(ctx: Context, key: string): Promise<s
       const candidate = eligible.find(c => c.key === e.candidate_id);
       const review = reviews.find(r => r.candidate_id === e.candidate_id);
       if (!candidate || !review || review.reject) return [];
-      const sources = eligibleEvidence(e.candidate_id, evidence, classes);
+      // Confidence and the score cap follow independent supporting domains only; counter-evidence is shown, never counted.
+      const { sources, supportingDomains } = evidenceGate(e.candidate_id, evidence, classes);
       if (!sources.length) return [];
-      const score = weightedScore(e.dimensions, mode, sources.length, review.penalty);
-      return [opportunitySchema.parse({ id: crypto.randomUUID(), candidate_id: candidate.key, title: candidate.title, category: e.category, description: e.description, buyer: candidate.buyer, pain: candidate.pain, score, confidence: confidenceLevel(sources.length), revenue: e.revenue, cost: e.cost, risk: e.risk, scores: Object.values(e.dimensions), icon: "workflow", evidence: sources, assumptions: e.assumptions, validation: e.validation, rationale: e.rationale, critique: review.critique, falsification: review.falsification, penalty: review.penalty })];
+      const score = weightedScore(e.dimensions, mode, supportingDomains, review.penalty);
+      return [opportunitySchema.parse({ id: crypto.randomUUID(), candidate_id: candidate.key, title: candidate.title, category: e.category, description: e.description, buyer: candidate.buyer, pain: candidate.pain, score, confidence: confidenceLevel(supportingDomains), revenue: e.revenue, cost: e.cost, risk: e.risk, scores: Object.values(e.dimensions), icon: "workflow", evidence: sources, assumptions: e.assumptions, validation: e.validation, rationale: e.rationale, critique: review.critique, falsification: review.falsification, penalty: review.penalty })];
     }).sort((a, b) => b.score - a.score);
     if (!opportunities.length) throw new Error("INSUFFICIENT_EVIDENCE");
     const attempts = checked(await client.from("research_usage").select("model,provider").eq("run_id", ctx.runId).eq("user_id", ctx.userId));

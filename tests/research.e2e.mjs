@@ -4,7 +4,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { createClient } from "@supabase/supabase-js";
 import { createServerClient } from "@supabase/ssr";
 import { emptyBrief, emptyProfile, opportunitySchema } from "../lib/workspace-schema.ts";
-import { eligibleEvidence, groundedClassifications, weightedScore } from "../lib/research-core.ts";
+import { evidenceGate, groundedClassifications, weightedScore } from "../lib/research-core.ts";
 import { qwenModelIds, geminiModelIds } from "../lib/research-models.ts";
 const allowedModels = [...qwenModelIds, ...geminiModelIds];
 const allowedProviders = ["dashscope-beijing", "google-gemini"];
@@ -132,13 +132,13 @@ try {
   const evaluations = stages.find(stage => stage.stage_key === "evaluation").output.items;
   const reviews = stages.find(stage => stage.stage_key === "review").output.items;
   for (const opportunity of opportunities) {
-    const sources = eligibleEvidence(opportunity.candidate_id, evidence, classes);
-    assert.ok(sources.length >= 2, "机会必须满足独立证据及非供应商需求门槛");
+    const { sources, supportingDomains } = evidenceGate(opportunity.candidate_id, evidence, classes);
+    assert.ok(supportingDomains >= 2, "机会必须满足两个独立支持域名及非供应商需求门槛");
     assert.deepEqual(opportunity.evidence.map(e => e.source_key).sort(), sources.map(e => e.source_key).sort(), "报告引用必须来自实际入库的已核验证据");
     const evaluation = evaluations.find(e => e.candidate_id === opportunity.candidate_id);
     const review = reviews.find(r => r.candidate_id === opportunity.candidate_id);
     assert.ok(evaluation && review && !review.reject, "机会必须通过商业评估与反向审查");
-    assert.equal(opportunity.score, weightedScore(evaluation.dimensions, "combined", sources.length, review.penalty), "最终评分必须按真实检查点重新计算一致");
+    assert.equal(opportunity.score, weightedScore(evaluation.dimensions, "combined", supportingDomains, review.penalty), "最终评分必须按真实检查点重新计算一致");
   }
   const storedOpportunities = checked(await fresh.from("opportunities").select("id,payload").eq("run_id", runId).eq("user_id", userId), "读取落库机会失败");
   assert.deepEqual(storedOpportunities.map(o => o.payload).sort((a, b) => a.id.localeCompare(b.id)), [...opportunities].sort((a, b) => a.id.localeCompare(b.id)), "报告与机会表必须完整一致");
