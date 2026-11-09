@@ -5,13 +5,16 @@ const config: NextConfig = {
   async headers() {
     return [
       {
-        source:
-          "/:path(dashboard|research|saved|profile|billing|onboarding|opportunities|reset-password|login|signup)/:rest*",
-        headers: [{ key: "X-Frame-Options", value: "SAMEORIGIN" }],
-      },
-      {
         source: "/:path*",
         headers: [
+          // No page may be framed by another site (clickjacking), including /admin and /auth/confirm, which an
+          // allowlist of routes previously missed. X-Frame-Options covers browsers without frame-ancestors.
+          { key: "X-Frame-Options", value: "SAMEORIGIN" },
+          // Only directives that cannot break Next.js's inline scripts. A script-src policy needs per-request nonces.
+          {
+            key: "Content-Security-Policy",
+            value: "frame-ancestors 'self'; base-uri 'self'; object-src 'none'; form-action 'self'",
+          },
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           { key: "Strict-Transport-Security", value: "max-age=63072000" },

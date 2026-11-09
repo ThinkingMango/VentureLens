@@ -52,9 +52,11 @@ export function OpportunityEvidence({
               <p className="break-all text-sm text-muted-foreground">
                 {source.source_key} · {source.url}
               </p>
-              <blockquote className="whitespace-pre-wrap text-sm leading-relaxed">
-                {source.excerpt}
-              </blockquote>
+              {source.excerpt && (
+                <blockquote className="whitespace-pre-wrap text-sm leading-relaxed">
+                  {source.excerpt}
+                </blockquote>
+              )}
               <p className="text-sm text-muted-foreground">
                 {copy("Retrieved: {date} UTC · Published: {published}", {
                   date: format.date(source.retrieved_at, true),

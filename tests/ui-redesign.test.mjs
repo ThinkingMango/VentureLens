@@ -61,7 +61,8 @@ test("opportunity cards keep essential mobile evidence visible", () => {
 });
 
 test("research results default to cards and retain accessible comparison", () => {
-  const results = read("components/research-results.tsx");
+  // The demo results view lives in its own lazily loaded module; the live view is LiveResearchResults.
+  const results = read("components/demo-research-results.tsx");
   assert.match(results, /useState<"cards" \| "compare">\("cards"\)/);
   assert.match(results, /Opportunity comparison; scroll horizontally/);
   assert.match(results, /Clear filters/);
@@ -69,11 +70,11 @@ test("research results default to cards and retain accessible comparison", () =>
 
 
 test("dashboard metrics stay visible on mobile in demo and live workspaces", () => {
-  for (const path of ["components/dashboard.tsx", "components/live-workspace.tsx"]) {
+  for (const path of ["components/demo-dashboard.tsx", "components/live-workspace.tsx"]) {
     const source = read(path);
     assert.doesNotMatch(source, /<MobileDisclosure title=\{copy\("Workspace statistics"\)\}>/);
   }
-  const dashboard = read("components/dashboard.tsx");
+  const dashboard = read("components/demo-dashboard.tsx");
   assert.match(dashboard, /terminal-stats/);
 });
 

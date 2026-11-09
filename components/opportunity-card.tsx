@@ -16,7 +16,6 @@ import { type WorkspaceOpportunity } from "@/lib/workspace-schema";
 import { reportEvidenceCount } from "@/lib/report-presentation";
 import { useDemo } from "@/components/demo-provider";
 import { cn } from "@/lib/utils";
-import { useDemoContent } from "@/i18n/demo";
 import { useCopy } from "@/i18n/use-copy";
 
 export function OpportunityCard({
@@ -26,8 +25,8 @@ export function OpportunityCard({
 }) {
   const copy = useCopy();
   const { saved, toggleSave, isDemo, busy } = useDemo();
-  const content = useDemoContent();
-  const o = isDemo ? content.opportunity(original) : original;
+  // Demo callers pass fixtures already localized by useDemoContent, so the card never loads the demo dataset.
+  const o = original;
   const isSaved = saved.includes(o.id);
 
   return (

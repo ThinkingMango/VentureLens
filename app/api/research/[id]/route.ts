@@ -16,22 +16,22 @@ export async function GET(
 ) {
   const { id } = await params;
   if (!z.uuid().safeParse(id).success)
-    return json({ code: "NOT_FOUND", error: "找不到研究任务。" }, 404);
+    return json({ code: "NOT_FOUND", error: "Research task not found." }, 404);
   try {
     const supabase = await createClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    if (!user) return json({ code: "AUTH_REQUIRED", error: "请先登录。" }, 401);
+    if (!user) return json({ code: "AUTH_REQUIRED", error: "Please log in first." }, 401);
     const detail = await researchDetail(supabase, user.id, id);
     return detail
       ? json(detail)
-      : json({ code: "NOT_FOUND", error: "找不到研究任务。" }, 404);
+      : json({ code: "NOT_FOUND", error: "Research task not found." }, 404);
   } catch {
     return json(
       {
         code: "STATUS_UNAVAILABLE",
-        error: "暂时无法读取研究状态，请刷新重试。",
+        error: "Research status is temporarily unavailable. Refresh to try again.",
       },
       503,
     );

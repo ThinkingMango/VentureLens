@@ -75,7 +75,8 @@ export const opportunitySchema = z.object({
   icon: z.enum(["file", "headset", "chart", "workflow"]),
   candidate_id: z.string().optional(),
   // `stance` is recorded from v2 of the evidence gate; reports saved earlier have no stance on their sources.
-  evidence: z.array(z.object({ source_key: z.string(), url: z.string().url(), title: z.string(), excerpt: z.string(), retrieved_at: z.string(), published_at: z.string().nullable(), stance: z.enum(["supports", "contradicts", "neutral"]).optional() })).optional(),
+  // `excerpt` is present on the opportunity page and omitted from the workspace list (see workspaceOpportunity).
+  evidence: z.array(z.object({ source_key: z.string(), url: z.string().url(), title: z.string(), excerpt: z.string().optional(), retrieved_at: z.string(), published_at: z.string().nullable(), stance: z.enum(["supports", "contradicts", "neutral"]).optional() })).optional(),
   assumptions: z.array(z.string()).optional(),
   validation: z.array(z.string()).optional(),
   rationale: z.string().optional(),

@@ -1,4 +1,4 @@
-import { researchErrors } from "../lib/research-core";
+import { researchErrors } from "../lib/research-core.ts";
 export const feedback: Record<string, string> = {
   ...researchErrors,
   AUTH_REQUIRED: "Your session has expired. Please log in again.",

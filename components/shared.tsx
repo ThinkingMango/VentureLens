@@ -15,7 +15,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { demoNotice } from "@/lib/demo-data";
+import { demoNotice } from "@/lib/demo-notice";
 import { useOptionalWorkspace } from "@/components/demo-provider";
 export function Brand({ compact = false }: { compact?: boolean }) {
   const copy = useCopy();

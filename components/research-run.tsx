@@ -212,7 +212,7 @@ export function ResearchRunView({
               {copy(
                 data.status === "failed"
                   ? "Research incomplete"
-                  : (stageLabels[data.stage] ?? "等待处理"),
+                  : (stageLabels[data.stage] ?? "Queued"),
               )}
             </h2>
           </div>

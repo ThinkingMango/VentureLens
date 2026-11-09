@@ -229,3 +229,33 @@ test("demo narratives are translated while IDs, scores, and source counts remain
     }
   }
 });
+
+test("labels and messages passed to copy() through variables are translated in every catalogue", async () => {
+  // The literal-call test above cannot see these: they reach copy() as variables, and useCopy falls back silently.
+  const { stageLabels, researchErrors } = await import("../lib/research-core.ts");
+  const { feedback } = await import("../i18n/errors.ts");
+  const dynamic = { ...stageLabels, ...researchErrors, ...feedback };
+  for (const [name, source] of Object.entries(dynamic))
+    for (const locale of locales)
+      assert.ok(catalogs[locale].ui[messageKey(source)], `${locale}: ${name} → ${source}`);
+});
+
+test("translation sources are written in English, never in Chinese", () => {
+  // A Chinese source string shows Chinese to English users whenever its catalogue entry is missing.
+  const han = /[一-鿿]/;
+  const files = ["app", "components", "lib", "i18n"].flatMap(dir =>
+    readdirSync(dir, { recursive: true }).filter(f => /\.tsx?$/.test(f)).map(f => `${dir}/${f}`),
+  ).filter(path => !["i18n/demo.ts", "i18n/glossary.ts", "i18n/config.ts", "lib/demo-data.ts"].includes(path));
+  for (const path of files) {
+    const source = ts.createSourceFile(path, readFileSync(path, "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+    function visit(node) {
+      if (ts.isCallExpression(node) && node.expression.getText(source) === "copy" && ts.isStringLiteral(node.arguments[0]))
+        assert.doesNotMatch(node.arguments[0].text, han, `${path}: copy("${node.arguments[0].text}")`);
+      ts.forEachChild(node, visit);
+    }
+    visit(source);
+  }
+  return import("../lib/research-core.ts").then(({ stageLabels, researchErrors }) => {
+    for (const value of [...Object.values(stageLabels), ...Object.values(researchErrors)]) assert.doesNotMatch(value, han, value);
+  });
+});

@@ -7,8 +7,8 @@ import { ResearchRunView } from "@/components/research-run";
 export async function generateMetadata() {
   const copy = await getCopy();
   return {
-    title: copy("研究任务与报告"),
-    description: copy("VentureLens 私有证据研究进度、来源与完整报告。"),
+    title: copy("Research run & report"),
+    description: copy("Private VentureLens evidence research progress, sources, and complete reports."),
   };
 }
 export default async function Page({

@@ -353,15 +353,15 @@ export function LiveDashboard() {
               ? copy("Task status: {status}", {
                   status: copy(
                     firstRun.status === "failed"
-                      ? "研究中止"
-                      : (stageLabels[firstRun.stage] ?? "等待处理"),
+                      ? "Research stopped"
+                      : (stageLabels[firstRun.stage] ?? "Queued"),
                   ),
                 })
-              : copy("简报已保存，可创建新的研究任务。")}
+              : copy("Your brief is saved. You can create a new research task.")}
           </p>
           <Button variant="outline" asChild className="w-fit">
             <Link href={firstRun ? `/research/${firstRun.id}` : "/research"}>
-              {copy("查看研究任务")}
+              {copy("Open research task")}
               <ArrowRight />
             </Link>
           </Button>
@@ -485,7 +485,7 @@ export function LiveResearchResults({
                     "Save an opportunity from your completed research to add it here. Demonstration opportunities remain in the demo and are never copied into your account.",
                   )
                 : copy(
-                    "尚无通过证据核验的报告。可从研究历史查看任务进度或失败原因；检索不可用或证据不足时不会生成虚构结果。",
+                    "No evidence-verified reports yet. Open research history for progress or failure details. Unavailable retrieval or insufficient evidence never produces fabricated results.",
                   )
           }
         />
