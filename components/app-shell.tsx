@@ -84,7 +84,7 @@ export function AppShell({
                 : nav.find((n) => n.href === path)?.title || "Workspace";
   const sidebar = (
     <>
-      <div className="flex h-20 items-center justify-between px-6">
+      <div className="flex h-16 items-center justify-between px-6">
         <Brand />
         <Button
           variant="ghost"
@@ -96,8 +96,8 @@ export function AppShell({
           <X />
         </Button>
       </div>
-      <div className="flex flex-1 flex-col px-4 py-5">
-        <div className="mb-7 flex items-center gap-3 rounded-lg border p-3">
+      <div className="flex flex-1 flex-col px-4 py-3">
+        <div className="mb-5 flex items-center gap-3 rounded-lg border p-3">
           <span className="flex size-8 items-center justify-center rounded-md bg-secondary font-semibold text-primary">
             {profile.name.slice(0, 1) || copy("F")}
           </span>
@@ -281,7 +281,7 @@ export function AppShell({
         </DialogContent>
       </Dialog>
       <div className="lg:pl-64">
-        <header className="sticky top-0 z-20 flex min-h-20 flex-wrap items-center justify-between gap-3 border-b bg-card/95 px-4 py-3 backdrop-blur md:px-8">
+        <header className="sticky top-0 z-20 flex min-h-16 flex-wrap items-center justify-between gap-3 border-b bg-card/95 px-4 py-3 backdrop-blur md:px-8">
           <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             <Button
               variant="ghost"
@@ -303,7 +303,7 @@ export function AppShell({
             <LanguageSwitcher />
             <Badge
               variant="secondary"
-              className="gap-1.5 rounded-md font-normal"
+              className="hidden gap-1.5 rounded-md font-normal sm:inline-flex"
             >
               <FlaskConical className="size-3.5" />
               <span>
@@ -312,7 +312,7 @@ export function AppShell({
             </Badge>
             <button
               aria-label={copy("Help & resources")}
-              className="flex size-11 items-center justify-center rounded-md text-muted-foreground hover:bg-secondary"
+              className="hidden size-11 items-center justify-center rounded-md text-muted-foreground hover:bg-secondary sm:flex"
               onClick={(event) => {
                 helpTrigger.current = event.currentTarget;
                 setHelp(true);
@@ -327,7 +327,7 @@ export function AppShell({
         </header>
         <main
           id="main-content"
-          className="mx-auto flex min-w-0 max-w-[1600px] flex-col gap-6 p-5 md:gap-8 md:p-8 xl:p-10"
+          className="mx-auto flex min-w-0 max-w-[1600px] flex-col gap-5 p-4 md:gap-6 md:p-7"
         >
           {children}
           <footer className="flex flex-wrap items-center justify-between gap-2 border-t pt-5 text-sm text-muted-foreground">

@@ -1,108 +1,145 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { ArrowUpRight, Link2, Swords, FileText } from "lucide-react";
+import { ArrowUpRight, FileText } from "lucide-react";
 import { useCopy } from "@/i18n/use-copy";
 import { useDemoContent } from "@/i18n/demo";
 import { scoreLabels } from "@/lib/demo-data";
-import { Badge } from "@/components/ui/badge";
 
-/** A real link into the demo, with synthetic evidence explicitly identified. */
+/** An interactive, clearly labeled synthetic report using the actual demo fixtures. */
 export function EvidencePreview() {
   const copy = useCopy();
   const { opportunities } = useDemoContent();
-  const lead = opportunities[0];
+  const [selectedId, setSelectedId] = useState(opportunities[0].id);
+  const lead =
+    opportunities.find((opportunity) => opportunity.id === selectedId) ??
+    opportunities[0];
   return (
     <section
       aria-label={copy("Demonstration report")}
-      className="hero-preview overflow-hidden rounded-2xl border bg-card text-left"
+      className="hero-preview overflow-hidden text-left"
     >
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b px-6 py-5">
-        <span className="flex items-center gap-2 text-sm font-medium">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b px-5 py-4 text-xs">
+        <span className="flex items-center gap-2 font-medium">
           <FileText className="size-4 text-primary" />
-          {copy("Research complete")}
+          {copy("Research workspace")}
         </span>
-        <Badge variant="secondary">{copy("Synthetic demo")}</Badge>
+        <span className="text-muted-foreground">
+          {copy("Synthetic demo")} / {copy("4 hypotheses · 12 sample sources")}
+        </span>
       </div>
-      <div className="space-y-5 p-6 sm:p-7">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="mb-2 text-sm text-muted-foreground">
-              {lead.category}
-            </p>
+      <div className="grid lg:grid-cols-[1fr_1.15fr]">
+        <div className="border-b lg:border-b-0 lg:border-r">
+          <div className="flex justify-between gap-4 border-b bg-background/40 px-5 py-3 text-xs text-muted-foreground">
+            <span>{copy("Opportunities")}</span>
+            <span>{copy("Demo score")}</span>
+          </div>
+          <div
+            className="grid sm:grid-cols-2 lg:grid-cols-1"
+            aria-label={copy("Opportunities")}
+          >
+            {opportunities.map((opportunity) => (
+              <button
+                key={opportunity.id}
+                type="button"
+                aria-pressed={lead.id === opportunity.id}
+                aria-controls="preview-detail"
+                onClick={() => setSelectedId(opportunity.id)}
+                className={`flex min-w-0 items-start justify-between gap-3 border-b px-5 py-5 text-left last:border-b-0 hover:bg-secondary/40 ${lead.id === opportunity.id ? "bg-secondary/60 shadow-[inset_2px_0_var(--primary)]" : ""}`}
+              >
+                <span className="min-w-0">
+                  <span className="block text-sm font-medium leading-snug">
+                    {opportunity.title}
+                  </span>
+                  <span className="mt-2 block text-xs text-muted-foreground">
+                    {opportunity.category}
+                  </span>
+                </span>
+                <span className="terminal-number text-lg text-primary">
+                  {opportunity.score}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+        <div
+          id="preview-detail"
+          className="space-y-5 p-5 sm:p-6"
+          aria-live="polite"
+          aria-atomic="true"
+        >
+          <div className="flex items-start justify-between gap-4">
+            <h2 className="max-w-md text-lg font-medium leading-snug">
+              {lead.title}
+            </h2>
             <Link
               href={`/demo/opportunities/${lead.id}`}
-              className="group flex items-start gap-2 text-xl font-semibold leading-snug hover:text-primary sm:text-2xl"
+              aria-label={copy("Read report: {title}", { title: lead.title })}
+              className="flex size-11 shrink-0 items-center justify-center rounded border text-primary hover:bg-secondary"
             >
-              {lead.title}
-              <ArrowUpRight className="mt-1 size-5 shrink-0 transition-transform group-hover:-translate-y-0.5" />
+              <ArrowUpRight className="size-4" />
             </Link>
           </div>
-          <div className="rounded-xl bg-secondary px-4 py-3 text-center text-primary">
-            <strong className="block text-3xl font-semibold tabular-nums">
-              {lead.score}
-            </strong>
-            <span className="text-xs">{copy("Demo score")}</span>
-          </div>
-        </div>
-        <p className="text-sm leading-relaxed text-muted-foreground">
-          {lead.description}
-        </p>
-        <dl className="grid gap-4 border-y py-4 text-sm sm:grid-cols-2">
-          <div>
-            <dt className="text-muted-foreground">{copy("Likely buyer")}</dt>
-            <dd className="mt-1 font-medium">{lead.buyer}</dd>
-          </div>
-          <div>
-            <dt className="text-muted-foreground">
-              {copy("Monthly price hypothesis")}
-            </dt>
-            <dd className="mt-1 font-medium">{lead.revenue}</dd>
-          </div>
-        </dl>
-        <dl className="space-y-3">
-          {scoreLabels.slice(0, 3).map((label, i) => (
-            <div
-              key={label}
-              className="grid grid-cols-[1fr_5rem_2rem] items-center gap-3 text-sm"
-            >
-              <dt className="text-muted-foreground">{copy(label)}</dt>
-              <div className="progress-track" aria-hidden="true">
-                <div
-                  className="progress-fill"
-                  style={{ width: `${lead.scores[i]}%` }}
-                />
-              </div>
-              <dd className="text-right font-medium tabular-nums">
-                {lead.scores[i]}
-              </dd>
+          <p className="max-w-xl text-sm leading-relaxed text-muted-foreground">
+            {lead.description}
+          </p>
+          <dl className="grid gap-4 border-y py-4 text-sm sm:grid-cols-2">
+            <div>
+              <dt className="text-xs text-muted-foreground">
+                {copy("Likely buyer")}
+              </dt>
+              <dd className="mt-1.5">{lead.buyer}</dd>
             </div>
-          ))}
-        </dl>
-        <p className="flex items-start gap-2 rounded-lg bg-warm-soft p-3 text-sm">
-          <Swords className="mt-0.5 size-4 shrink-0 text-warm" />
-          {copy(
-            "Review note: established proposal tools may bundle similar features.",
-          )}
-        </p>
-        <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
-          <span className="flex items-center gap-2 text-muted-foreground">
-            <Link2 className="size-4" />
-            {copy("4 hypotheses · 12 sample sources")}
-          </span>
-          <Link
-            href="/demo/research/results"
-            className="inline-flex min-h-11 items-center gap-1 font-medium text-primary hover:underline"
-          >
-            {copy("View research")}
-            <ArrowUpRight className="size-4" />
-          </Link>
+            <div>
+              <dt className="text-xs text-muted-foreground">
+                {copy("Monthly price hypothesis")}
+              </dt>
+              <dd className="mt-1.5 tabular-nums">{lead.revenue}</dd>
+            </div>
+          </dl>
+          <dl className="grid grid-cols-3 gap-4">
+            {scoreLabels.slice(0, 3).map((label, i) => (
+              <div key={label}>
+                <dt className="mb-2 text-xs text-muted-foreground">
+                  {copy(label)}
+                </dt>
+                <dd className="terminal-number text-lg">
+                  {lead.scores[i]}
+                  <span className="ml-1 text-xs text-muted-foreground">
+                    /100
+                  </span>
+                </dd>
+                <div className="progress-track mt-2" aria-hidden="true">
+                  <div
+                    className="progress-fill"
+                    style={{ width: `${lead.scores[i]}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </dl>
+          <div className="border-l-2 border-warm py-1 pl-3">
+            <p className="mb-1 text-xs text-warm">
+              {copy("Key risk to validate")}
+            </p>
+            <p className="text-sm text-muted-foreground">{lead.risk}</p>
+          </div>
         </div>
-        <p className="border-t pt-4 text-xs leading-relaxed text-muted-foreground">
+      </div>
+      <div className="flex flex-col justify-between gap-3 border-t px-5 py-3 text-xs text-muted-foreground sm:flex-row sm:items-center">
+        <p>
           {copy(
             "Illustrative opportunities and scores. Not verified findings or financial advice.",
           )}
         </p>
+        <Link
+          href="/demo/research/results"
+          className="inline-flex min-h-11 shrink-0 items-center gap-2 text-primary hover:underline"
+        >
+          {copy("View research")}
+          <ArrowUpRight className="size-3.5" />
+        </Link>
       </div>
     </section>
   );

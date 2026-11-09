@@ -153,23 +153,25 @@ export function Landing() {
     <PublicShell>
       <main id="main-content">
         <section className="hero-bg relative overflow-hidden">
-          <div className="hero-layout relative mx-auto max-w-7xl px-5 py-14 md:px-8 md:py-20">
-            <div className="hero-copy">
-              <div className="flex items-center gap-2 rounded-full border bg-card/80 px-3.5 py-1.5 text-sm text-muted-foreground shadow-card backdrop-blur">
-                <span className="demo-dot" />
+          <div className="hero-layout relative mx-auto max-w-7xl px-5 py-8 md:px-8 md:py-12">
+            <div className="terminal-masthead">
+              <span>
                 {copy("Evidence-first opportunity research for founders")}
-              </div>
+              </span>
+              <span>{copy("English · 简体中文 · 繁體中文")}</span>
+            </div>
+            <div className="hero-copy">
               <h1 className="max-w-4xl text-balance text-4xl font-semibold leading-[1.08] tracking-[-0.045em] sm:text-5xl md:text-6xl">
                 {copy("Find a business worth building.")}
                 <br />
                 <span>{copy("Then prove it.")}</span>
               </h1>
-              <p className="max-w-2xl text-pretty text-base leading-relaxed text-muted-foreground md:text-lg">
+              <p className="text-pretty text-sm leading-relaxed text-muted-foreground md:text-base">
                 {copy(
                   "VentureLens turns your experience into a shortlist of GenAI-enabled, recurring-revenue businesses—each backed by linked sources, an explainable score, a critique, and a validation plan.",
                 )}
               </p>
-              <div className="flex flex-wrap gap-3">
+              <div className="hero-actions flex flex-wrap gap-3">
                 <Button asChild size="lg">
                   <Link href="/demo/dashboard">
                     {copy("Explore the live demo")}
@@ -231,13 +233,13 @@ export function Landing() {
               )}
             </p>
           </div>
-          <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-10 grid gap-x-10 sm:grid-cols-2 lg:grid-cols-3">
             {reportParts.map((part) => (
               <article
                 key={part.title}
-                className="surface lift flex flex-col gap-4 p-6"
+                className="flex flex-col gap-3 border-t py-6"
               >
-                <span className="flex size-11 items-center justify-center rounded-xl bg-secondary text-primary">
+                <span className="text-primary">
                   <part.icon className="size-5" />
                 </span>
                 <h3 className="text-lg font-semibold">{copy(part.title)}</h3>
@@ -267,7 +269,7 @@ export function Landing() {
             </div>
             <ol className="mt-12 grid gap-6 md:grid-cols-3">
               {steps.map((f, i) => (
-                <li key={f.title} className="surface flex flex-col gap-5 p-6">
+                <li key={f.title} className="flex flex-col gap-5 border-t py-6">
                   <div className="flex items-center justify-between">
                     <span className="step-number">{i + 1}</span>
                     <f.icon className="size-5 text-muted-foreground" />
@@ -379,7 +381,7 @@ export function Landing() {
             </div>
           </div>
         </section>
-        <section className="mx-5 mb-20 mt-20 flex max-w-7xl flex-col items-center gap-6 rounded-3xl brand-gradient px-6 py-16 text-center text-white md:mx-8 xl:mx-auto">
+        <section className="mx-5 mb-20 mt-20 flex max-w-7xl flex-col items-center gap-6 rounded-lg border bg-card px-6 py-16 text-center text-white md:mx-8 xl:mx-auto">
           <h2 className="text-balance text-3xl font-semibold md:text-4xl">
             {copy("Your next chapter deserves a clearer lens.")}
           </h2>
@@ -393,7 +395,7 @@ export function Landing() {
               asChild
               size="lg"
               variant="outline"
-              className="border-white/20 bg-white text-foreground hover:bg-white/90"
+              className="border-border bg-primary text-primary-foreground hover:bg-[var(--primary-deep)]"
             >
               <Link href="/signup">
                 {copy("Build your founder profile")}
