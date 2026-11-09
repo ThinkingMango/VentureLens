@@ -37,6 +37,7 @@ export function EvidencePreview() {
           </div>
           <div
             className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-1"
+            role="group"
             aria-label={copy("Opportunities")}
           >
             {opportunities.map((opportunity) => (

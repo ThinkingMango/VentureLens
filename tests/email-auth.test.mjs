@@ -141,11 +141,10 @@ test("provider errors give safe, translated recovery guidance", () => {
 });
 
 test("legacy password routes no longer expose password authentication", () => {
+  // They are permanent redirects in next.config.ts (tests/hardening.test.mjs checks the redirect rules), so no page
+  // is left to render.
   for (const route of ["forgot-password", "reset-password", "verify-email"])
-    assert.match(
-      readFileSync(`app/${route}/page.tsx`, "utf8"),
-      /redirect\("\/login"\)/,
-    );
+    assert.ok(!existsSync(`app/${route}`), `app/${route} should not exist`);
   const screen = readFileSync("components/auth-screen.tsx", "utf8");
   assert.doesNotMatch(
     screen,

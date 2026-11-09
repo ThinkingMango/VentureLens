@@ -25,7 +25,7 @@ export function ResearchLibrary() {
             title: run.name,
             sector: run.sector,
             count: 4,
-            date: "Current demo session",
+            date: copy("Current demo session"),
           },
           {
             id: "demo-history",
@@ -34,7 +34,7 @@ export function ResearchLibrary() {
             title: copy("Recurring-revenue tools for small teams"),
             sector: "B2B SaaS",
             count: 4,
-            date: "Sample research history",
+            date: copy("Sample research history"),
           },
         ]
       : (data?.projects ?? []).map((project) => ({
@@ -61,7 +61,7 @@ export function ResearchLibrary() {
               (item) =>
                 item.project_id === project.id && item.status === "completed",
             ).length ?? 0,
-          date: `${format.date(project.created_at)} UTC`,
+          date: copy("{date} UTC", { date: format.date(project.created_at) }),
         }))
   ).filter((r) =>
     `${r.title} ${copy(r.sector)}`
@@ -130,11 +130,12 @@ export function ResearchLibrary() {
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge variant="secondary">{copy(r.status)}</Badge>
                   <span className="text-sm text-muted-foreground">
-                    {r.count}{" "}
-                    {isDemo ? copy("Opportunities") : copy("Completed runs")}
+                    {isDemo
+                      ? copy("{count, plural, one {# opportunity} other {# opportunities}}", { count: r.count })
+                      : copy("{count, plural, one {# completed run} other {# completed runs}}", { count: r.count })}
                   </span>
                 </div>
-                <p className="text-xs text-muted-foreground">{copy(r.date)}</p>
+                <p className="text-xs text-muted-foreground">{r.date}</p>
               </div>
               <ArrowUpRight className="mt-1 size-4 shrink-0 text-primary" />
             </Link>
@@ -175,7 +176,7 @@ export function ResearchLibrary() {
                       <span>
                         <span className="font-medium">{r.title}</span>
                         <span className="mt-1 block text-sm text-muted-foreground">
-                          {copy(r.sector)} · {copy(r.date)}
+                          {copy(r.sector)} · {r.date}
                         </span>
                       </span>
                     </Link>

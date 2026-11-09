@@ -139,6 +139,7 @@ export function DemoDashboard() {
                 <Link
                   href="/research/results"
                   aria-label={copy("Open research results")}
+                  className="-m-3 flex size-11 shrink-0 items-center justify-center rounded-lg hover:bg-secondary"
                 >
                   <ArrowUpRight className="size-5 text-muted-foreground" />
                 </Link>

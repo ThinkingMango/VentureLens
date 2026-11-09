@@ -84,7 +84,7 @@ export function OpportunityDetail({
               {o.description}
             </p>
             <p className="text-sm text-muted-foreground">
-              {o.category} {copy("· Opportunity hypothesis")}
+              {copy("{category} · Opportunity hypothesis", { category: o.category })}
             </p>
           </div>
           <Button

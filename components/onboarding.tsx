@@ -28,6 +28,7 @@ import {
   founderGoals,
   skillSuggestions,
 } from "@/lib/profile-options";
+import { budgetOptions, hoursOptions } from "@/lib/workspace-schema";
 import { cn } from "@/lib/utils";
 const steps = [
   {
@@ -62,7 +63,8 @@ export function Onboarding({ editing = false }: { editing?: boolean }) {
   );
   const stepHeading = useRef<HTMLHeadingElement>(null);
   const previousStep = useRef(step);
-  const StepHeading = editing ? "h2" : "h1";
+  // The first-run page title above the form is the h1, and the profile page owns it in edit mode.
+  const StepHeading = "h2";
   const router = useRouter();
   useEffect(() => {
     if (previousStep.current !== step) stepHeading.current?.focus();
@@ -316,19 +318,8 @@ export function Onboarding({ editing = false }: { editing?: boolean }) {
             )}
             {step === 2 && (
               <>
-                {select("hours", "How much time can you commit each week?", [
-                  "Under 5 hours",
-                  "5–10 hours",
-                  "10–20 hours",
-                  "20–40 hours",
-                  "Full time",
-                ])}
-                {select("budget", "What is your initial budget?", [
-                  "Under $1,000",
-                  "$1,000–5,000",
-                  "$5,000–15,000",
-                  "$15,000+",
-                ])}
+                {select("hours", "How much time can you commit each week?", [...hoursOptions])}
+                {select("budget", "What is your initial budget?", [...budgetOptions])}
               </>
             )}
             {step === 3 && (
@@ -441,9 +432,9 @@ export function Onboarding({ editing = false }: { editing?: boolean }) {
       <main className="mx-auto flex max-w-4xl flex-col gap-6 px-5 py-8">
         <div className="mb-3 flex flex-col items-center gap-3 text-center">
           <span className="eyebrow">{copy("About two minutes")}</span>
-          <h2 className="text-3xl font-semibold md:text-4xl">
+          <h1 className="text-3xl font-semibold md:text-4xl">
             {copy("Better opportunities start with you.")}
-          </h2>
+          </h1>
           <p className="max-w-xl text-muted-foreground">
             {copy("Let’s build a picture of the founder behind the idea.")}{" "}
             {copy(

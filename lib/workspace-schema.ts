@@ -16,6 +16,10 @@ export const profileSchema = z.object({
   goal: z.string().trim().min(1).max(150),
 });
 export type Profile = z.infer<typeof profileSchema>;
+// The fixed answers for available hours and starting budget, read by the onboarding form so it cannot drift from
+// what the API accepts.
+export const hoursOptions = profileSchema.shape.hours.options;
+export const budgetOptions = profileSchema.shape.budget.options;
 export const projectSchema = z.object({
   name: z.string().trim().min(1).max(100),
   sector: z.enum([

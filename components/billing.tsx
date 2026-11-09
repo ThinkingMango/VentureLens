@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PricingCards } from "@/components/pricing";
 import { useDemo } from "@/components/demo-provider";
-import { ResearchAccessCard } from "@/components/live-workspace";
+import { ResearchAccessCard } from "@/components/research-access-card";
 export function Billing() {
   const copy = useCopy();
   const { isDemo } = useDemo();

@@ -14,7 +14,7 @@ import {
 import { useCopy, useFormats } from "@/i18n/use-copy";
 import { localeNames } from "@/i18n/config";
 import { reportLanguage } from "@/lib/research-core";
-import { ModelTag } from "@/components/research-run";
+import { ModelTag } from "@/components/model-tag";
 const dimensions: Record<string, string> = {
   pain: "Buyer pain",
   demand: "Demand",
@@ -83,7 +83,7 @@ export function ResearchReportView({ report }: { report: ResearchReport }) {
             className="text-muted-foreground"
             dateTime={report.generated_at}
           >
-            {format.date(report.generated_at, true)} UTC
+            {copy("{date} UTC", { date: format.date(report.generated_at, true) })}
           </time>
         </div>
         <p className="text-sm text-muted-foreground">
@@ -124,7 +124,7 @@ export function ResearchReportView({ report }: { report: ResearchReport }) {
               )}
             </p>
             <p className="text-sm text-muted-foreground">
-              {copy("Research model")}: {report.model}
+              {copy("Research model: {model}", { model: report.model })}
             </p>
           </div>
         </details>

@@ -79,9 +79,14 @@ export function AuthScreen() {
     setError("");
     setMessage("");
     try {
+      // The override exists for local development only. In a production build it is ignored, so a variable set by
+      // mistake can never send every sign-in link to another address.
+      const developmentRedirect =
+        process.env.NODE_ENV !== "production"
+          ? process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL
+          : undefined;
       const redirect = new URL(
-        process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL ??
-          `${window.location.origin}/auth/callback`,
+        developmentRedirect ?? `${window.location.origin}/auth/callback`,
       );
       redirect.searchParams.set(
         "next",
@@ -361,7 +366,7 @@ export function AuthScreen() {
         <div className="flex flex-col gap-6">
           <ShieldCheck className="size-12 text-primary" strokeWidth={1.3} />
           <h2 className="editorial-title max-w-lg text-5xl leading-[1.08]">
-            {copy("The next great business")} {copy("might be the right one")} {copy("for you.")}
+            {copy("The next great business might be the right one for you.")}
           </h2>
           <p className="max-w-md text-base text-muted-foreground">
             {copy(

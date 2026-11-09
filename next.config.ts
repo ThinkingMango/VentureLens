@@ -2,6 +2,15 @@ import type { NextConfig } from "next";
 import { withWorkflow } from "workflow/next";
 import createNextIntlPlugin from "next-intl/plugin";
 const config: NextConfig = {
+  // Password-era routes. Sign-in is passwordless, so they permanently (308) point to the email sign-in page,
+  // answered by the router without rendering a page.
+  async redirects() {
+    return ["/forgot-password", "/reset-password", "/verify-email"].map((source) => ({
+      source,
+      destination: "/login",
+      permanent: true,
+    }));
+  },
   async headers() {
     return [
       {

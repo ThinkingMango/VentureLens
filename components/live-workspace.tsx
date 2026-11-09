@@ -11,9 +11,7 @@ import {
   Check,
   Circle,
   Compass,
-  FlaskConical,
   Link2,
-  Lock,
   Plus,
   Sparkles,
   Telescope,
@@ -29,6 +27,7 @@ import { stageLabels } from "@/lib/research-core";
 import { reportEvidenceCount } from "@/lib/report-presentation";
 import { OpportunityEvidence } from "@/components/opportunity-evidence";
 import { cn } from "@/lib/utils";
+import { ResearchAccessCard } from "@/components/research-access-card";
 
 export const liveDimensionLabels = [
   "Buyer pain",
@@ -81,83 +80,6 @@ export function WorkspaceEmpty({
         <ArrowRight className="ml-1 inline size-4" />
       </Link>
     </section>
-  );
-}
-
-export function ResearchAccessCard({ compact = false }: { compact?: boolean }) {
-  const copy = useCopy();
-  const format = useFormats();
-  const { data } = useDemo();
-  const access = data?.access;
-  if (!access) return null;
-  if (access.enabled)
-    return (
-      <div
-        className={cn(
-          "flex flex-col gap-3 rounded-xl border border-success/30 bg-success-soft p-4",
-          compact && "p-4",
-        )}
-      >
-        <div className="flex items-center justify-between gap-2">
-          <span className="flex items-center gap-2 font-medium">
-            <FlaskConical className="size-4 text-success" />
-            {copy("Live research enabled")}
-          </span>
-          <Badge
-            variant="outline"
-            className="border-success/30 bg-card text-success"
-          >
-            {copy("Included")}
-          </Badge>
-        </div>
-        <p className="text-sm text-muted-foreground">
-          {copy(
-            "{count, plural, one {# research run remaining} other {# research runs remaining}}",
-            { count: access.remaining },
-          )}
-          {access.expiresAt
-            ? ` · ${copy("Access until {date}", { date: format.date(access.expiresAt) })}`
-            : ""}
-        </p>
-        {!compact && (
-          <div className="progress-track" aria-hidden="true">
-            <div
-              className="progress-fill"
-              style={{
-                width: `${access.maxRuns ? (access.remaining / access.maxRuns) * 100 : 0}%`,
-              }}
-            />
-          </div>
-        )}
-      </div>
-    );
-  return (
-    <div className="flex flex-col gap-3 rounded-xl border bg-background p-4">
-      <span className="flex items-center gap-2 font-medium">
-        <Lock className="size-4 text-muted-foreground" />
-        {access.maxRuns > 0
-          ? copy("No research runs left")
-          : copy("No research run on this account yet")}
-      </span>
-      <p className="text-sm leading-relaxed text-muted-foreground">
-        {access.maxRuns > 0
-          ? copy(
-              "You have used your free research run. Failed runs are returned automatically, within a limit per account, and paid credits are planned. Your reports and briefs stay saved.",
-            )
-          : copy(
-              "Every confirmed account receives one free research run. If yours is missing, sign out and back in, or contact support. You can build your profile, save briefs, and explore the full demo meanwhile.",
-            )}
-      </p>
-      {!compact && (
-        <Link
-          href="/demo/research/results"
-          className="flex items-center gap-1 text-sm font-medium text-primary"
-        >
-          {copy("Read a sample report")}
-          <ArrowRight className="size-4" />
-        </Link>
-      )}
-    </div>
   );
 }
 

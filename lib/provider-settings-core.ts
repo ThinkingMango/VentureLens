@@ -66,3 +66,20 @@ export function assertBudgetFits(settings: ProviderSettings, at = new Date()) {
   const { primary } = runCostEstimates(settings, at);
   if (primary.requiredUsd > settings.budgetUsd) throw Object.assign(new Error("BUDGET_TOO_LOW"), { requiredUsd: primary.requiredUsd, model: primary.model });
 }
+
+/**
+ * The per-run budget as typed into the admin form. Returns the value rounded to cents when it is a usable budget,
+ * or null while the text is incomplete or out of range ("", "0.", "0.0"), so typing is never overwritten mid-entry.
+ */
+export function parseBudgetInput(text: string): number | null {
+  if (!/^\d*\.?\d*$/.test(text.trim()) || !/\d/.test(text)) return null;
+  const value = Math.round(Number(text) * 100) / 100;
+  return Number.isFinite(value) && value >= MIN_RESEARCH_BUDGET_USD && value <= MAX_RESEARCH_BUDGET_USD ? value : null;
+}
+
+/** The budget to keep when the field loses focus: the typed value clamped into range, or the previous value. */
+export function settleBudgetInput(text: string, previous: number): number {
+  const value = Number(text);
+  if (!text.trim() || !Number.isFinite(value)) return previous;
+  return Math.min(MAX_RESEARCH_BUDGET_USD, Math.max(MIN_RESEARCH_BUDGET_USD, Math.round(value * 100) / 100));
+}
