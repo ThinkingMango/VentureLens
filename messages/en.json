@@ -1038,7 +1038,8 @@
     "m1lnpcxt": "The connection dropped before the server replied. Your research may already have started: check My research before trying again.",
     "m1aq5q7j": "Research could not start right now. Please try again.",
     "m6vtlyo": "Demo score: {score} out of 100",
-    "mcl61zm": "Research score: {score} out of 100"
+    "mcl61zm": "Research score: {score} out of 100",
+    "mx9tsfp": "Score"
   },
   "language": {
     "label": "Interface language",

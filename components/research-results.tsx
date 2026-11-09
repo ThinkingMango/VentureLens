@@ -17,7 +17,6 @@ import { PageHeader, DemoNote } from "@/components/shared";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
-import { Badge } from "@/components/ui/badge";
 import { useDemo } from "@/components/demo-provider";
 import { demoNotice } from "@/lib/demo-data";
 import { useDemoContent } from "@/i18n/demo";
@@ -112,15 +111,14 @@ export function ResearchResults({
           {copy("Export demo brief")}
         </Button>
       </PageHeader>
+      {/* One demo notice per page: the header badge says "Demo mode", this
+          sentence says what is synthetic, and the details explain the scores. */}
       <div className="flex flex-col gap-3 border-y py-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <Badge variant="secondary">{copy("Demonstration report")}</Badge>
-          {!savedOnly && (
-            <p className="text-sm text-muted-foreground">
-              {copy(run.sector)} · {copy(run.model)} · {copy(run.geography)}
-            </p>
-          )}
-        </div>
+        {!savedOnly && (
+          <p className="text-sm text-muted-foreground">
+            {copy(run.sector)} · {copy(run.model)} · {copy(run.geography)}
+          </p>
+        )}
         <DemoNote />
         <details className="text-sm text-muted-foreground">
           <summary className="w-fit rounded-sm underline-offset-4 hover:text-primary hover:underline">
@@ -212,7 +210,7 @@ export function ResearchResults({
           </Field>
           <Field className="md:w-52 md:shrink-0">
             <FieldLabel htmlFor="confidence-filter">
-              {copy("Demo confidence")}
+              {copy("Confidence")}
             </FieldLabel>
             <select
               id="confidence-filter"
@@ -305,7 +303,7 @@ export function ResearchResults({
                 <tr>
                   {[
                     "Opportunity",
-                    "Demo score",
+                    "Score",
                     "Buyer",
                     "Price / month",
                     "Delivery cost / month",

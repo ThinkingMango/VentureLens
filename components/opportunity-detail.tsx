@@ -126,7 +126,7 @@ export function OpportunityDetail({
           </div>
           <div className="flex flex-col gap-1">
             <dt className="text-sm text-muted-foreground">
-              {copy("Demo assessment")}
+              {copy("Score")}
             </dt>
             <dd className="font-semibold tabular-nums">
               {o.score}/100{" "}
@@ -455,7 +455,6 @@ export function OpportunityDetail({
               <h2 id="score-title" className="font-semibold">
                 {copy("Score breakdown")}
               </h2>
-              <Badge variant="outline">{copy("Demo")}</Badge>
             </div>
             <div className="flex items-center gap-4">
               <ScoreRing
