@@ -5,6 +5,3 @@ node_modules
 *.tsbuildinfo
 /.swc
 next-env.d.ts
-dist
-.output
-.tanstack
