@@ -14,6 +14,23 @@ export function sourceUrl(value: string): URL {
   url.hash = "";
   return url;
 }
+/**
+ * Decodes a fetched page in its declared character set: the Content-Type header first, then a <meta charset> or
+ * http-equiv declaration in the first 2 KB, otherwise UTF-8. Many Chinese, Japanese and Korean sites still serve
+ * GBK, Big5, Shift_JIS or EUC-KR; read as UTF-8 their text is garbled, quotes cannot be matched, and the evidence is
+ * silently dropped.
+ */
+export function decodeHtml(body: Buffer, contentType: string | undefined): string {
+  const declared = (text: string | undefined) => /charset\s*=\s*["']?([\w.:-]+)/i.exec(text ?? "")?.[1]?.toLowerCase();
+  const head = body.subarray(0, 2048).toString("latin1");
+  const label = declared(contentType) ?? declared(/<meta[^>]+charset[^>]*>/i.exec(head)?.[0]) ?? "utf-8";
+  try {
+    // GB2312 pages routinely contain GBK characters; GB18030 is the superset that decodes all of them.
+    return new TextDecoder(label === "gb2312" || label === "gbk" ? "gb18030" : label).decode(body);
+  } catch {
+    return new TextDecoder("utf-8").decode(body);
+  }
+}
 export function sourceExcerpt(html: string) {
   const $ = load(html);
   $("script,style,noscript,nav,header,footer,form,aside,[hidden],[aria-hidden='true']").remove();
@@ -57,7 +74,7 @@ export async function fetchResearchSource(value: string) {
           if (bytes > 2_000_000) response.destroy(new Error("SOURCE_TOO_LARGE"));
           else chunks.push(chunk);
         });
-        response.on("end", () => resolve({ html: Buffer.concat(chunks).toString("utf8") }));
+        response.on("end", () => resolve({ html: decodeHtml(Buffer.concat(chunks), String(response.headers["content-type"] ?? "")) }));
         response.on("error", reject);
         response.on("aborted", () => reject(new Error("SOURCE_INTERRUPTED")));
       });
