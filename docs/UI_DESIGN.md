@@ -6,12 +6,12 @@ The interface helps founders compare opportunities, inspect evidence, and decide
 
 - Charcoal canvas `#101318`, raised panels `#181d25`, pale text `#e4e8ef`, secondary text `#9aa6b8`, and blue actions `#94b5ff`.
 - Geist with the existing CJK fallback stack. Use tabular numerals for comparable scores and compact, medium-weight headings. Small corner radii distinguish controls and panels without making every item a floating card.
-- Replace the demo dashboard's promotional banner with a summary strip and a shared opportunity ledger. Account-backed overviews use the same ledger component; save actions retain the existing workspace provider behavior.
+- Replace the demo dashboard's promotional banner with a summary strip and a shared opportunity card grid. Account-backed overviews use the same card component; save actions retain the existing workspace provider behavior.
 - Keep synthetic reports visibly labeled. Scores are comparative scenarios, never verified demand or success probabilities.
 
 ## Mobile behavior
 
-- At phone widths, opportunity rows show title, category, buyer, score, and save action. Desktop-only risk summaries remain available inside each report.
+- At phone widths, opportunity cards stack vertically and retain buyer, pricing, risk, score, and save action. Report buttons span the card width.
 - Research history uses linked cards on phones and a table on desktop. Search matches title and localized industry, trims whitespace, and includes an inline clear action.
 - The workspace header keeps navigation, page context, and the language picker visible; secondary header controls move out of the narrow layout. Help remains accessible in the drawer.
 - Primary landing actions span the available phone width. Preview selection buttons stack, and the evidence detail follows the selection list. No page-level horizontal scrolling is intended at 320px and above.
@@ -33,3 +33,7 @@ Product Design was installed during the session, but no Product Design skills or
 - Drawer dismissal and focus restoration, nested active navigation, and public skip links.
 - English, Simplified Chinese, and Traditional Chinese on phone and desktop widths.
 - Account-backed research requires configured Supabase and provider credentials; demo validation does not verify those integrations.
+
+## Card presentation
+
+Overview, results, and saved opportunities use the shared OpportunityCard component. Cards stack on phones and form two columns on wider screens, with score, title, description, buyer, pricing assumptions, risk, confidence, and a full-width mobile report action. Save remains an independent accessible toggle. Landing preview choices are also presented as selectable cards. The results comparison view remains optional.

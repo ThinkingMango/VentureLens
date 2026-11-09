@@ -21,7 +21,6 @@ import { useDemo } from "@/components/demo-provider";
 import { PageHeader, SectionTitle, Confidence } from "@/components/shared";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { OpportunityLedger } from "@/components/opportunity-ledger";
 import { OpportunityCard } from "@/components/opportunity-card";
 import { Input } from "@/components/ui/input";
 import type { WorkspaceOpportunity } from "@/lib/workspace-schema";
@@ -326,7 +325,9 @@ export function LiveDashboard() {
             title={copy("Your opportunities")}
             href="/research/results"
           />
-          <OpportunityLedger opportunities={data.opportunities} />
+          <div className="grid gap-5 md:grid-cols-2">
+            {data.opportunities.map((opportunity) => <OpportunityCard key={opportunity.id} opportunity={opportunity} />)}
+          </div>
         </section>
       )}
       {fresh && (

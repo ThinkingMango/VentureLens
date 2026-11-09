@@ -17,7 +17,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { PageHeader, SectionTitle, DemoNote } from "@/components/shared";
-import { OpportunityLedger } from "@/components/opportunity-ledger";
+import { OpportunityCard } from "@/components/opportunity-card";
 import { ScoreChart } from "@/components/score-chart";
 import { useDemoContent } from "@/i18n/demo";
 import { useDemo } from "@/components/demo-provider";
@@ -81,7 +81,9 @@ export function Dashboard() {
               <s.icon className="size-[18px] shrink-0 text-muted-foreground" />
             </div>
             <p className="stat-value">{s.value}</p>
-            <p className="hidden text-sm text-muted-foreground sm:block">{copy(s.detail)}</p>
+            <p className="hidden text-sm text-muted-foreground sm:block">
+              {copy(s.detail)}
+            </p>
           </div>
         ))}
       </section>
@@ -94,7 +96,11 @@ export function Dashboard() {
           href="/research/results"
           label={copy("Explore all")}
         />
-        <OpportunityLedger opportunities={opportunities} />
+        <div className="grid gap-5 md:grid-cols-2">
+          {opportunities.map((opportunity) => (
+            <OpportunityCard key={opportunity.id} opportunity={opportunity} />
+          ))}
+        </div>
       </section>
       <div className="grid gap-6 xl:grid-cols-[1.4fr_1fr]">
         <section className="surface flex flex-col gap-5 p-6">
