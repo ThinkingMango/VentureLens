@@ -1,5 +1,7 @@
 import { z } from "zod";
-import { businessModels, researchSectors, targetMarkets } from "./research-options.ts";
+import {
+  businessModels, researchSectors, targetMarkets, MAX_BUSINESS_MODELS, MAX_RESEARCH_SECTORS, openBusinessModel, openSector, validChoices,
+} from "./research-options.ts";
 
 export const profileSchema = z.object({
   name: z.string().trim().min(1, "Enter your name.").max(80),
@@ -21,24 +23,48 @@ export type Profile = z.infer<typeof profileSchema>;
 // what the API accepts.
 export const hoursOptions = profileSchema.shape.hours.options;
 export const budgetOptions = profileSchema.shape.budget.options;
-export const projectSchema = z.object({
+const briefFields = z.object({
   name: z.string().trim().min(1).max(100),
   // Canonical English values from lib/research-options.ts; translated only for display.
-  sector: z.enum(researchSectors),
-  model: z.enum(businessModels),
+  sectors: z.array(z.enum(researchSectors)).min(1).max(MAX_RESEARCH_SECTORS)
+    .refine(list => validChoices(list, openSector, MAX_RESEARCH_SECTORS), "Choose up to two different industries, or Open to any industry on its own."),
+  models: z.array(z.enum(businessModels)).min(1).max(MAX_BUSINESS_MODELS)
+    .refine(list => validChoices(list, openBusinessModel, MAX_BUSINESS_MODELS), "Choose up to three different business models, or Open to possibilities on its own."),
   geography: z.enum(targetMarkets),
   context: z.string().trim().max(1000).default(""),
   discovery_mode: z.enum(["founder", "market", "combined"]).optional(),
 });
-export type ResearchBrief = z.infer<typeof projectSchema>;
+/**
+ * Briefs saved before industries and business models became lists carry one `sector` and one `model`: stored run
+ * configurations, project rows, and requests from a browser still running the earlier page. They are read as lists of
+ * one. When both forms are present the lists win.
+ */
+export function upgradeBrief(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+  const { sector, model, ...rest } = value as Record<string, unknown>;
+  return {
+    ...rest,
+    sectors: rest.sectors ?? (sector === undefined || sector === null ? undefined : [sector]),
+    models: rest.models ?? (model === undefined || model === null ? undefined : [model]),
+  };
+}
+export const projectSchema = z.preprocess(upgradeBrief, briefFields);
+export type ResearchBrief = z.infer<typeof briefFields>;
 export const reportLanguageSchema = z.enum(["en", "zh-Hans", "zh-Hant"]);
 export type ReportLanguage = z.infer<typeof reportLanguageSchema>;
 // A research request is a brief plus the language the report should be written in.
 // The language travels inside the stored run configuration; it is not a column.
-export const researchRequestSchema = projectSchema.extend({
+export const researchRequestSchema = z.preprocess(upgradeBrief, briefFields.extend({
   language: reportLanguageSchema.optional(),
-});
+}));
 export type ResearchRequest = z.infer<typeof researchRequestSchema>;
+/**
+ * The columns a brief is stored in. `sector` and `model` keep the first choice so code and reports that read one
+ * value still work; `sectors` and `models` hold every choice.
+ */
+export function briefColumns(brief: ResearchBrief) {
+  return { ...brief, sector: brief.sectors[0], model: brief.models[0] };
+}
 export type Project = ResearchBrief & { id: string; created_at: string };
 export type ResearchRun = {
   id: string;
@@ -113,8 +139,8 @@ export const emptyProfile: Profile = {
 };
 export const emptyBrief: ResearchBrief = {
   name: "",
-  sector: "Professional services",
-  model: "B2B subscription",
+  sectors: ["Professional services"],
+  models: ["B2B subscription"],
   geography: "United States",
   context: "",
 };

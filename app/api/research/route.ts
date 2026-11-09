@@ -3,7 +3,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getLocale } from "next-intl/server";
-import { researchRequestSchema, profileSchema } from "@/lib/workspace-schema";
+import { briefColumns, researchRequestSchema, profileSchema } from "@/lib/workspace-schema";
 import { reportLanguage } from "@/lib/research-core";
 import { researchErrors, errorCode } from "@/lib/research-core";
 import { dispatchResearch, researchDetail } from "@/lib/research-service";
@@ -69,8 +69,9 @@ export async function POST(request: NextRequest) {
         );
       const result = await admin.rpc("enqueue_research", {
         p_user: user.id,
+        // briefColumns also sends the first industry and model as single values, which the stored project row keeps.
         p_brief: {
-          ...parsed.data.brief,
+          ...briefColumns(parsed.data.brief),
           discovery_mode: parsed.data.brief.discovery_mode ?? "combined",
           // The report is written in the language the founder chose; default to the interface language.
           language: reportLanguage(

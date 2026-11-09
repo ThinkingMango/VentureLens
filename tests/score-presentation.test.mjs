@@ -8,6 +8,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { createTranslator } from "next-intl";
 import * as presentation from "../lib/report-presentation.ts";
 import * as researchCore from "../lib/research-core.ts";
+import * as researchOptions from "../lib/research-options.ts";
 import { messageKey, locales } from "../i18n/config.ts";
 
 const { scoreBreakdown, scoreBand, scoreBands } = presentation;
@@ -104,7 +105,7 @@ test("cards and the opportunity page show the rating and every step of the score
     "@/components/ui/button": { Button: pass("button") }, "@/components/ui/badge": { Badge: pass("span") }, "@/components/ui/input": { Input: props => createElement("input", props) },
     "@/components/opportunity-card": card, "@/lib/research-core": researchCore, "@/lib/report-presentation": presentation,
     "@/components/opportunity-evidence": { OpportunityEvidence: () => null }, "@/lib/utils": { cn: (...c) => c.filter(Boolean).join(" ") },
-    "@/components/research-access-card": { ResearchAccessCard: () => null },
+    "@/components/research-access-card": { ResearchAccessCard: () => null }, "@/lib/research-options": researchOptions,
   });
   const detail = text(renderToStaticMarkup(createElement(live.LiveOpportunityDetail, { opportunity })));
   assert.match(detail, /Promising/);

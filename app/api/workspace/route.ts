@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { readWorkspace } from "@/lib/workspace";
-import { profileSchema, projectSchema } from "@/lib/workspace-schema";
+import { briefColumns, profileSchema, projectSchema } from "@/lib/workspace-schema";
 
 export const dynamic = "force-dynamic";
 const mutationSchema = z.discriminatedUnion("action", [
@@ -109,7 +109,7 @@ export async function POST(request: NextRequest) {
     } else if (input.action === "project") {
       const { error } = await supabase
         .from("research_projects")
-        .insert({ user_id: user.id, ...input.project });
+        .insert({ user_id: user.id, ...briefColumns(input.project) });
       if (error) throw error;
     } else {
       const { data: opportunity, error: lookupError } = await supabase

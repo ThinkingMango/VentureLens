@@ -28,10 +28,10 @@ const payload = {
   rationale: "Pain is high because c1-s1 reports ten hours a week. ".repeat(30), critique: "Free templates exist. ".repeat(30),
   falsification: "Offer a paid pilot to ten agencies.", penalty: 5,
 };
-function workspaceModule(rows) {
+function workspaceModule(rows, projects = []) {
   const tables = {
     founder_profiles: { name: "Alex", role: "Founder", industry: "Services", skills: "Sales", hours: "10–20 hours", budget: "Under $1,000", goal: "Side business", onboarding_completed: true },
-    research_projects: [], research_runs: [], saved_opportunities: [], research_dev_access: null,
+    research_projects: projects, research_runs: [], saved_opportunities: [], research_dev_access: null,
     opportunities: rows,
   };
   const from = table => {
@@ -125,4 +125,24 @@ test("live workspace components never import demo fixtures or the chart statical
   // The demo views are still reachable, through lazily loaded modules.
   assert.match(readFileSync(new URL("../components/dashboard.tsx", import.meta.url), "utf8"), /dynamic\(\(\) => import\("@\/components\/demo-dashboard"\)/);
   assert.match(readFileSync(new URL("../components/research-results.tsx", import.meta.url), "utf8"), /import\("@\/components\/demo-research-results"\)/);
+});
+
+test("saved briefs load with their industry and model lists, and briefs saved before multi-select read as lists of one", async () => {
+  const at = "2026-11-09T00:00:00Z";
+  const projects = [
+    { id: "p1", user_id: "user", name: "Lists", sector: "Healthcare", model: "B2B subscription", sectors: ["Healthcare", "Legal & compliance"], models: ["B2B subscription", "Productized service"], geography: "United States", context: "", discovery_mode: "combined", created_at: at, updated_at: at },
+    // A row read before the list migration is applied has no list columns at all.
+    { id: "p2", user_id: "user", name: "Earlier", sector: "Education", model: "Productized service", geography: "Japan", context: null, discovery_mode: null, created_at: at },
+  ];
+  const { module, supabase } = workspaceModule([], projects);
+  const { projects: loaded } = await module.readWorkspace(supabase, { id: "user", email: "a@example.com" });
+  assert.deepEqual(loaded, [
+    { id: "p1", name: "Lists", sectors: ["Healthcare", "Legal & compliance"], models: ["B2B subscription", "Productized service"], geography: "United States", context: "", discovery_mode: "combined", created_at: at },
+    { id: "p2", name: "Earlier", sectors: ["Education"], models: ["Productized service"], geography: "Japan", context: "", discovery_mode: undefined, created_at: at },
+  ]);
+  // Both are valid briefs to start from again.
+  for (const project of loaded) assert.equal(workspaceSchema.projectSchema.safeParse(project).success, true, project.name);
+  // Stored briefs keep the first choice in the single-value columns as well as the lists.
+  assert.deepEqual(workspaceSchema.briefColumns({ ...workspaceSchema.emptyBrief, sectors: ["Healthcare", "Education"], models: ["API or data product", "B2B subscription"] }),
+    { ...workspaceSchema.emptyBrief, sectors: ["Healthcare", "Education"], models: ["API or data product", "B2B subscription"], sector: "Healthcare", model: "API or data product" });
 });

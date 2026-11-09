@@ -10,6 +10,7 @@ import {
   type WorkspaceData,
   type WorkspaceOpportunity,
   type Profile,
+  type Project,
 } from "@/lib/workspace-schema";
 
 /**
@@ -17,6 +18,21 @@ import {
  * renders: source excerpts and the long review text. Cards keep the title, scores, economics, the first validation
  * step and the source links they count. The opportunity page reads the full record with readOpportunity().
  */
+/** A stored brief, with briefs saved before multi-select (one sector and one model) read as lists of one. */
+export function projectFromRow(row: Record<string, unknown>): Project {
+  const list = (values: unknown, single: unknown) =>
+    Array.isArray(values) && values.length ? values : single ? [single] : [];
+  return {
+    id: row.id as string,
+    name: row.name as string,
+    sectors: list(row.sectors, row.sector) as Project["sectors"],
+    models: list(row.models, row.model) as Project["models"],
+    geography: row.geography as Project["geography"],
+    context: (row.context as string | null) ?? "",
+    discovery_mode: (row.discovery_mode as Project["discovery_mode"]) ?? undefined,
+    created_at: row.created_at as string,
+  };
+}
 export function workspaceOpportunity(item: WorkspaceOpportunity): WorkspaceOpportunity {
   const { rationale: _rationale, critique: _critique, falsification: _falsification, assumptions: _assumptions, ...summary } = item;
   return {
@@ -82,7 +98,9 @@ export async function readWorkspace(
       .maybeSingle(),
     supabase
       .from("research_projects")
-      .select("id,name,sector,model,geography,context,discovery_mode,created_at")
+      // "*" rather than a column list: the list columns (sectors, models) arrive in a migration, and naming them
+      // would fail every workspace load if this code is deployed before that migration is applied.
+      .select("*")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false }),
     supabase
@@ -148,7 +166,7 @@ export async function readWorkspace(
     profile,
     onboarded: row?.onboarding_completed ?? false,
     access,
-    projects: projectsResult.data ?? [],
+    projects: (projectsResult.data ?? []).map(projectFromRow),
     runs: runsResult.data ?? [],
     opportunities,
     saved: (savesResult.data ?? []).map((s) => s.opportunity_id),

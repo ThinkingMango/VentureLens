@@ -30,6 +30,13 @@ export const researchSectors = [
 ] as const;
 export type ResearchSector = (typeof researchSectors)[number];
 
+// A brief may name up to two industries and up to three business models. A run produces eight hypotheses, so more
+// industries would leave too few surviving ideas in each to compare. The "open" choice means no constraint, so it is
+// only valid on its own.
+export const MAX_RESEARCH_SECTORS = 2;
+export const MAX_BUSINESS_MODELS = 3;
+export const openSector: ResearchSector = "Open to any industry";
+
 export const businessModels = [
   "Open to possibilities",
   "B2B subscription",
@@ -47,6 +54,7 @@ export type BusinessModel = (typeof businessModels)[number];
 
 /** Shown first and outside any group; the rest are grouped so a long list stays scannable. */
 export const businessModelLead: BusinessModel = "Open to possibilities";
+export const openBusinessModel = businessModelLead;
 export const businessModelGroups: Group<BusinessModel>[] = [
   { label: "Recurring software", options: ["B2B subscription", "B2C subscription", "Usage-based software", "Freemium with paid upgrades", "API or data product"] },
   { label: "Services", options: ["Productized service", "Managed service or retainer"] },
@@ -101,4 +109,41 @@ const marketSearchLanguages: Partial<Record<TargetMarket, string>> = {
 /** The language discovery should write each candidate's evidence search query in, for a brief's target market. */
 export function searchLanguage(market: string): string {
   return marketSearchLanguages[market as TargetMarket] ?? "English";
+}
+
+/**
+ * Toggles one choice in a multi-select list. The "open" choice replaces every other choice, and choosing anything
+ * else replaces it. Adding beyond the limit is ignored, and the last remaining choice cannot be removed.
+ */
+export function toggleChoice<T extends string>(selected: readonly T[], value: T, open: T, max: number): T[] {
+  if (selected.includes(value)) return selected.length > 1 ? selected.filter(item => item !== value) : [...selected];
+  if (value === open) return [open];
+  const rest = selected.filter(item => item !== open);
+  return rest.length >= max ? [...selected] : [...rest, value];
+}
+
+/** Whether a list is a valid selection: no duplicates, within the limit, and the "open" choice only on its own. */
+export function validChoices(selected: readonly string[], open: string, max: number) {
+  return selected.length >= 1 && selected.length <= max && new Set(selected).size === selected.length && (!selected.includes(open) || selected.length === 1);
+}
+
+/**
+ * Extra discovery instructions when a brief names several industries or business models; a single choice is read
+ * from the brief itself, as before. Accepts briefs saved before multi-select (one `sector` and one `model`), which
+ * in-flight runs may still carry.
+ */
+export function briefFocusInstructions(brief: { sectors?: readonly string[]; models?: readonly string[]; sector?: string; model?: string }) {
+  const sectors = brief.sectors ?? (brief.sector ? [brief.sector] : []);
+  const models = brief.models ?? (brief.model ? [brief.model] : []);
+  const lines: string[] = [];
+  if (sectors.length > 1)
+    lines.push(`The brief names ${sectors.length} industries (${sectors.join("; ")}): each hypothesis may sit in any of them; cover each, and make at least two hypotheses combine them.`);
+  if (models.length > 1)
+    lines.push(`The brief accepts ${models.length} business models (${models.join("; ")}): every hypothesis must use one of them, and use each at least once.`);
+  return lines.join(" ");
+}
+
+/** How a brief's industries or business models read in one line, each translated by `translate`. */
+export function joinChoices(values: readonly string[], translate: (value: string) => string) {
+  return values.map(value => translate(value)).join(" + ");
 }

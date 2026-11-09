@@ -791,6 +791,29 @@ test("discovery asks for evidence searches in the target market's own language",
   }
 });
 
+test("discovery spreads hypotheses across several industries and business models, and a single choice reads as before", async () => {
+  const candidates = Array.from({ length: 5 }, (_, i) => ({ key: `c${i + 1}`, title: "Candidate", buyer: "Clinic owners", pain: "Billing takes hours", solution: "Assistant", advantage: "Network", query: "clinic billing time survey report" }));
+  const discover = async brief => {
+    const fixture = researchFixture({ spent: 0, settings: { primary: "qwen", autoFallback: false, qwenModel: "qwen3.8-flash", geminiModel: "gemini-3.5-flash-lite" }, generate: async () => ({ output: { candidates }, totalUsage: { inputTokens: 100, outputTokens: 50 } }) });
+    fixture.checkpoints.get("setup").brief = brief;
+    await fixture.engine.executeResearchStage(fixture.context, "discovery");
+    return fixture.calls[0].prompt;
+  };
+  const base = { ...workspaceSchema.emptyBrief, name: "Research" };
+  const several = await discover({ ...base, sectors: ["Healthcare", "Legal & compliance"], models: ["B2B subscription", "Productized service"] });
+  assert.match(several, /names 2 industries \(Healthcare; Legal & compliance\)[^.]*make at least two hypotheses combine them\./);
+  assert.match(several, /accepts 2 business models \(B2B subscription; Productized service\): every hypothesis must use one of them, and use each at least once\. Mode=/);
+  assert.match(several, /"sectors":\["Healthcare","Legal & compliance"\]/, "the brief itself lists both industries");
+  const single = await discover(base);
+  assert.doesNotMatch(single, /industries \(|business models \(/);
+  assert.match(single, /Do not name products or ask for tools or software\. Mode=/, "no extra text and no stray space for a single choice");
+  // A run that started before multi-select stored one sector and one model in its setup; it still runs.
+  const { sectors, models, ...legacy } = base;
+  assert.match(await discover({ ...legacy, sector: "Healthcare", model: "B2B subscription" }), /"sector":"Healthcare"/);
+  // The stored configuration of such a run is read as lists of one when it is set up again.
+  assert.deepEqual(workspaceSchema.researchRequestSchema.parse({ ...legacy, sector: "Healthcare", model: "B2B subscription", language: "en" }).sectors, ["Healthcare"]);
+});
+
 test("discovery queries look for evidence of the problem, not for products", () => {
   const source = readFileSync(new URL("../lib/research-engine.ts", import.meta.url), "utf8");
   assert.doesNotMatch(source, /naming the buyer, the problem, paid alternatives/, "asking for paid alternatives steered search to vendor pages");

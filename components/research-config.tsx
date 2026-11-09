@@ -21,11 +21,15 @@ import {
 import { useDemo } from "@/components/demo-provider";
 import {
   businessModelGroups,
-  businessModelLead,
+  MAX_BUSINESS_MODELS,
+  MAX_RESEARCH_SECTORS,
+  openBusinessModel,
+  openSector,
   researchSectors,
   targetMarketGroups,
   targetMarketLead,
 } from "@/lib/research-options";
+import { ChoiceChips } from "@/components/choice-chips";
 import { PageHeader, DemoNote } from "@/components/shared";
 import { ResearchAccessCard } from "@/components/research-access-card";
 import { Button } from "@/components/ui/button";
@@ -56,7 +60,7 @@ export function ResearchConfig() {
   // A first brief starts from the founder's own industry when it is one of the research industries.
   const [draft, setDraft] = useState(() =>
     !isDemo && !data?.projects.length && (researchSectors as readonly string[]).includes(profile.industry)
-      ? { ...run, sector: profile.industry as typeof run.sector }
+      ? { ...run, sectors: [profile.industry as (typeof run.sectors)[number]] }
       : run,
   );
   const [submitting, setSubmitting] = useState(false);
@@ -261,55 +265,24 @@ export function ResearchConfig() {
                   )}
                 </FieldDescription>
               </Field>
-              <Field>
-                <FieldLabel htmlFor="sector">
-                  {copy("Industry or market")}
-                </FieldLabel>
-                <select
-                  id="sector"
-                  className="field-select"
-                  value={draft.sector}
-                  onChange={(e) =>
-                    setDraft({
-                      ...draft,
-                      sector: e.target.value as typeof draft.sector,
-                    })
-                  }
-                >
-                  {researchSectors.map((v) => (
-                    <option key={v} value={v}>
-                      {copy(v)}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-              <Field>
-                <FieldLabel htmlFor="model">
-                  {copy("Business model")}
-                </FieldLabel>
-                <select
-                  id="model"
-                  className="field-select"
-                  value={draft.model}
-                  onChange={(e) =>
-                    setDraft({
-                      ...draft,
-                      model: e.target.value as typeof draft.model,
-                    })
-                  }
-                >
-                  <option value={businessModelLead}>{copy(businessModelLead)}</option>
-                  {businessModelGroups.map((group) => (
-                    <optgroup key={group.label} label={copy(group.label)}>
-                      {group.options.map((v) => (
-                        <option key={v} value={v}>
-                          {copy(v)}
-                        </option>
-                      ))}
-                    </optgroup>
-                  ))}
-                </select>
-              </Field>
+              <ChoiceChips
+                id="sector"
+                legend={copy("Industry or market")}
+                open={openSector}
+                groups={[{ label: "", options: researchSectors }]}
+                selected={draft.sectors}
+                max={MAX_RESEARCH_SECTORS}
+                onChange={(sectors) => setDraft({ ...draft, sectors })}
+              />
+              <ChoiceChips
+                id="model"
+                legend={copy("Business model")}
+                open={openBusinessModel}
+                groups={businessModelGroups}
+                selected={draft.models}
+                max={MAX_BUSINESS_MODELS}
+                onChange={(models) => setDraft({ ...draft, models })}
+              />
               <Field>
                 <FieldLabel htmlFor="geography">
                   {copy("Target market")}
@@ -410,6 +383,7 @@ export function ResearchConfig() {
               </span>
               <Button
                 type="submit"
+                className="shrink-0"
                 disabled={busy || submitting}
                 aria-busy={busy || submitting}
               >

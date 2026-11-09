@@ -99,3 +99,53 @@ test("failed-run refunds are capped per account, except for our failures and run
   assert.match(sqlError(() => sql(`set role authenticated; set request.jwt.claim.sub = '${user}'; update public.research_dev_access set runs_refunded = 0`)), /permission denied/);
   assert.match(sqlError(() => sql(`set role authenticated; set request.jwt.claim.sub = '${user}'; update public.research_runs set quota_released = true`)), /permission denied/);
 });
+
+test("a brief stores up to two industries and three business models, and earlier writers still work", { skip }, async t => {
+  const name = `vl_lists_${process.pid}_${Date.now()}`;
+  psql(server, ["-c", `create database ${name}`]);
+  t.after(() => psql(server, ["-c", `drop database if exists ${name} with (force)`]));
+  const db = Object.assign(new URL(server), { pathname: `/${name}` }).href;
+  const sql = query => psql(db, ["-c", query]);
+
+  // Apply everything before the list migration, save a brief the earlier way, then apply it: the brief gets lists of one.
+  const lists = "20261109170000_research_brief_lists.sql";
+  psql(db, ["-f", path("tests/sql/supabase-auth-stub.sql")]);
+  const files = readdirSync(path("supabase/migrations")).filter(f => f.endsWith(".sql")).sort();
+  assert.ok(files.includes(lists));
+  for (const file of files.filter(f => f < lists)) psql(db, ["-f", path(`supabase/migrations/${file}`)]);
+  const user = sql(`insert into auth.users (email, email_confirmed_at) values ('founder@example.com', now()) returning id`);
+  const saved = sql(`insert into public.research_projects (user_id, name, sector, model, geography) values ('${user}', 'Before', 'Healthcare', 'B2B subscription', 'United States') returning id`);
+  for (const file of files.filter(f => f >= lists)) psql(db, ["-f", path(`supabase/migrations/${file}`)]);
+  const row = id => sql(`select sector || ' | ' || model || ' | ' || array_to_string(sectors, ';') || ' | ' || array_to_string(models, ';') from public.research_projects where id = '${id}'`);
+  assert.equal(row(saved), "Healthcare | B2B subscription | Healthcare | B2B subscription");
+
+  sql(`update public.research_dev_access set max_runs = 10 where user_id = '${user}'`);
+  const start = brief => {
+    const run = sql(`select public.enqueue_research('${user}', '${JSON.stringify(brief)}'::jsonb, '{}'::jsonb, gen_random_uuid())`);
+    sql(`update public.research_runs set status = 'completed' where id = '${run}'`);
+    return sql(`select project_id from public.research_runs where id = '${run}'`);
+  };
+  const base = { name: "Research", geography: "United States" };
+  // What the application sends: the lists, plus the first choice as single values.
+  assert.equal(row(start({ ...base, sector: "Healthcare", model: "B2B subscription", sectors: ["Healthcare", "Legal & compliance"], models: ["B2B subscription", "Productized service", "API or data product"] })),
+    "Healthcare | B2B subscription | Healthcare;Legal & compliance | B2B subscription;Productized service;API or data product");
+  // A brief from the earlier application code, and one with lists only.
+  assert.equal(row(start({ ...base, sector: "Education", model: "Productized service" })), "Education | Productized service | Education | Productized service");
+  assert.equal(row(start({ ...base, sectors: ["B2B SaaS"], models: ["Usage-based software", "API or data product"] })), "B2B SaaS | Usage-based software | B2B SaaS | Usage-based software;API or data product");
+
+  // A direct insert (saving a brief without a run) in either form.
+  const insert = columns => sql(`insert into public.research_projects (user_id, name, geography, ${Object.keys(columns).join(", ")}) values ('${user}', 'Saved', 'United States', ${Object.values(columns).join(", ")}) returning id`);
+  assert.equal(row(insert({ sector: "'Education'", model: "'Productized service'" })), "Education | Productized service | Education | Productized service");
+  const both = insert({ sectors: "array['Healthcare','Education']", models: "array['Productized service']" });
+  assert.equal(row(both), "Healthcare | Productized service | Healthcare;Education | Productized service");
+  // Changing only the single value replaces that list; changing a list moves the first choice into the single value.
+  sql(`update public.research_projects set sector = 'B2B SaaS' where id = '${both}'`);
+  assert.equal(row(both), "B2B SaaS | Productized service | B2B SaaS | Productized service");
+  sql(`update public.research_projects set models = array['API or data product','Productized service'] where id = '${both}'`);
+  assert.equal(row(both), "B2B SaaS | API or data product | B2B SaaS | API or data product;Productized service");
+
+  // The shape is bounded: at most two industries and three models, no empty entries.
+  assert.match(sqlError(() => insert({ sectors: "array['Healthcare','Education','B2B SaaS']", models: "array['Productized service']" })), /research_projects_sectors_check/);
+  assert.match(sqlError(() => insert({ sectors: "array['Healthcare']", models: "array['a','b','c','d']" })), /research_projects_models_check/);
+  assert.match(sqlError(() => insert({ sectors: "array['Healthcare', null]", models: "array['a']" })), /research_projects_sectors_check/);
+});

@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useDemo } from "@/components/demo-provider";
 import { stageLabels } from "@/lib/research-core";
+import { joinChoices } from "@/lib/research-options";
 export function ResearchLibrary() {
   const copy = useCopy();
   const format = useFormats();
@@ -23,7 +24,7 @@ export function ResearchLibrary() {
             target: "/research/results",
             status: "Demo complete",
             title: run.name,
-            sector: run.sector,
+            sector: joinChoices(run.sectors, copy),
             count: 4,
             date: copy("Current demo session"),
           },
@@ -32,7 +33,7 @@ export function ResearchLibrary() {
             target: "/research/results",
             status: "Demo complete",
             title: copy("Recurring-revenue tools for small teams"),
-            sector: "B2B SaaS",
+            sector: copy("B2B SaaS"),
             count: 4,
             date: copy("Sample research history"),
           },
@@ -55,7 +56,7 @@ export function ResearchLibrary() {
                   : (stageLabels[latest.stage] ?? latest.status);
           })(),
           title: project.name,
-          sector: project.sector,
+          sector: joinChoices(project.sectors, copy),
           count:
             data?.runs.filter(
               (item) =>
@@ -64,7 +65,7 @@ export function ResearchLibrary() {
           date: copy("{date} UTC", { date: format.date(project.created_at) }),
         }))
   ).filter((r) =>
-    `${r.title} ${copy(r.sector)}`
+    `${r.title} ${r.sector}`
       .toLocaleLowerCase()
       .includes(query.trim().toLocaleLowerCase()),
   );
@@ -125,7 +126,7 @@ export function ResearchLibrary() {
               <div className="min-w-0 flex-1 space-y-2">
                 <h3 className="font-semibold">{r.title}</h3>
                 <p className="text-sm text-muted-foreground">
-                  {copy(r.sector)}
+                  {r.sector}
                 </p>
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge variant="secondary">{copy(r.status)}</Badge>
@@ -176,7 +177,7 @@ export function ResearchLibrary() {
                       <span>
                         <span className="font-medium">{r.title}</span>
                         <span className="mt-1 block text-sm text-muted-foreground">
-                          {copy(r.sector)} · {r.date}
+                          {r.sector} · {r.date}
                         </span>
                       </span>
                     </Link>

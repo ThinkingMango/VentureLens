@@ -24,6 +24,7 @@ import { OpportunityCard } from "@/components/opportunity-card";
 import { Input } from "@/components/ui/input";
 import type { WorkspaceOpportunity } from "@/lib/workspace-schema";
 import { stageLabels } from "@/lib/research-core";
+import { joinChoices } from "@/lib/research-options";
 import { reportEvidenceCount, scoreBand, scoreBreakdown } from "@/lib/report-presentation";
 import { OpportunityEvidence } from "@/components/opportunity-evidence";
 import { cn } from "@/lib/utils";
@@ -268,7 +269,7 @@ export function LiveDashboard() {
           <SectionTitle title={copy("Your latest research")} href="/research" />
           <h2 className="font-semibold">{data.projects[0].name}</h2>
           <p className="text-muted-foreground">
-            {copy(data.projects[0].sector)} · {copy(data.projects[0].geography)}
+            {joinChoices(data.projects[0].sectors, copy)} · {copy(data.projects[0].geography)}
           </p>
           <p className="text-sm text-muted-foreground">
             {firstRun

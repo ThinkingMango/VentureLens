@@ -50,9 +50,12 @@ test("project validates and preserves complete context", () => {
   assert.equal(project.name, "Customer workflow");
   assert.equal(project.context, "private buyer notes");
   assert.equal(
-    projectSchema.safeParse({ ...project, sector: "invalid" }).success,
+    projectSchema.safeParse({ ...project, sectors: ["invalid"] }).success,
     false,
   );
+  // A brief saved before multi-select is still validated as a list of one.
+  const { sectors, models, ...legacy } = project;
+  assert.equal(projectSchema.safeParse({ ...legacy, sector: "invalid", model: models[0] }).success, false);
   assert.equal(
     projectSchema.safeParse({ ...project, context: "x".repeat(1001) }).success,
     false,

@@ -46,6 +46,14 @@ After this change `supabase migration list` shows local and remote in sync, and 
 4. **Keep RLS invariants.** New tables use `enable` + `force row level security`, composite `(id, user_id)` foreign keys, `revoke all … from anon, authenticated`, and explicit `grant` statements, as in the existing files.
 5. **Business parameters live in `public.app_settings`, not in check constraints.** The per-run budget is read by `public.research_budget_usd()` from the `research` row (bounded 0.05–5 USD). `research_dev_access.max_runs` is bounded 1–100 by a check constraint (raised from 3 on 2026-11-06); the grant size itself is set per account by an operator until the entitlement ledger exists.
 
+## Notes on `20261109170000_research_brief_lists` (not yet applied)
+
+- Adds `research_projects.sectors` (1–2 entries) and `research_projects.models` (1–3 entries), backfills both from `sector` and `model`, and makes them `not null` with shape checks. Option values are validated by the application (`lib/workspace-schema.ts`), not by the database.
+- `sector` and `model` keep the first choice. The `sync_research_project_lists` trigger (before insert or update) keeps the two forms in step: a writer that sets only the single values gets lists of one, a writer that sets only the lists gets the first choice in the single values, and an update that changes only a single value replaces that list.
+- `enqueue_research` is unchanged except that the project row also receives the lists from `p_brief.sectors` / `p_brief.models` when present.
+- **Order-independent with the application deploy.** The application reads `research_projects` with `select("*")` and treats missing lists as lists of one, and it sends `sector`/`model` alongside the lists, so the earlier function and the new one both accept its briefs. Until the migration is applied, a saved brief keeps only its first industry and model in the project row (the run configuration keeps every choice), and saving a brief without starting a run fails because the insert names the new columns.
+- Covered by `tests/quota-ledger.sql.test.mjs` (backfill of a row saved before the migration, both write paths, the trigger and the bounds).
+
 ## Notes on `20261106141806_research_dev_access_max_runs_limit`
 
 - Replaces `research_dev_access_max_runs_check` (`max_runs between 1 and 3`) with `between 1 and 100`. No grant is changed by the migration.

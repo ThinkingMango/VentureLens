@@ -1303,7 +1303,9 @@
     "mhnc299": "Evidence cap (fewer than 3 independent supporting sources)",
     "mx9tsfp": "Score",
     "mn53pfh": "The evidence cap set this score. More independent supporting sources would raise the cap.",
-    "m1kyxviq": "Scores are capped at 70 with limited evidence and 85 otherwise. Adversarial review can only deduct points, at most {points}, and not again for evidence gaps the ratings already reflect."
+    "m1kyxviq": "Scores are capped at 70 with limited evidence and 85 otherwise. Adversarial review can only deduct points, at most {points}, and not again for evidence gaps the ratings already reflect.",
+    "m184jamw": "Choose up to {max}. “{open}” clears the other choices.",
+    "m16k21pi": "{count} of {max} selected"
   },
   "language": {
     "label": "Interface language",

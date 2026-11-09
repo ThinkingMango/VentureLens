@@ -22,6 +22,7 @@ import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Badge } from "@/components/ui/badge";
 import { useDemo } from "@/components/demo-provider";
 import { demoNotice } from "@/lib/demo-notice";
+import { joinChoices } from "@/lib/research-options";
 import { useDemoContent } from "@/i18n/demo";
 export function DemoResearchResults({
   savedOnly = false,
@@ -56,8 +57,8 @@ export function DemoResearchResults({
       copy(demoNotice),
       copy("Research: {name}", { name: run.name }),
       copy("Configuration: {sector}; {model}; {geography}", {
-        sector: copy(run.sector),
-        model: copy(run.model),
+        sector: joinChoices(run.sectors, copy),
+        model: joinChoices(run.models, copy),
         geography: copy(run.geography),
       }),
       copy(
@@ -121,7 +122,7 @@ export function DemoResearchResults({
             <Badge variant="secondary">{copy("Demonstration report")}</Badge>
             {!savedOnly && (
               <p className="text-sm text-muted-foreground">
-                {copy(run.sector)} · {copy(run.model)} · {copy(run.geography)}
+                {joinChoices(run.sectors, copy)} · {joinChoices(run.models, copy)} · {copy(run.geography)}
               </p>
             )}
           </div>
