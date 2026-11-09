@@ -2,7 +2,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
-import { Check, Circle, LoaderCircle, ArrowLeft, Cpu } from "lucide-react";
+import { Check, Circle, CircleSlash, LoaderCircle, ArrowLeft, Cpu } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { researchModels } from "@/lib/research-models";
 import { Button } from "@/components/ui/button";
@@ -83,6 +83,14 @@ export function ResearchRunView({
   const completed = data.status === "completed" && !!data.report;
   const ExecutionContainer = completed ? "details" : "section";
   const index = stages.indexOf(data.stage);
+  const retrievedCount = data.steps.filter((s) =>
+    s.stage_key.startsWith("retrieval:"),
+  ).length;
+  // Retrieval runs one hypothesis at a time, in order: the first unfinished one is the one being searched.
+  const searchingKey =
+    active && data.stage === "retrieval"
+      ? data.candidates?.find((c) => c.state === "searching")?.key
+      : undefined;
   const retryable =
     data.status === "failed" &&
     data.retry_count < 1 &&
@@ -187,11 +195,10 @@ export function ResearchRunView({
               {copy("Execution details")}
             </span>
             <span className="mt-1 block text-sm text-muted-foreground sm:ml-6">
-              {copy("Estimated known cost")}:{" "}
-              {format.usd(data.usage.estimated_usd, 4)}
-              {" · "}
-              {copy("Search requests")}:{" "}
-              {format.number(data.usage.search_requests)}
+              {copy(
+                "{count, plural, one {# candidate retrieved} other {# candidates retrieved}}",
+                { count: retrievedCount },
+              )}
             </span>
           </summary>
         )}
@@ -245,11 +252,7 @@ export function ResearchRunView({
                       <span className="block text-muted-foreground">
                         {copy(
                           "{count, plural, one {# candidate retrieved} other {# candidates retrieved}}",
-                          {
-                            count: data.steps.filter((s) =>
-                              s.stage_key.startsWith("retrieval:"),
-                            ).length,
-                          },
+                          { count: retrievedCount },
                         )}
                       </span>
                     )}
@@ -258,6 +261,63 @@ export function ResearchRunView({
               );
             })}
           </ol>
+          {!completed && !!data.candidates?.length && (
+            <section
+              aria-labelledby="candidate-progress-title"
+              className="flex flex-col gap-3 border-t pt-4"
+            >
+              <div className="flex flex-col gap-1">
+                <h3 id="candidate-progress-title" className="font-medium">
+                  {copy("Hypotheses")}
+                </h3>
+                <p className="max-w-prose text-sm text-muted-foreground">
+                  {copy(
+                    "Each hypothesis is searched in turn. One without usable sources is dropped, not filled in.",
+                  )}
+                </p>
+              </div>
+              <ul className="flex flex-col">
+                {data.candidates.map((candidate) => {
+                  const now = candidate.key === searchingKey;
+                  const Icon =
+                    candidate.state === "done"
+                      ? Check
+                      : candidate.state === "skipped"
+                        ? CircleSlash
+                        : now
+                          ? LoaderCircle
+                          : Circle;
+                  return (
+                    <li
+                      key={candidate.key}
+                      aria-current={now ? "step" : undefined}
+                      className="flex items-start gap-3 border-t py-3 text-sm first:border-t-0"
+                    >
+                      <Icon
+                        aria-hidden="true"
+                        className={`mt-0.5 size-4 shrink-0 ${now ? "animate-spin text-primary motion-reduce:animate-none" : candidate.state === "done" ? "text-primary" : "text-muted-foreground"}`}
+                      />
+                      <span className="min-w-0 flex-1">{candidate.title}</span>
+                      <span className="shrink-0 text-right text-muted-foreground tabular-nums">
+                        {candidate.state === "done"
+                          ? copy(
+                              "{count, plural, one {# source} other {# sources}}",
+                              { count: candidate.sources },
+                            )
+                          : candidate.state === "skipped"
+                            ? copy("No usable sources")
+                            : now
+                              ? copy("Searching…")
+                              : active
+                                ? copy("Waiting")
+                                : copy("Not searched")}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          )}
           {data.status === "failed" && (
             <div className="flex flex-col gap-4" role="alert">
               <p className="leading-relaxed">
@@ -299,50 +359,62 @@ export function ResearchRunView({
               {retryError && <p>{copy(retryError)}</p>}
             </div>
           )}
-          <dl className="grid gap-4 border-t pt-4 text-sm sm:grid-cols-2">
-            <div>
-              <dt className="text-muted-foreground">
-                {copy("Estimated known cost")}
-              </dt>
-              <dd>{format.usd(data.usage.estimated_usd, 4)}</dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground">
-                {copy("Committed budget / limit")}
-              </dt>
-              <dd>
-                {format.usd(data.usage.committed_usd, 4)} /{" "}
-                {format.usd(data.usage.budget_usd)}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground">
-                {copy("Search requests")}
-              </dt>
-              <dd>{format.number(data.usage.search_requests)}</dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground">{copy("Tokens")}</dt>
-              <dd>
-                {format.number(
-                  data.usage.input_tokens + data.usage.output_tokens,
-                )}
-              </dd>
-            </div>
-          </dl>
-          {!!data.usage.uncertain_calls && (
-            <p className="text-sm text-muted-foreground">
-              {copy(
-                "Costs for {count} calls are unconfirmed; their budget remains reserved.",
-                { count: data.usage.uncertain_calls },
+          {/* Costs and token counts matter to operators, not to reading the result; they stay one
+              click away, and open by default when a run stopped on its budget. */}
+          <details
+            className="border-t pt-4 text-sm"
+            open={data.error_code === "BUDGET_EXCEEDED" || undefined}
+          >
+            <summary className="w-fit rounded-sm font-medium">
+              {copy("Technical details")}
+            </summary>
+            <div className="flex flex-col gap-4 pt-4">
+              <dl className="grid gap-4 text-sm sm:grid-cols-2">
+                <div>
+                  <dt className="text-muted-foreground">
+                    {copy("Estimated known cost")}
+                  </dt>
+                  <dd>{format.usd(data.usage.estimated_usd, 4)}</dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">
+                    {copy("Committed budget / limit")}
+                  </dt>
+                  <dd>
+                    {format.usd(data.usage.committed_usd, 4)} /{" "}
+                    {format.usd(data.usage.budget_usd)}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">
+                    {copy("Search requests")}
+                  </dt>
+                  <dd>{format.number(data.usage.search_requests)}</dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">{copy("Tokens")}</dt>
+                  <dd>
+                    {format.number(
+                      data.usage.input_tokens + data.usage.output_tokens,
+                    )}
+                  </dd>
+                </div>
+              </dl>
+              {!!data.usage.uncertain_calls && (
+                <p className="text-sm text-muted-foreground">
+                  {copy(
+                    "Costs for {count} calls are unconfirmed; their budget remains reserved.",
+                    { count: data.usage.uncertain_calls },
+                  )}
+                </p>
               )}
-            </p>
-          )}
-          <p className="text-sm text-muted-foreground">
-            {copy(
-              "Excludes hosting and Workflow costs. No user balance is charged.",
-            )}
-          </p>
+              <p className="text-sm text-muted-foreground">
+                {copy(
+                  "Excludes hosting and Workflow costs. No user balance is charged.",
+                )}
+              </p>
+            </div>
+          </details>
         </div>
       </ExecutionContainer>
     </>

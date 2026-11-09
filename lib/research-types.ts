@@ -1,5 +1,6 @@
 import type { WorkspaceOpportunity, ResearchBrief } from "@/lib/workspace-schema";
 import type { Mode } from "@/lib/research-core";
+import type { CandidateProgress } from "@/lib/report-presentation";
 export type ResearchReport = {
   methodology: string;
   language?: string;
@@ -33,4 +34,6 @@ export type ResearchDetail = {
   completed_at: string | null;
   steps: { stage_key: string; created_at: string }[];
   usage: { estimated_usd: number; committed_usd: number; uncertain_calls: number; input_tokens: number; output_tokens: number; search_requests: number; budget_usd: number };
+  // Per-hypothesis retrieval progress; present only for runs without a report that have finished discovery.
+  candidates?: CandidateProgress[];
 };

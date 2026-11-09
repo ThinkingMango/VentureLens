@@ -18,6 +18,7 @@ import * as workspaceSchema from "../lib/workspace-schema.ts";
 import * as fallbackCore from "../lib/research-fallback-core.ts";
 import * as budget from "../lib/research-budget.ts";
 import * as apiClient from "../lib/api-client.ts";
+import * as reportPresentation from "../lib/report-presentation.ts";
 
 const verified = { id: "admin-test-id", email: "owner@example.org", email_confirmed_at: "2026-11-05T00:00:00.000Z", app_metadata: { role: "admin" } };
 const require = createRequire(import.meta.url);
@@ -440,7 +441,7 @@ test("full CJK evidence is classified, evaluated, and reviewed in resumable boun
 test("concurrent dispatches share a durable hook and manual retries get a new identity", async () => {
   const row = { status: "pending", workflow_id: null, retry_count: 0 };
   const hooks = new Map(), requests = [], updates = [];
-  const service = loadModule("../lib/research-service.ts", {
+  const service = loadModule("../lib/research-service.ts", { "@/lib/report-presentation": reportPresentation,
     "server-only": {},
     "@/lib/provider-settings": { researchProviderSettings: async () => ({ primary: "qwen", autoFallback: true }) }, "@/lib/provider-settings-core": settingsCore, "@/lib/research-models": models, "@/lib/qwen-core": { QWEN_PROVIDER: "dashscope-beijing" }, "@/lib/research-fallback-core": fallbackCore,
     "workflow/api": { start: async (_workflow, args, options) => {
@@ -499,7 +500,7 @@ test("research detail explains blocked reservations without adding them to spent
     };
     return query;
   }
-  const service = loadModule("../lib/research-service.ts", { "server-only": {}, "workflow/api": {}, "workflow/errors": {}, "@/workflows/research": {}, "@/lib/provider-settings": { researchProviderSettings: async () => ({ primary: "qwen", autoFallback: true }) }, "@/lib/provider-settings-core": settingsCore, "@/lib/research-models": models, "@/lib/qwen-core": { QWEN_PROVIDER: "dashscope-beijing" }, "@/lib/research-fallback-core": fallbackCore, "@/lib/supabase/admin": {} });
+  const service = loadModule("../lib/research-service.ts", { "@/lib/report-presentation": reportPresentation, "server-only": {}, "workflow/api": {}, "workflow/errors": {}, "@/workflows/research": {}, "@/lib/provider-settings": { researchProviderSettings: async () => ({ primary: "qwen", autoFallback: true }) }, "@/lib/provider-settings-core": settingsCore, "@/lib/research-models": models, "@/lib/qwen-core": { QWEN_PROVIDER: "dashscope-beijing" }, "@/lib/research-fallback-core": fallbackCore, "@/lib/supabase/admin": {} });
   const detail = await service.researchDetail({ from }, "owner", "run");
   assert.equal(detail.usage.committed_usd, 0.051042);
   assert.equal(detail.usage.search_requests, 0);
@@ -534,6 +535,40 @@ test("the actual progress view renders blocked-request costs and a usable recove
   assert.match(html, /Existing progress and costs remain saved/);
   assert.match(html, /Model: Gemini 4 Argon/);
   assert.match(html, /Gemini via Google/);
+  assert.match(html, /<details[^>]*open=""[^>]*><summary[^>]*>Technical details/, "a budget stop opens the cost details");
+});
+
+test("the progress view lists each hypothesis with its retrieval state and keeps costs collapsed", () => {
+  const data = { id: "run", status: "running", stage: "retrieval", error_code: null, retry_count: 0, model: { provider: "dashscope-beijing", model: "qwen3.8-flash", planned: false, used: ["qwen3.8-flash"] }, configuration: { brief: { name: "Test 2" } }, report: null, steps: [{ stage_key: "discovery" }, { stage_key: "retrieval:c1" }, { stage_key: "retrieval:c2" }], usage: { estimated_usd: 0.01, committed_usd: 0.02, budget_usd: 0.25, uncertain_calls: 0, input_tokens: 10, output_tokens: 10, search_requests: 3 },
+    candidates: [
+      { key: "c1", title: "Proposal copilot", state: "done", sources: 3 },
+      { key: "c2", title: "Feedback triage", state: "skipped", sources: 0 },
+      { key: "c3", title: "Audit helper", state: "searching", sources: 1 },
+      { key: "c4", title: "Briefing assistant", state: "searching", sources: 0 },
+    ] };
+  const { ResearchRunView } = loadModule("../components/research-run.tsx", {
+    "next/link": { default: ({ children, ...props }) => createElement("a", props, children) },
+    "swr": { default: () => ({ data, mutate: async () => undefined }) },
+    "@/components/ui/button": { Button: ({ asChild, children, ...props }) => asChild ? cloneElement(children, props) : createElement("button", props, children) },
+    "@/components/shared": { PageHeader: ({ title, description }) => createElement("header", null, createElement("h1", null, title), createElement("p", null, description)) },
+    "@/components/demo-provider": { useDemo: () => ({ refresh: async () => undefined }) },
+    "@/components/research-report": { ResearchReportView: () => null },
+    "@/lib/research-core": researchCore,
+    "@/lib/research-models": models,
+    "@/components/ui/badge": { Badge: ({ children, ...props }) => createElement("span", props, children) },
+    "@/i18n/use-copy": { useCopy: () => (text, values = {}) => text.replace(/\{(\w+)\}/g, (_match, key) => values[key] ?? key), useFormats: () => ({ usd: (value, digits = 2) => `$${value.toFixed(digits)}`, number: value => String(value) }) },
+    "@/i18n/errors": { feedbackSource: (_code, fallback) => fallback },
+    "@/lib/api-client": apiClient,
+  });
+  const html = renderToStaticMarkup(createElement(ResearchRunView, { initialData: data }));
+  for (const title of ["Proposal copilot", "Feedback triage", "Audit helper", "Briefing assistant"]) assert.match(html, new RegExp(title));
+  assert.match(html, /No usable sources/);
+  assert.equal(html.match(/Searching…/g)?.length, 1, "only the first unfinished hypothesis is being searched");
+  const current = html.slice(html.indexOf('aria-current="step"', html.indexOf("Hypotheses")));
+  assert.match(current.slice(0, current.indexOf("</li>")), /Audit helper/);
+  assert.match(html, /Waiting/);
+  assert.match(html, /<details[^>]*><summary[^>]*>Technical details/);
+  assert.doesNotMatch(html, /<details[^>]*open=""[^>]*><summary[^>]*>Technical details/, "costs stay collapsed while the run is healthy");
 });
 
 test("structured output that does not parse is retried once, and each attempt is metered separately", async () => {
@@ -619,7 +654,7 @@ test("a run whose models cannot finish within its budget stops before any provid
 test("dispatch falls back to a plain start when the deployment does not support start hooks", async () => {
   const row = { status: "pending", workflow_id: null, retry_count: 0 };
   const starts = [];
-  const service = loadModule("../lib/research-service.ts", {
+  const service = loadModule("../lib/research-service.ts", { "@/lib/report-presentation": reportPresentation,
     "server-only": {},
     "@/lib/provider-settings": {}, "@/lib/provider-settings-core": settingsCore, "@/lib/research-models": models, "@/lib/qwen-core": { QWEN_PROVIDER: "dashscope-beijing" }, "@/lib/research-fallback-core": fallbackCore,
     "workflow/api": { start: async (_workflow, _args, options) => {

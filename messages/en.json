@@ -1039,7 +1039,15 @@
     "m1aq5q7j": "Research could not start right now. Please try again.",
     "m6vtlyo": "Demo score: {score} out of 100",
     "mcl61zm": "Research score: {score} out of 100",
-    "mx9tsfp": "Score"
+    "mx9tsfp": "Score",
+    "mdc8clj": "Hypotheses",
+    "mg2rq7l": "Each hypothesis is searched in turn. One without usable sources is dropped, not filled in.",
+    "mo7hanr": "{count, plural, one {# source} other {# sources}}",
+    "m11tp8s0": "No usable sources",
+    "mauc2lf": "Searching…",
+    "m1jufdxk": "Waiting",
+    "mvpgi27": "Not searched",
+    "m8fsw8u": "Technical details"
   },
   "language": {
     "label": "Interface language",

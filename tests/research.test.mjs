@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { scoringWeights, weightedScore, safeSourceUrl, groundedClassifications, eligibleEvidence, requireExactIds, errorCode } from '../lib/research-core.ts';
 import { projectSchema, emptyBrief } from '../lib/workspace-schema.ts';
-import { reportEvidenceCount, reportShortlist } from '../lib/report-presentation.ts';
+import { reportEvidenceCount, reportShortlist, candidateProgress } from '../lib/report-presentation.ts';
 
 test('report source counts deduplicate pages across opportunities without inflating endorsements', () => {
   assert.equal(reportEvidenceCount([
@@ -183,4 +183,22 @@ test('the classifier is told that associations, trade press and news are indepen
   assert.doesNotMatch(source, /sells a product or service in this space/, 'the broad rule labelled a professional body, trade press and news as vendors');
   assert.match(source, /"secondary" = independent reporting or analysis \(news outlets, trade publications, professional bodies and industry associations/);
   assert.match(source, /"vendor" = a company marketing a product or service that solves this specific pain/);
+});
+
+test('candidate progress marks each hypothesis as searching, done with a source count, or skipped', () => {
+  const discovery = { candidates: [{ key: 'c1', title: 'Proposal copilot' }, { key: 'c2', title: 'Feedback triage' }, { key: 'c3', title: 'Audit helper' }] };
+  assert.deepEqual(
+    candidateProgress(discovery, ['setup', 'discovery', 'retrieval:c1', 'retrieval:c3'], ['c1', 'c1', 'c2']),
+    [
+      { key: 'c1', title: 'Proposal copilot', state: 'done', sources: 2 },
+      { key: 'c2', title: 'Feedback triage', state: 'searching', sources: 1 },
+      { key: 'c3', title: 'Audit helper', state: 'skipped', sources: 0 },
+    ],
+  );
+});
+
+test('candidate progress ignores malformed discovery output instead of failing the status view', () => {
+  assert.deepEqual(candidateProgress(null, [], []), []);
+  assert.deepEqual(candidateProgress({ candidates: 'oops' }, [], []), []);
+  assert.deepEqual(candidateProgress({ candidates: [{ key: 1, title: 'x' }, null, { key: 'c2', title: 'ok' }] }, [], []), [{ key: 'c2', title: 'ok', state: 'searching', sources: 0 }]);
 });

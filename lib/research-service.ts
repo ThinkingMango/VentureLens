@@ -8,6 +8,7 @@ import type { ResearchDetail, ResearchModelInfo } from "@/lib/research-types";
 import { researchProviderSettings } from "@/lib/provider-settings";
 import { providerPlan } from "@/lib/provider-settings-core";
 import { selectedModel } from "@/lib/research-models";
+import { candidateProgress, type CandidateProgress } from "@/lib/report-presentation";
 import { QWEN_PROVIDER } from "@/lib/qwen-core";
 import { GEMINI_PROVIDER } from "@/lib/research-fallback-core";
 
@@ -92,7 +93,19 @@ export async function researchDetail(supabase: Awaited<ReturnType<typeof createC
   const budget_block = run.status === "failed" && run.error_code === "BUDGET_EXCEEDED" && blocked && typeof blocked.model === "string" && Number.isFinite(blocked.required_usd)
     ? { model: blocked.model, required_usd: Number(blocked.required_usd), remaining_usd: Math.max(0, Number(run.budget_usd) - totals.committed_usd), kind: blocked.kind === "estimate" ? "estimate" as const : "reservation" as const }
     : undefined;
-  return { id: run.id, status: run.status, stage: run.stage, model, error_code: run.error_code, retry_count: run.retry_count, configuration: { brief: run.configuration.brief }, report: run.report, created_at: run.created_at, completed_at: run.completed_at, steps: steps.data ?? [], usage: { ...totals, budget_usd: Number(run.budget_usd) }, ...(budget_block ? { budget_block } : {}) };
+  // Until a report exists, show which hypotheses retrieval has reached. Only candidate keys/titles and
+  // evidence candidate_ids are read, so the 3-second poll stays small.
+  const stageKeys = (steps.data ?? []).map((step) => step.stage_key);
+  let candidates: CandidateProgress[] | undefined;
+  if (!run.report && stageKeys.includes("discovery")) {
+    const [discovery, sources] = await Promise.all([
+      supabase.from("research_stages").select("candidates:output->candidates").eq("run_id", id).eq("user_id", userId).eq("stage_key", "discovery").maybeSingle(),
+      supabase.from("research_evidence").select("candidate_id").eq("run_id", id).eq("user_id", userId),
+    ]);
+    // Progress detail is optional: a failed read leaves the stage list as it was rather than failing the status call.
+    if (!discovery.error && !sources.error) candidates = candidateProgress(discovery.data, stageKeys, (sources.data ?? []).map((row) => row.candidate_id));
+  }
+  return { id: run.id, status: run.status, stage: run.stage, model, error_code: run.error_code, retry_count: run.retry_count, configuration: { brief: run.configuration.brief }, report: run.report, created_at: run.created_at, completed_at: run.completed_at, steps: steps.data ?? [], usage: { ...totals, budget_usd: Number(run.budget_usd) }, ...(budget_block ? { budget_block } : {}), ...(candidates?.length ? { candidates } : {}) };
 }
 
 // Which model a run uses: the recorded choice once the run has initialized, otherwise the configured primary.
