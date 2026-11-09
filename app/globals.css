@@ -1,6 +1,9 @@
 @import "tailwindcss";
 @theme inline {
-  --font-sans: var(--font-geist), "PingFang SC", "PingFang TC", "Microsoft YaHei", "Microsoft JhengHei", "Noto Sans CJK SC", "Noto Sans CJK TC", var(--font-cjk), sans-serif;
+  --font-sans:
+    var(--font-geist), "PingFang SC", "PingFang TC", "Microsoft YaHei",
+    "Microsoft JhengHei", "Noto Sans CJK SC", "Noto Sans CJK TC",
+    var(--font-cjk), sans-serif;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -33,13 +36,13 @@
   --shadow-float: var(--shadow-float);
 }
 :root {
-  --background: #f5f7fb;
-  --foreground: #10213f;
+  --background: #f3f6f7;
+  --foreground: #182f3c;
   --card: #ffffff;
-  --primary: #2f55d4;
-  --primary-deep: #1f3fae;
+  --primary: #087e83;
+  --primary-deep: #086367;
   --secondary: color-mix(in srgb, var(--primary) 9%, var(--card));
-  --muted-foreground: #5b6b84;
+  --muted-foreground: #576d78;
   --warm: #d98a1a;
   --warm-soft: #fff4e2;
   --success: #1f8f65;
@@ -48,8 +51,11 @@
   --border: color-mix(in srgb, var(--muted-foreground) 18%, var(--card));
   --radius: 0.875rem;
   --chart-1: var(--primary);
-  --shadow-card: 0 1px 2px rgba(16, 33, 63, 0.04), 0 1px 1px rgba(16, 33, 63, 0.03);
-  --shadow-float: 0 24px 60px -24px rgba(16, 33, 63, 0.28), 0 8px 24px -12px rgba(47, 85, 212, 0.18);
+  --shadow-card:
+    0 1px 2px rgba(16, 33, 63, 0.04), 0 1px 1px rgba(16, 33, 63, 0.03);
+  --shadow-float:
+    0 24px 60px -24px rgba(16, 33, 63, 0.28),
+    0 8px 24px -12px rgba(8, 126, 131, 0.18);
 }
 * {
   border-color: var(--border);
@@ -107,9 +113,24 @@ html:lang(zh-Hant) h3 {
   letter-spacing: 0;
   line-height: 1.45;
 }
-main, section, article, header, nav { min-width: 0; }
-h1, h2, h3, p, dd, label { overflow-wrap: anywhere; }
-button { white-space: normal; }
+main,
+section,
+article,
+header,
+nav {
+  min-width: 0;
+}
+h1,
+h2,
+h3,
+p,
+dd,
+label {
+  overflow-wrap: anywhere;
+}
+button {
+  white-space: normal;
+}
 a,
 button {
   transition:
@@ -170,32 +191,55 @@ button {
 }
 /* Marketing surfaces */
 .hero-bg {
-  background:
-    radial-gradient(60% 50% at 50% -10%, color-mix(in srgb, var(--primary) 14%, transparent), transparent 70%),
-    radial-gradient(30% 30% at 90% 10%, color-mix(in srgb, var(--warm) 8%, transparent), transparent 70%),
-    radial-gradient(30% 30% at 8% 15%, color-mix(in srgb, var(--primary) 7%, transparent), transparent 70%),
-    var(--card);
+  background: #f0f6f5;
 }
+
 .grid-bg {
   background-image:
-    linear-gradient(to right, color-mix(in srgb, var(--foreground) 5%, transparent) 1px, transparent 1px),
-    linear-gradient(to bottom, color-mix(in srgb, var(--foreground) 5%, transparent) 1px, transparent 1px);
+    linear-gradient(
+      to right,
+      color-mix(in srgb, var(--foreground) 5%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--foreground) 5%, transparent) 1px,
+      transparent 1px
+    );
   background-size: 32px 32px;
   mask-image: radial-gradient(70% 70% at 50% 40%, #000 30%, transparent 100%);
 }
 .gradient-text {
-  background: linear-gradient(100deg, var(--primary-deep), var(--primary) 55%, #5b8def);
+  background: linear-gradient(
+    100deg,
+    var(--primary-deep),
+    var(--primary) 55%,
+    #40a7a5
+  );
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
 .brand-gradient {
-  background: linear-gradient(135deg, var(--primary-deep), var(--primary) 60%, #5b8def);
+  background: linear-gradient(
+    135deg,
+    var(--primary-deep),
+    var(--primary) 60%,
+    #40a7a5
+  );
 }
 .band-dark {
   background:
-    radial-gradient(70% 60% at 20% 0%, color-mix(in srgb, var(--primary) 55%, transparent), transparent 70%),
-    radial-gradient(50% 50% at 90% 100%, color-mix(in srgb, #5b8def 40%, transparent), transparent 70%),
+    radial-gradient(
+      70% 60% at 20% 0%,
+      color-mix(in srgb, var(--primary) 55%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      50% 50% at 90% 100%,
+      color-mix(in srgb, #40a7a5 40%, transparent),
+      transparent 70%
+    ),
     #0f1d3f;
   color: #fff;
 }
@@ -206,7 +250,10 @@ button {
   box-shadow: var(--shadow-float);
 }
 .lift {
-  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s, border-color 0.16s;
+  transition:
+    transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.2s,
+    border-color 0.16s;
 }
 .lift:hover {
   transform: translateY(-2px);
@@ -234,7 +281,7 @@ html:lang(zh-Hant) .eyebrow {
   font-size: 1.125rem;
   color: #fff;
   background: linear-gradient(135deg, var(--primary-deep), var(--primary));
-  box-shadow: 0 10px 24px -12px rgba(47, 85, 212, 0.65);
+  box-shadow: 0 10px 24px -12px rgba(8, 126, 131, 0.65);
 }
 @layer components {
   .field-select {
@@ -321,8 +368,14 @@ progress::-moz-progress-bar {
   animation: enter 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 @keyframes pulse-ring {
-  0% { transform: scale(0.9); opacity: 0.8; }
-  100% { transform: scale(1.6); opacity: 0; }
+  0% {
+    transform: scale(0.9);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
 }
 .pulse-ring::after {
   content: "";
@@ -340,4 +393,78 @@ progress::-moz-progress-bar {
     transition: none !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* A quiet research canvas, with persistent ink-colored navigation. */
+.workspace-sidebar {
+  --background: #193945;
+  --card: #122e3a;
+  --foreground: #f0f7f8;
+  --muted-foreground: #b1c5ce;
+  --primary: #8bdfd6;
+  --primary-deep: #b4eee6;
+  --secondary: #244955;
+  --border: #35525e;
+  color: var(--foreground);
+  background: var(--card);
+}
+.workspace-sidebar .nav-link {
+  min-height: 46px;
+}
+.workspace-sidebar .nav-link.active {
+  background: var(--secondary);
+  box-shadow: inset 3px 0 var(--primary);
+  color: #ffffff;
+}
+.workspace-sidebar .nav-link:hover {
+  color: #ffffff;
+}
+.workspace-sidebar a:focus-visible,
+.workspace-sidebar button:focus-visible {
+  outline-color: #8bdfd6;
+}
+.hero-layout {
+  display: grid;
+  gap: 3rem;
+  align-items: center;
+}
+.hero-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1.5rem;
+}
+.hero-copy h1 {
+  font-size: clamp(2.8rem, 4.8vw, 4.5rem);
+  line-height: 1.08;
+  letter-spacing: -0.05em;
+}
+.hero-preview {
+  position: relative;
+  box-shadow: 0 24px 65px -30px #173c4055;
+}
+.hero-preview::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: var(--primary);
+}
+@media (min-width: 1024px) {
+  .hero-layout {
+    grid-template-columns: 1fr 1.05fr;
+    gap: 4rem;
+    min-height: 740px;
+  }
+}
+@media (max-width: 639px) {
+  .hero-copy h1 {
+    letter-spacing: -0.035em;
+  }
+}
+
+.band-dark .eyebrow {
+  color: #8bdfd6;
 }
