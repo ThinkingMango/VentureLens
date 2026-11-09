@@ -77,7 +77,7 @@ export function Support() {
   const copy = useCopy();
   return (
     <PublicShell>
-      <main>
+      <main id="main-content">
         <section className="hero-bg">
           <div className="mx-auto flex max-w-6xl flex-col items-center gap-5 px-5 pb-12 pt-16 text-center md:px-8 md:pt-20">
             <Badge variant="secondary" className="gap-1.5">
