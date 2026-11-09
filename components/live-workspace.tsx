@@ -18,7 +18,7 @@ import {
   Telescope,
 } from "lucide-react";
 import { useDemo } from "@/components/demo-provider";
-import { PageHeader, SectionTitle, Confidence, ScoreRing } from "@/components/shared";
+import { PageHeader, SectionTitle, Confidence, ScoreRing, ScoreBreakdown } from "@/components/shared";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { OpportunityCard } from "@/components/opportunity-card";
@@ -565,22 +565,7 @@ export function LiveOpportunityDetail({
               <span className="text-sm text-muted-foreground">{copy("out of 100")}</span>
             </div>
             <Confidence level={item.confidence} />
-            <dl className="flex flex-col gap-4 border-t pt-5">
-              {liveDimensionLabels.map((label, i) => (
-                <div key={label} className="flex flex-col gap-2">
-                  <div className="flex justify-between gap-3 text-sm">
-                    <dt className="text-muted-foreground">{copy(label)}</dt>
-                    <dd className="font-medium tabular-nums">
-                      {item.scores[i]}
-                      <span className="sr-only"> {copy("out of 100")}</span>
-                    </dd>
-                  </div>
-                  <div className="progress-track" aria-hidden="true">
-                    <div className="progress-fill" style={{ width: `${item.scores[i]}%` }} />
-                  </div>
-                </div>
-              ))}
-            </dl>
+            <ScoreBreakdown labels={liveDimensionLabels} scores={item.scores} className="border-t pt-5" />
             {typeof item.penalty === "number" && item.penalty > 0 && (
               <p className="text-sm text-muted-foreground">
                 {copy("Review deduction: {points} points", { points: item.penalty })}

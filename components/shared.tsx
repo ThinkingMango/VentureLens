@@ -243,3 +243,44 @@ export function TextLink({
     </Button>
   );
 }
+/**
+ * Dimension scores as a definition list with a bar under each row. Every
+ * <dl> group holds only <dt>/<dd>; the bar sits inside the <dd> and is
+ * positioned against the group, so the markup stays valid for assistive tech.
+ */
+export function ScoreBreakdown({
+  labels,
+  scores,
+  className,
+}: {
+  labels: readonly string[];
+  scores: readonly number[];
+  className?: string;
+}) {
+  const copy = useCopy();
+  return (
+    <dl className={cn("flex flex-col gap-4", className)}>
+      {labels.map((label, i) => (
+        <div
+          key={label}
+          className="relative flex justify-between gap-3 pb-3.5 text-sm"
+        >
+          <dt className="text-muted-foreground">{copy(label)}</dt>
+          <dd className="font-medium tabular-nums">
+            {scores[i]}
+            <span className="sr-only"> {copy("out of 100")}</span>
+            <span
+              className="progress-track absolute inset-x-0 bottom-0"
+              aria-hidden="true"
+            >
+              <span
+                className="progress-fill block"
+                style={{ width: `${scores[i]}%` }}
+              />
+            </span>
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}

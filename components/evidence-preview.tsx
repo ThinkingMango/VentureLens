@@ -1,13 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowUpRight, Link2, Swords, FileText } from "lucide-react";
+import { ArrowUpRight, Link2, TriangleAlert, FileText } from "lucide-react";
 import { useCopy } from "@/i18n/use-copy";
 import { useDemoContent } from "@/i18n/demo";
 import { scoreLabels } from "@/lib/demo-data";
 import { Badge } from "@/components/ui/badge";
+import { Confidence, ScoreBreakdown, ScoreRing } from "@/components/shared";
 
-/** A real link into the demo, with synthetic evidence explicitly identified. */
+/**
+ * A real link into the demo, with synthetic evidence explicitly identified.
+ * It is built from the same data and components as the workspace
+ * (ScoreRing, Confidence, the key-risk callout), so it cannot drift from
+ * the product the way a hand-drawn mockup or a static screenshot would,
+ * and it follows the interface language and colour scheme.
+ */
 export function EvidencePreview() {
   const copy = useCopy();
   const { opportunities } = useDemoContent();
@@ -25,11 +32,13 @@ export function EvidencePreview() {
         <Badge variant="secondary">{copy("Synthetic demo")}</Badge>
       </div>
       <div className="space-y-5 p-6 sm:p-7">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="mb-2 text-sm text-muted-foreground">
-              {lead.category}
-            </p>
+        <div className="flex items-start gap-4">
+          <ScoreRing
+            score={lead.score}
+            label={copy("Demo score: {score} out of 100", { score: lead.score })}
+          />
+          <div className="flex min-w-0 flex-1 flex-col gap-1 pt-1">
+            <p className="text-sm text-muted-foreground">{lead.category}</p>
             <Link
               href={`/demo/opportunities/${lead.id}`}
               className="group flex items-start gap-2 text-xl font-semibold leading-snug hover:text-primary sm:text-2xl"
@@ -37,12 +46,6 @@ export function EvidencePreview() {
               {lead.title}
               <ArrowUpRight className="mt-1 size-5 shrink-0 transition-transform group-hover:-translate-y-0.5" />
             </Link>
-          </div>
-          <div className="rounded-xl bg-secondary px-4 py-3 text-center text-primary">
-            <strong className="block text-3xl font-semibold tabular-nums">
-              {lead.score}
-            </strong>
-            <span className="text-xs">{copy("Demo score")}</span>
           </div>
         </div>
         <p className="text-sm leading-relaxed text-muted-foreground">
@@ -57,34 +60,29 @@ export function EvidencePreview() {
             <dt className="text-muted-foreground">
               {copy("Monthly price hypothesis")}
             </dt>
-            <dd className="mt-1 font-medium">{lead.revenue}</dd>
+            <dd className="mt-1 font-medium tabular-nums">
+              {lead.revenue}
+              <span className="ml-1 font-normal text-muted-foreground">
+                {copy("USD / customer")}
+              </span>
+            </dd>
           </div>
         </dl>
-        <dl className="space-y-3">
-          {scoreLabels.slice(0, 3).map((label, i) => (
-            <div
-              key={label}
-              className="grid grid-cols-[1fr_5rem_2rem] items-center gap-3 text-sm"
-            >
-              <dt className="text-muted-foreground">{copy(label)}</dt>
-              <div className="progress-track" aria-hidden="true">
-                <div
-                  className="progress-fill"
-                  style={{ width: `${lead.scores[i]}%` }}
-                />
-              </div>
-              <dd className="text-right font-medium tabular-nums">
-                {lead.scores[i]}
-              </dd>
-            </div>
-          ))}
-        </dl>
-        <p className="flex items-start gap-2 rounded-lg bg-warm-soft p-3 text-sm">
-          <Swords className="mt-0.5 size-4 shrink-0 text-warm" />
-          {copy(
-            "Review note: established proposal tools may bundle similar features.",
-          )}
-        </p>
+        <ScoreBreakdown
+          labels={scoreLabels.slice(0, 3)}
+          scores={lead.scores.slice(0, 3)}
+        />
+        <div className="flex gap-3 rounded-lg border border-warm/25 bg-warm-soft p-4">
+          <TriangleAlert
+            className="mt-0.5 size-4 shrink-0 text-warm"
+            aria-hidden="true"
+          />
+          <div className="flex min-w-0 flex-col gap-1 text-sm">
+            <p className="font-medium">{copy("Key risk to validate")}</p>
+            <p className="leading-relaxed">{lead.risk}</p>
+          </div>
+        </div>
+        <Confidence level={lead.confidence} />
         <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
           <span className="flex items-center gap-2 text-muted-foreground">
             <Link2 className="size-4" />

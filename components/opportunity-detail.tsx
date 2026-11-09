@@ -13,7 +13,7 @@ import {
 import { toast } from "sonner";
 import { type Opportunity, scoreLabels } from "@/lib/demo-data";
 import { useDemo } from "@/components/demo-provider";
-import { DemoNote, Confidence, SectionTitle, ScoreRing } from "@/components/shared";
+import { DemoNote, Confidence, SectionTitle, ScoreRing, ScoreBreakdown } from "@/components/shared";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -466,25 +466,7 @@ export function OpportunityDetail({
               <span className="text-sm text-muted-foreground">{copy("out of 100")}</span>
             </div>
             <Confidence level={o.confidence} />
-            <dl className="flex flex-col gap-4 border-t pt-5">
-              {scoreLabels.map((s, i) => (
-                <div key={s} className="flex flex-col gap-2">
-                  <div className="flex justify-between gap-3 text-sm">
-                    <dt className="text-muted-foreground">{copy(s)}</dt>
-                    <dd className="font-medium tabular-nums">
-                      {o.scores[i]}
-                      <span className="sr-only"> {copy("out of 100")}</span>
-                    </dd>
-                  </div>
-                  <div className="progress-track" aria-hidden="true">
-                    <div
-                      className="progress-fill"
-                      style={{ width: `${o.scores[i]}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </dl>
+            <ScoreBreakdown labels={scoreLabels} scores={o.scores} className="border-t pt-5" />
             <p className="text-sm text-muted-foreground">
               {copy(
                 "Illustrative composite assessment, not a probability of success or an investment recommendation. Confidence is relative within this demo.",
