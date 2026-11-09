@@ -1,4 +1,5 @@
 "use client";
+import { MobileDisclosure } from "@/components/mobile-disclosure";
 import { useCopy } from "@/i18n/use-copy";
 
 import { useEffect, useRef, useState } from "react";
@@ -92,7 +93,7 @@ export function Onboarding({ editing = false }: { editing?: boolean }) {
   );
   const form = (
     <div className="grid overflow-hidden rounded-xl border bg-card md:grid-cols-[240px_1fr]">
-      <aside className="flex flex-col gap-6 border-b bg-background p-6 md:border-r md:border-b-0">
+      <aside className="hidden flex-col gap-6 border-b bg-background p-6 md:flex md:border-r md:border-b-0">
         <p className="font-semibold">{copy("Your founder profile")}</p>
         <ol className="flex justify-between gap-4 md:flex-col md:gap-6">
           {steps.map((s, i) => (
@@ -126,7 +127,7 @@ export function Onboarding({ editing = false }: { editing?: boolean }) {
           {copy("A more personal perspective.")}
         </p>
       </aside>
-      <div className="flex flex-col gap-8 p-6 sm:p-10">
+      <div className="flex flex-col gap-6 p-5 sm:gap-8 sm:p-10">
         <div className="flex flex-col gap-3">
           <div className="flex items-center gap-3">
             <p className="shrink-0 text-sm text-muted-foreground">
@@ -277,38 +278,40 @@ export function Onboarding({ editing = false }: { editing?: boolean }) {
                     )}
                   </p>
                 </Field>
-                <div className="flex flex-col gap-3">
-                  <p className="text-sm text-muted-foreground">
-                    {copy(
-                      "Need a starting point? Add an example, then make it your own.",
-                    )}
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {skillSuggestions.map((suggestion) => {
-                      const text = copy(suggestion);
-                      const next = draft.skills.trim()
-                        ? `${draft.skills.trim()}; ${text}`
-                        : text;
-                      return (
-                        <Button
-                          key={suggestion}
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="min-h-11 text-left"
-                          disabled={
-                            busy ||
-                            draft.skills.includes(text) ||
-                            next.length > 500
-                          }
-                          onClick={() => update("skills", next)}
-                        >
-                          {text}
-                        </Button>
-                      );
-                    })}
+                <MobileDisclosure title={copy("See skill examples")}>
+                  <div className="flex flex-col gap-3">
+                    <p className="text-sm text-muted-foreground">
+                      {copy(
+                        "Need a starting point? Add an example, then make it your own.",
+                      )}
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {skillSuggestions.map((suggestion) => {
+                        const text = copy(suggestion);
+                        const next = draft.skills.trim()
+                          ? `${draft.skills.trim()}; ${text}`
+                          : text;
+                        return (
+                          <Button
+                            key={suggestion}
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="min-h-11 text-left"
+                            disabled={
+                              busy ||
+                              draft.skills.includes(text) ||
+                              next.length > 500
+                            }
+                            onClick={() => update("skills", next)}
+                          >
+                            {text}
+                          </Button>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
+                </MobileDisclosure>
               </>
             )}
             {step === 2 && (
@@ -339,29 +342,31 @@ export function Onboarding({ editing = false }: { editing?: boolean }) {
                   disabled={busy}
                   onChange={(value) => update("goal", value)}
                 />
-                <div className="rounded-lg bg-background p-5">
-                  <p className="font-medium">
-                    {copy("Your profile, at a glance")}
-                  </p>
-                  <dl className="mt-4 flex flex-col gap-3 text-sm">
-                    {[
-                      ["Founder", draft.name],
-                      ["Industry", draft.industry],
-                      [
-                        "Time",
-                        copy("{hours} / week", { hours: copy(draft.hours) }),
-                      ],
-                      ["Budget", draft.budget],
-                    ].map(([k, v]) => (
-                      <div key={k} className="flex justify-between gap-3">
-                        <dt className="text-muted-foreground">{copy(k)}</dt>
-                        <dd className="text-right font-medium">
-                          {k === "Founder" ? v : copy(v)}
-                        </dd>
-                      </div>
-                    ))}
-                  </dl>
-                </div>
+                <MobileDisclosure title={copy("Review your profile")}>
+                  <div className="rounded-lg bg-background p-5">
+                    <p className="font-medium">
+                      {copy("Your profile, at a glance")}
+                    </p>
+                    <dl className="mt-4 flex flex-col gap-3 text-sm">
+                      {[
+                        ["Founder", draft.name],
+                        ["Industry", draft.industry],
+                        [
+                          "Time",
+                          copy("{hours} / week", { hours: copy(draft.hours) }),
+                        ],
+                        ["Budget", draft.budget],
+                      ].map(([k, v]) => (
+                        <div key={k} className="flex justify-between gap-3">
+                          <dt className="text-muted-foreground">{copy(k)}</dt>
+                          <dd className="text-right font-medium">
+                            {k === "Founder" ? v : copy(v)}
+                          </dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </div>
+                </MobileDisclosure>
               </>
             )}
           </FieldGroup>
@@ -407,12 +412,14 @@ export function Onboarding({ editing = false }: { editing?: boolean }) {
   if (editing)
     return (
       <>
-        <PageHeader
-          title={copy("Your founder profile")}
-          description={copy(
-            "The starting point for opportunities that fit you.",
-          )}
-        />
+        <div className="sr-only md:not-sr-only">
+          <PageHeader
+            title={copy("Your founder profile")}
+            description={copy(
+              "The starting point for opportunities that fit you.",
+            )}
+          />
+        </div>
         {form}
         <DemoNote />
       </>

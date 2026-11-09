@@ -36,7 +36,7 @@ export function EvidencePreview() {
             <span>{copy("Demo score")}</span>
           </div>
           <div
-            className="grid sm:grid-cols-2 lg:grid-cols-1"
+            className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-1"
             aria-label={copy("Opportunities")}
           >
             {opportunities.map((opportunity) => (
@@ -46,7 +46,7 @@ export function EvidencePreview() {
                 aria-pressed={lead.id === opportunity.id}
                 aria-controls="preview-detail"
                 onClick={() => setSelectedId(opportunity.id)}
-                className={`flex min-w-0 items-start justify-between gap-3 border-b px-5 py-5 text-left last:border-b-0 hover:bg-secondary/40 ${lead.id === opportunity.id ? "bg-secondary/60 shadow-[inset_2px_0_var(--primary)]" : ""}`}
+                className={`flex min-w-0 items-start justify-between gap-3 rounded-lg border px-4 py-4 text-left hover:border-primary/50 hover:bg-secondary/40 ${lead.id === opportunity.id ? "border-primary/60 bg-secondary/60" : ""}`}
               >
                 <span className="min-w-0">
                   <span className="block text-sm font-medium leading-snug">

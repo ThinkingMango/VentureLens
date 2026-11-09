@@ -1,4 +1,5 @@
 "use client";
+import { MobileDisclosure } from "@/components/mobile-disclosure";
 import { useCopy } from "@/i18n/use-copy";
 
 import Link from "@/components/workspace-link";
@@ -29,10 +30,14 @@ export function OpportunityCard({
   const content = useDemoContent();
   const o = isDemo ? content.opportunity(original) : original;
   return (
-    <Card className="flex h-full min-w-0 flex-col transition-colors hover:border-primary/40">
-      <CardHeader className="gap-3 pb-5">
+    <Card
+      role="article"
+      aria-label={o.title}
+      className="flex h-full min-w-0 flex-col overflow-hidden transition-colors hover:border-primary/40"
+    >
+      <CardHeader className="gap-3 p-5 sm:p-6">
         <div className="flex items-center justify-between gap-3">
-          <p className="text-sm text-muted-foreground">
+          <p className="rounded-md border border-primary/20 bg-secondary/50 px-3 py-1.5 text-xs text-muted-foreground">
             <strong className="mr-2 text-xl font-semibold tabular-nums text-foreground">
               {o.score}
               <span className="text-sm font-normal">/100</span>
@@ -63,7 +68,7 @@ export function OpportunityCard({
           o.category.toLowerCase().trim(),
         ) && <p className="text-sm text-muted-foreground">{o.category}</p>}
         <CardTitle>
-          <h3 className="text-xl font-semibold leading-snug">
+          <h3 className="text-lg font-semibold leading-snug sm:text-xl">
             <Link
               href={`/opportunities/${o.id}`}
               className="hover:text-primary"
@@ -76,7 +81,7 @@ export function OpportunityCard({
           {o.description}
         </CardDescription>
       </CardHeader>
-      <CardContent className="flex flex-1 flex-col gap-5">
+      <CardContent className="flex flex-1 flex-col gap-5 px-5 pb-5 sm:px-6 sm:pb-6">
         <dl className="flex flex-col gap-4">
           <div className="flex flex-col gap-1">
             <dt className="text-sm text-muted-foreground">
@@ -84,45 +89,49 @@ export function OpportunityCard({
             </dt>
             <dd className="font-medium">{o.buyer}</dd>
           </div>
-          <div className="flex flex-col gap-1">
-            <dt className="text-sm text-muted-foreground">
-              {copy(
-                isDemo
-                  ? "Monthly price hypothesis"
-                  : "Business model and pricing assumptions",
-              )}
-            </dt>
-            <dd className="text-sm leading-relaxed tabular-nums">
-              {o.revenue}
-              {isDemo && (
-                <span className="ml-1 font-normal text-muted-foreground">
-                  {copy("USD / customer")}
-                </span>
-              )}
-            </dd>
-          </div>
-          <div className="flex flex-col gap-1">
-            <dt className="text-sm text-muted-foreground">
-              {copy("Key risk to validate")}
-            </dt>
-            <dd className="text-sm leading-relaxed">{o.risk}</dd>
-          </div>
-          {!isDemo && original.validation?.[0] && (
+        </dl>
+        <MobileDisclosure title={copy("Pricing, risks and confidence")}>
+          <dl className="flex flex-col gap-4">
             <div className="flex flex-col gap-1">
               <dt className="text-sm text-muted-foreground">
-                {copy("Next validation step")}
+                {copy(
+                  isDemo
+                    ? "Monthly price hypothesis"
+                    : "Business model and pricing assumptions",
+                )}
               </dt>
-              <dd className="text-sm leading-relaxed">
-                {original.validation[0]}
+              <dd className="text-sm leading-relaxed tabular-nums">
+                {o.revenue}
+                {isDemo && (
+                  <span className="ml-1 font-normal text-muted-foreground">
+                    {copy("USD / customer")}
+                  </span>
+                )}
               </dd>
             </div>
-          )}
-        </dl>
-        <div className="flex flex-wrap items-center gap-2">
-          <Confidence level={o.confidence} />
-        </div>
+            <div className="flex flex-col gap-1 border-l-2 border-warm/60 pl-3">
+              <dt className="text-sm text-warm">
+                {copy("Key risk to validate")}
+              </dt>
+              <dd className="text-sm leading-relaxed">{o.risk}</dd>
+            </div>
+            {!isDemo && original.validation?.[0] && (
+              <div className="flex flex-col gap-1">
+                <dt className="text-sm text-muted-foreground">
+                  {copy("Next validation step")}
+                </dt>
+                <dd className="text-sm leading-relaxed">
+                  {original.validation[0]}
+                </dd>
+              </div>
+            )}
+          </dl>
+          <div className="flex flex-wrap items-center gap-2">
+            <Confidence level={o.confidence} />
+          </div>
+        </MobileDisclosure>
       </CardContent>
-      <CardFooter className="flex-wrap justify-between gap-3 border-t px-6 py-4">
+      <CardFooter className="flex-col items-stretch gap-3 border-t bg-background/30 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
         <p className="text-sm text-muted-foreground">
           {isDemo
             ? copy("Demo assessment")
@@ -131,7 +140,7 @@ export function OpportunityCard({
                 { count: reportEvidenceCount([original]) },
               )}
         </p>
-        <Button asChild variant="link" className="h-auto p-0">
+        <Button asChild variant="outline" className="w-full sm:w-auto">
           <Link
             href={`/opportunities/${o.id}`}
             aria-label={copy("Read report: {title}", { title: o.title })}
