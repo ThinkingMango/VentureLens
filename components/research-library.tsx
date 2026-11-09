@@ -3,7 +3,7 @@ import { useCopy, useFormats } from "@/i18n/use-copy";
 
 import { useState } from "react";
 import Link from "@/components/workspace-link";
-import { Plus, ArrowUpRight, Search, FileText } from "lucide-react";
+import { Plus, ArrowUpRight, Search, FileText, X } from "lucide-react";
 import { PageHeader, DemoNote } from "@/components/shared";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -63,7 +63,11 @@ export function ResearchLibrary() {
             ).length ?? 0,
           date: `${format.date(project.created_at)} UTC`,
         }))
-  ).filter((r) => r.title.toLowerCase().includes(query.toLowerCase()));
+  ).filter((r) =>
+    `${r.title} ${copy(r.sector)}`
+      .toLocaleLowerCase()
+      .includes(query.trim().toLocaleLowerCase()),
+  );
   return (
     <>
       <PageHeader
@@ -82,18 +86,62 @@ export function ResearchLibrary() {
       <div className="surface overflow-hidden">
         <div className="flex flex-col items-start justify-between gap-4 border-b p-5 sm:flex-row sm:items-center">
           <h2 className="font-semibold">{copy("Research library")}</h2>
-          <div className="flex max-w-xs items-center gap-2">
-            <Search className="size-4 text-muted-foreground" />
+          <div className="relative flex w-full items-center gap-2 sm:max-w-sm">
+            <Search
+              className="pointer-events-none absolute left-3 size-4 text-muted-foreground"
+              aria-hidden="true"
+            />
             <Input
+              type="search"
+              className="pl-10 pr-11"
               aria-label={copy("Search research")}
               placeholder={copy("Search research…")}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
+            {query && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute right-0"
+                aria-label={copy("Clear search")}
+                onClick={() => setQuery("")}
+              >
+                <X />
+              </Button>
+            )}
           </div>
         </div>
+        <div className="divide-y md:hidden">
+          {runs.map((r) => (
+            <Link
+              key={r.id}
+              href={r.target}
+              className="flex items-start gap-3 p-5 hover:bg-secondary/40"
+            >
+              <span className="rounded-lg bg-secondary p-2.5 text-primary">
+                <FileText className="size-5" />
+              </span>
+              <div className="min-w-0 flex-1 space-y-2">
+                <h3 className="font-semibold">{r.title}</h3>
+                <p className="text-sm text-muted-foreground">
+                  {copy(r.sector)}
+                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="secondary">{copy(r.status)}</Badge>
+                  <span className="text-sm text-muted-foreground">
+                    {r.count}{" "}
+                    {isDemo ? copy("Opportunities") : copy("Completed runs")}
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground">{copy(r.date)}</p>
+              </div>
+              <ArrowUpRight className="mt-1 size-4 shrink-0 text-primary" />
+            </Link>
+          ))}
+        </div>
         <div
-          className="overflow-x-auto"
+          className="hidden overflow-x-auto md:block"
           role="region"
           tabIndex={0}
           aria-label={copy("Research library")}
@@ -101,17 +149,23 @@ export function ResearchLibrary() {
           <table className="w-full min-w-[620px] text-left">
             <thead className="bg-background text-sm text-muted-foreground">
               <tr>
-                <th scope="col" className="px-6 py-3 font-medium">{copy("Research")}</th>
+                <th scope="col" className="px-6 py-3 font-medium">
+                  {copy("Research")}
+                </th>
                 <th scope="col" className="px-4 py-3 font-medium">
                   {isDemo ? copy("Opportunities") : copy("Completed runs")}
                 </th>
-                <th scope="col" className="px-4 py-3 font-medium">{copy("Status")}</th>
-                <th scope="col" className="px-4 py-3 font-medium">{copy("Open")}</th>
+                <th scope="col" className="px-4 py-3 font-medium">
+                  {copy("Status")}
+                </th>
+                <th scope="col" className="px-4 py-3 font-medium">
+                  {copy("Open")}
+                </th>
               </tr>
             </thead>
             <tbody>
               {runs.map((r) => (
-                <tr key={r.id} className="border-t">
+                <tr key={r.id} className="border-t hover:bg-secondary/30">
                   <td className="px-6 py-6">
                     <Link
                       href={r.target}
@@ -145,7 +199,7 @@ export function ResearchLibrary() {
           </table>
         </div>
         {runs.length === 0 && (
-          <p className="p-10 text-center text-muted-foreground">
+          <p role="status" className="p-10 text-center text-muted-foreground">
             {query
               ? copy("No research matches “{query}”. Try a different search.", {
                   query: query,

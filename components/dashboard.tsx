@@ -10,17 +10,14 @@ import {
   Lightbulb,
   Bookmark,
   Target,
-  Sparkles,
   Check,
-  Compass,
   FileText,
   Clock3,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { PageHeader, SectionTitle, DemoNote } from "@/components/shared";
-import { OpportunityCard } from "@/components/opportunity-card";
+import { OpportunityLedger } from "@/components/opportunity-ledger";
 import { ScoreChart } from "@/components/score-chart";
 import { useDemoContent } from "@/i18n/demo";
 import { useDemo } from "@/components/demo-provider";
@@ -33,7 +30,7 @@ export function Dashboard() {
   return (
     <>
       <PageHeader
-        title={copy("A little clarity. A lot of possibility.")}
+        title={copy("Research overview")}
         description={copy(
           "Welcome back, {name}. Let’s find a business worth building.",
           { name: profile.name },
@@ -46,54 +43,9 @@ export function Dashboard() {
           </Link>
         </Button>
       </PageHeader>
-      <section className="relative flex flex-col justify-between gap-7 overflow-hidden rounded-xl border border-primary/15 bg-secondary p-6 sm:flex-row sm:items-center xl:p-8">
-        <div className="flex max-w-xl flex-col items-start gap-4">
-          <Badge
-            variant="outline"
-            className="gap-1.5 rounded-md border-primary/20 bg-card/70 text-primary"
-          >
-            <Sparkles className="size-3.5" />
-            {copy("Your next chapter starts with evidence")}
-          </Badge>
-          <div className="flex flex-col gap-2">
-            <h2 className="text-2xl font-semibold tracking-tight text-balance">
-              {copy("Big ideas deserve a closer look.")}
-            </h2>
-            <p className="max-w-lg leading-relaxed text-muted-foreground">
-              {copy(
-                "Find recurring-revenue opportunities that fit your strengths. Move beyond inspiration—with a clearer view of the buyer, the market, and your next step.",
-              )}
-            </p>
-          </div>
-          <Button asChild className="mt-1">
-            <Link href="/research/new">
-              {copy("Explore new opportunities")}
-              <ArrowRight />
-            </Link>
-          </Button>
-        </div>
-        <div
-          className="hidden h-36 w-48 shrink-0 items-center justify-center lg:flex"
-          aria-hidden="true"
-        >
-          <div className="relative flex size-32 items-center justify-center rounded-full border border-primary/15">
-            <div className="flex size-24 items-center justify-center rounded-full border border-primary/25">
-              <div className="flex size-14 items-center justify-center rounded-full bg-card shadow-sm">
-                <Compass className="size-8 text-primary" strokeWidth={1.4} />
-              </div>
-            </div>
-            <span className="absolute right-0 top-1 flex size-8 items-center justify-center rounded-lg border bg-card text-primary">
-              <Sparkles className="size-4" />
-            </span>
-            <span className="absolute bottom-0 left-1 flex size-8 items-center justify-center rounded-lg border bg-card text-primary">
-              <Target className="size-4" />
-            </span>
-          </div>
-        </div>
-      </section>
       <section
         aria-label={copy("Workspace statistics")}
-        className="grid grid-cols-2 gap-4 xl:grid-cols-4"
+        className="terminal-stats"
       >
         {[
           {
@@ -121,7 +73,7 @@ export function Dashboard() {
             icon: Target,
           },
         ].map((s) => (
-          <div className="surface flex flex-col gap-4 p-5" key={s.label}>
+          <div className="flex flex-col gap-2" key={s.label}>
             <div className="flex items-center justify-between gap-2">
               <span className="text-sm text-muted-foreground">
                 {copy(s.label)}
@@ -129,7 +81,7 @@ export function Dashboard() {
               <s.icon className="size-[18px] shrink-0 text-muted-foreground" />
             </div>
             <p className="stat-value">{s.value}</p>
-            <p className="text-sm text-muted-foreground">{copy(s.detail)}</p>
+            <p className="hidden text-sm text-muted-foreground sm:block">{copy(s.detail)}</p>
           </div>
         ))}
       </section>
@@ -142,11 +94,7 @@ export function Dashboard() {
           href="/research/results"
           label={copy("Explore all")}
         />
-        <div className="grid gap-5 md:grid-cols-2">
-          {opportunities.slice(0, 2).map((o) => (
-            <OpportunityCard key={o.id} opportunity={o} />
-          ))}
-        </div>
+        <OpportunityLedger opportunities={opportunities} />
       </section>
       <div className="grid gap-6 xl:grid-cols-[1.4fr_1fr]">
         <section className="surface flex flex-col gap-5 p-6">

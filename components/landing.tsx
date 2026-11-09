@@ -9,10 +9,6 @@ import {
   ScanLine,
   Users,
   SlidersHorizontal,
-  Telescope,
-  Bookmark,
-  LayoutDashboard,
-  Aperture,
   ShieldCheck,
   Link2,
   Scale,
@@ -29,9 +25,7 @@ import {
 } from "lucide-react";
 import { PublicShell } from "@/components/public-shell";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { useDemoContent } from "@/i18n/demo";
-import { scoreLabels } from "@/lib/demo-data";
+import { EvidencePreview } from "@/components/evidence-preview";
 
 const reportParts = [
   {
@@ -77,13 +71,15 @@ const steps = [
     icon: ScanLine,
     title: "See the opportunity, not just the idea.",
     text: "Explore buyer pain, competitive context, business economics, and evidence quality in one structured research brief.",
-    detail: "Discovery, web retrieval, classification, scoring, and review run as one durable job.",
+    detail:
+      "Discovery, web retrieval, classification, scoring, and review run as one durable job.",
   },
   {
     icon: Users,
     title: "Make your next conversation count.",
     text: "Turn a promising hypothesis into a focused validation plan, with assumptions to test and buyers to talk to.",
-    detail: "Save a shortlist, track the checklist, and come back when you have real answers.",
+    detail:
+      "Save a shortlist, track the checklist, and come back when you have real answers.",
   },
 ];
 
@@ -153,177 +149,58 @@ const faqs = [
 
 export function Landing() {
   const copy = useCopy();
-  const { opportunities } = useDemoContent();
-  const lead = opportunities[0];
   return (
     <PublicShell>
-      <main>
+      <main id="main-content">
         <section className="hero-bg relative overflow-hidden">
-          <div className="grid-bg pointer-events-none absolute inset-0" aria-hidden="true" />
-          <div className="relative mx-auto flex max-w-7xl flex-col items-center gap-7 px-5 pb-16 pt-14 text-center md:px-8 md:pt-24">
-            <div className="flex items-center gap-2 rounded-full border bg-card/80 px-3.5 py-1.5 text-sm text-muted-foreground shadow-card backdrop-blur">
-              <span className="demo-dot" />
-              {copy("Evidence-first opportunity research for founders")}
+          <div className="hero-layout relative mx-auto max-w-7xl px-5 py-8 md:px-8 md:py-12">
+            <div className="terminal-masthead">
+              <span>
+                {copy("Evidence-first opportunity research for founders")}
+              </span>
+              <span>{copy("English · 简体中文 · 繁體中文")}</span>
             </div>
-            <h1 className="max-w-4xl text-balance text-4xl font-semibold leading-[1.08] tracking-[-0.045em] sm:text-5xl md:text-6xl">
-              {copy("Find a business worth building.")}
-              <br />
-              <span className="gradient-text">{copy("Then prove it.")}</span>
-            </h1>
-            <p className="max-w-2xl text-pretty text-base leading-relaxed text-muted-foreground md:text-lg">
-              {copy(
-                "VentureLens turns your experience into a shortlist of GenAI-enabled, recurring-revenue businesses—each backed by linked sources, an explainable score, a critique, and a validation plan.",
-              )}
-            </p>
-            <div className="flex flex-wrap justify-center gap-3">
-              <Button asChild size="lg">
-                <Link href="/demo/dashboard">
-                  {copy("Explore the live demo")}
-                  <ArrowRight />
-                </Link>
-              </Button>
-              <Button asChild variant="outline" size="lg">
-                <Link href="/signup">
-                  {copy("Create a free account")}
-                  <ArrowUpRight />
-                </Link>
-              </Button>
-            </div>
-            <ul className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-sm text-muted-foreground">
-              <li className="flex items-center gap-1.5">
-                <ShieldCheck className="size-4 text-primary" />
-                {copy("No credit card")}
-              </li>
-              <li className="flex items-center gap-1.5">
-                <Check className="size-4 text-primary" />
-                {copy("Private workspace")}
-              </li>
-              <li className="flex items-center gap-1.5">
-                <Languages className="size-4 text-primary" />
-                {copy("English · 简体中文 · 繁體中文")}
-              </li>
-            </ul>
-            <div className="float mt-8 w-full overflow-hidden rounded-2xl border bg-background text-left">
-              <div className="flex h-12 items-center justify-between border-b bg-card px-5">
-                <span className="flex items-center gap-2 font-medium">
-                  <Aperture className="size-5 text-primary" />
-                  VentureLens AI
-                </span>
-                <Badge variant="secondary">{copy("Synthetic demo")}</Badge>
+            <div className="hero-copy">
+              <h1 className="max-w-4xl text-balance text-4xl font-semibold leading-[1.08] tracking-[-0.045em] sm:text-5xl md:text-6xl">
+                {copy("Find a business worth building.")}
+                <br />
+                <span>{copy("Then prove it.")}</span>
+              </h1>
+              <p className="text-pretty text-sm leading-relaxed text-muted-foreground md:text-base">
+                {copy(
+                  "VentureLens turns your experience into a shortlist of GenAI-enabled, recurring-revenue businesses—each backed by linked sources, an explainable score, a critique, and a validation plan.",
+                )}
+              </p>
+              <div className="hero-actions flex flex-wrap gap-3">
+                <Button asChild size="lg">
+                  <Link href="/demo/dashboard">
+                    {copy("Explore the live demo")}
+                    <ArrowRight />
+                  </Link>
+                </Button>
+                <Button asChild variant="outline" size="lg">
+                  <Link href="/signup">
+                    {copy("Create a free account")}
+                    <ArrowUpRight />
+                  </Link>
+                </Button>
               </div>
-              <div className="flex">
-                <div className="hidden w-52 shrink-0 flex-col gap-1 border-r bg-card p-4 lg:flex">
-                  <p className="px-3 pb-3 text-xs font-semibold tracking-wider text-muted-foreground">
-                    {copy("YOUR WORKSPACE")}
-                  </p>
-                  {[
-                    { icon: LayoutDashboard, label: "Overview" },
-                    { icon: Telescope, label: "My research", active: true },
-                    { icon: Bookmark, label: "Saved opportunities" },
-                    { icon: Users, label: "Founder profile" },
-                  ].map((n) => (
-                    <div
-                      key={n.label}
-                      className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm ${n.active ? "bg-secondary text-primary" : "text-muted-foreground"}`}
-                    >
-                      <n.icon className="size-4" />
-                      {copy(n.label)}
-                    </div>
-                  ))}
-                  <div className="mt-8 rounded-lg bg-secondary p-3 text-sm text-primary">
-                    {copy("From possibility")}
-                    <br />
-                    <strong>{copy("to a plan.")}</strong>
-                  </div>
-                </div>
-                <div className="flex min-w-0 flex-1 flex-col gap-5 p-5 md:p-7">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div>
-                      <p className="text-sm text-muted-foreground">
-                        {copy("Research complete")} · {copy("4 hypotheses · 12 sample sources")}
-                      </p>
-                      <h2 className="text-lg font-semibold md:text-xl">
-                        {copy("GenAI opportunities for service businesses")}
-                      </h2>
-                    </div>
-                    <Link
-                      href="/demo/research/results"
-                      className="hidden items-center gap-1 text-sm font-medium text-primary sm:flex"
-                    >
-                      {copy("View research")}
-                      <ArrowRight className="size-4" />
-                    </Link>
-                  </div>
-                  <div className="grid gap-4 md:grid-cols-[1.4fr_1fr]">
-                    <Link
-                      href={`/demo/opportunities/${lead.id}`}
-                      className="lift flex flex-col gap-4 rounded-xl border bg-card p-5"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="mb-1 text-sm text-muted-foreground">{lead.category}</p>
-                          <h3 className="text-lg font-semibold leading-snug">{lead.title}</h3>
-                        </div>
-                        <span className="shrink-0 text-2xl font-semibold tabular-nums text-primary">
-                          {lead.score}
-                          <span className="text-sm font-normal text-muted-foreground"> / 100</span>
-                        </span>
-                      </div>
-                      <p className="text-sm text-muted-foreground">{lead.description}</p>
-                      <dl className="grid gap-3 text-sm sm:grid-cols-2">
-                        <div>
-                          <dt className="text-muted-foreground">{copy("Likely buyer")}</dt>
-                          <dd className="font-medium">{lead.buyer}</dd>
-                        </div>
-                        <div>
-                          <dt className="text-muted-foreground">{copy("Monthly price hypothesis")}</dt>
-                          <dd className="font-medium tabular-nums">{lead.revenue}</dd>
-                        </div>
-                      </dl>
-                      <div className="flex flex-wrap gap-2 border-t pt-3">
-                        {["community-forum.org", "industry-survey.com", "buyer-blog.net"].map((d) => (
-                          <span
-                            key={d}
-                            className="flex items-center gap-1 rounded-full border bg-background px-2.5 py-1 text-xs text-muted-foreground"
-                          >
-                            <Link2 className="size-3" />
-                            {d}
-                          </span>
-                        ))}
-                      </div>
-                    </Link>
-                    <div className="flex flex-col gap-4 rounded-xl border bg-card p-5">
-                      <div className="flex items-center justify-between">
-                        <p className="font-medium">{copy("Score breakdown")}</p>
-                        <Badge variant="outline">{copy("Demo")}</Badge>
-                      </div>
-                      <dl className="flex flex-col gap-3">
-                        {scoreLabels.map((label, i) => (
-                          <div key={label} className="flex flex-col gap-1.5">
-                            <div className="flex justify-between gap-3 text-sm">
-                              <dt className="text-muted-foreground">{copy(label)}</dt>
-                              <dd className="font-medium tabular-nums">{lead.scores[i]}</dd>
-                            </div>
-                            <div className="progress-track" aria-hidden="true">
-                              <div className="progress-fill" style={{ width: `${lead.scores[i]}%` }} />
-                            </div>
-                          </div>
-                        ))}
-                      </dl>
-                      <p className="flex items-start gap-2 rounded-lg bg-warm-soft p-3 text-xs leading-relaxed text-foreground">
-                        <Swords className="mt-0.5 size-3.5 shrink-0 text-warm" />
-                        {copy("Review note: established proposal tools may bundle similar features.")}
-                      </p>
-                    </div>
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    {copy(
-                      "Illustrative opportunities and scores. Not verified findings or financial advice.",
-                    )}
-                  </p>
-                </div>
-              </div>
+              <ul className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-muted-foreground">
+                <li className="flex items-center gap-1.5">
+                  <ShieldCheck className="size-4 text-primary" />
+                  {copy("No credit card")}
+                </li>
+                <li className="flex items-center gap-1.5">
+                  <Check className="size-4 text-primary" />
+                  {copy("Private workspace")}
+                </li>
+                <li className="flex items-center gap-1.5">
+                  <Languages className="size-4 text-primary" />
+                  {copy("English · 简体中文 · 繁體中文")}
+                </li>
+              </ul>
             </div>
+            <EvidencePreview />
           </div>
         </section>
         <section className="border-y bg-background">
@@ -341,7 +218,10 @@ export function Landing() {
             ))}
           </div>
         </section>
-        <section id="whats-inside" className="mx-auto max-w-7xl px-5 py-20 md:px-8">
+        <section
+          id="whats-inside"
+          className="mx-auto max-w-7xl px-5 py-20 md:px-8"
+        >
           <div className="flex flex-col gap-4 md:max-w-2xl">
             <p className="eyebrow">{copy("What you get")}</p>
             <h2 className="text-balance text-3xl font-semibold md:text-4xl">
@@ -353,14 +233,19 @@ export function Landing() {
               )}
             </p>
           </div>
-          <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-10 grid gap-x-10 sm:grid-cols-2 lg:grid-cols-3">
             {reportParts.map((part) => (
-              <article key={part.title} className="surface lift flex flex-col gap-4 p-6">
-                <span className="flex size-11 items-center justify-center rounded-xl bg-secondary text-primary">
+              <article
+                key={part.title}
+                className="flex flex-col gap-3 border-t py-6"
+              >
+                <span className="text-primary">
                   <part.icon className="size-5" />
                 </span>
                 <h3 className="text-lg font-semibold">{copy(part.title)}</h3>
-                <p className="text-sm leading-relaxed text-muted-foreground">{copy(part.text)}</p>
+                <p className="text-sm leading-relaxed text-muted-foreground">
+                  {copy(part.text)}
+                </p>
               </article>
             ))}
           </div>
@@ -384,16 +269,20 @@ export function Landing() {
             </div>
             <ol className="mt-12 grid gap-6 md:grid-cols-3">
               {steps.map((f, i) => (
-                <li key={f.title} className="surface flex flex-col gap-5 p-6">
+                <li key={f.title} className="flex flex-col gap-5 border-t py-6">
                   <div className="flex items-center justify-between">
                     <span className="step-number">{i + 1}</span>
                     <f.icon className="size-5 text-muted-foreground" />
                   </div>
                   <div className="flex flex-col gap-2">
                     <h3 className="text-xl font-semibold">{copy(f.title)}</h3>
-                    <p className="text-base leading-relaxed text-muted-foreground">{copy(f.text)}</p>
+                    <p className="text-base leading-relaxed text-muted-foreground">
+                      {copy(f.text)}
+                    </p>
                   </div>
-                  <p className="mt-auto border-t pt-4 text-sm text-muted-foreground">{copy(f.detail)}</p>
+                  <p className="mt-auto border-t pt-4 text-sm text-muted-foreground">
+                    {copy(f.detail)}
+                  </p>
                 </li>
               ))}
             </ol>
@@ -402,7 +291,9 @@ export function Landing() {
         <section className="band-dark">
           <div className="mx-auto max-w-7xl px-5 py-20 md:px-8">
             <div className="flex flex-col gap-4 md:max-w-2xl">
-              <p className="eyebrow text-[#9fb7ff]">{copy("Honest by design")}</p>
+              <p className="eyebrow text-[#9fb7ff]">
+                {copy("Honest by design")}
+              </p>
               <h2 className="text-balance text-3xl font-semibold md:text-4xl">
                 {copy("Rules the research engine cannot break")}
               </h2>
@@ -422,8 +313,12 @@ export function Landing() {
                     <rule.icon className="size-5" />
                   </span>
                   <div className="flex flex-col gap-2">
-                    <h3 className="text-lg font-semibold">{copy(rule.title)}</h3>
-                    <p className="muted-on-dark text-sm leading-relaxed">{copy(rule.text)}</p>
+                    <h3 className="text-lg font-semibold">
+                      {copy(rule.title)}
+                    </h3>
+                    <p className="muted-on-dark text-sm leading-relaxed">
+                      {copy(rule.text)}
+                    </p>
                   </div>
                 </article>
               ))}
@@ -439,10 +334,15 @@ export function Landing() {
           </div>
           <div className="mt-12 grid gap-5 md:grid-cols-3">
             {audiences.map((a) => (
-              <article key={a.title} className="flex flex-col gap-4 rounded-2xl bg-secondary p-6">
+              <article
+                key={a.title}
+                className="flex flex-col gap-4 rounded-2xl bg-secondary p-6"
+              >
                 <a.icon className="size-6 text-primary" />
                 <h3 className="text-lg font-semibold">{copy(a.title)}</h3>
-                <p className="text-sm leading-relaxed text-muted-foreground">{copy(a.text)}</p>
+                <p className="text-sm leading-relaxed text-muted-foreground">
+                  {copy(a.text)}
+                </p>
               </article>
             ))}
           </div>
@@ -455,7 +355,9 @@ export function Landing() {
                 {copy("Straight answers before you start")}
               </h2>
               <p className="text-base text-muted-foreground">
-                {copy("Still unsure? Open the demo and read a full sample report first.")}
+                {copy(
+                  "Still unsure? Open the demo and read a full sample report first.",
+                )}
               </p>
               <Button asChild variant="outline" className="w-fit">
                 <Link href="/demo/research/results">
@@ -471,13 +373,15 @@ export function Landing() {
                     {copy(f.q)}
                     <ArrowRight className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-90" />
                   </summary>
-                  <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{copy(f.a)}</p>
+                  <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+                    {copy(f.a)}
+                  </p>
                 </details>
               ))}
             </div>
           </div>
         </section>
-        <section className="mx-5 mb-20 mt-20 flex max-w-7xl flex-col items-center gap-6 rounded-3xl brand-gradient px-6 py-16 text-center text-white md:mx-8 xl:mx-auto">
+        <section className="mx-5 mb-20 mt-20 flex max-w-7xl flex-col items-center gap-6 rounded-lg border bg-card px-6 py-16 text-center text-white md:mx-8 xl:mx-auto">
           <h2 className="text-balance text-3xl font-semibold md:text-4xl">
             {copy("Your next chapter deserves a clearer lens.")}
           </h2>
@@ -487,13 +391,23 @@ export function Landing() {
             )}
           </p>
           <div className="flex flex-wrap justify-center gap-3">
-            <Button asChild size="lg" variant="outline" className="border-white/20 bg-white text-foreground hover:bg-white/90">
+            <Button
+              asChild
+              size="lg"
+              variant="outline"
+              className="border-border bg-primary text-primary-foreground hover:bg-[var(--primary-deep)]"
+            >
               <Link href="/signup">
                 {copy("Build your founder profile")}
                 <ArrowRight />
               </Link>
             </Button>
-            <Button asChild size="lg" variant="ghost" className="text-white hover:bg-white/10 hover:text-white">
+            <Button
+              asChild
+              size="lg"
+              variant="ghost"
+              className="text-white hover:bg-white/10 hover:text-white"
+            >
               <Link href="/demo/dashboard">
                 {copy("Explore the demo")}
                 <ArrowUpRight />

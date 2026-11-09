@@ -154,7 +154,7 @@ export function Privacy() {
   const format = useFormats();
   return (
     <PublicShell>
-      <main>
+      <main id="main-content">
         <section className="hero-bg">
           <div className="mx-auto flex max-w-6xl flex-col items-start gap-5 px-5 pb-12 pt-16 md:px-8 md:pt-20">
             <Badge variant="secondary" className="gap-1.5">

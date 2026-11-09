@@ -1037,6 +1037,8 @@
     "mvcofaf": "A complete {model} run is estimated to need a budget of at least {required}, but this run's budget is {remaining}. The run stopped before sending any provider request.",
     "m1lnpcxt": "The connection dropped before the server replied. Your research may already have started: check My research before trying again.",
     "m1aq5q7j": "Research could not start right now. Please try again.",
+    "m1027147": "Research overview",
+    "mypemhd": "Research workspace",
     "m1f8350a": "Help",
     "mtxsyvc": "Support",
     "mab2tcv": "Privacy Policy",
