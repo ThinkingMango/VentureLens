@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldContent, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Separator } from "@/components/ui/separator";
-import { providerPlan, runCostEstimates, MIN_RESEARCH_BUDGET_USD, MAX_RESEARCH_BUDGET_USD, type ProviderSettings, type ProviderSettingsResponse, type ResearchProvider } from "@/lib/provider-settings-core";
+import { providerPlan, runCostEstimates, parseBudgetInput, settleBudgetInput, MIN_RESEARCH_BUDGET_USD, MAX_RESEARCH_BUDGET_USD, type ProviderSettings, type ProviderSettingsResponse, type ResearchProvider } from "@/lib/provider-settings-core";
 import { useFormats } from "@/i18n/use-copy";
 import { ProviderModelField } from "@/components/provider-model-field";
 import { selectedModel, researchModels, qwenModelSchema, geminiModelSchema } from "@/lib/research-models";
@@ -30,6 +30,8 @@ export function AdminProviders({ initialData }: { initialData: ProviderSettingsR
   const formats = useFormats();
   const { data = initialData, error: loadError, mutate, isValidating } = useSWR(endpoint, loadSettings, { fallbackData: initialData });
   const [draft, setDraft] = useState<ProviderSettings | null>(null);
+  // The budget text while it is being typed; null shows the saved or drafted value.
+  const [budgetText, setBudgetText] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<"saveFailed" | "notConfigured" | "accessExpired" | "budgetTooLowSaved" | null>(null);
   const settings = draft ?? data.settings;
@@ -103,9 +105,11 @@ export function AdminProviders({ initialData }: { initialData: ProviderSettingsR
                 <Field data-disabled={saving}>
                   <FieldLabel htmlFor="research-budget">{t("budget")}</FieldLabel>
                   <input
-                    id="research-budget" type="number" inputMode="decimal" step="0.05" min={MIN_RESEARCH_BUDGET_USD} max={MAX_RESEARCH_BUDGET_USD}
-                    value={settings.budgetUsd} disabled={saving || !!loadError} aria-describedby="budget-help"
-                    onChange={event => { const value = Number(event.target.value); if (Number.isFinite(value)) change({ budgetUsd: Math.min(MAX_RESEARCH_BUDGET_USD, Math.max(MIN_RESEARCH_BUDGET_USD, Math.round(value * 100) / 100)) }); }}
+                    id="research-budget" type="number" inputMode="decimal" step="0.01" min={MIN_RESEARCH_BUDGET_USD} max={MAX_RESEARCH_BUDGET_USD}
+                    value={budgetText ?? settings.budgetUsd} disabled={saving || !!loadError} aria-describedby="budget-help"
+                    // Keep what is typed; apply it once it is a usable budget, and clamp only when the field is left.
+                    onChange={event => { setBudgetText(event.target.value); const value = parseBudgetInput(event.target.value); if (value !== null) change({ budgetUsd: value }); }}
+                    onBlur={() => { if (budgetText !== null) { change({ budgetUsd: settleBudgetInput(budgetText, settings.budgetUsd) }); setBudgetText(null); } }}
                     className="h-12 w-full rounded-md border bg-card px-3 text-base text-foreground md:max-w-xs"
                   />
                   <FieldDescription id="budget-help">{t("budgetHelp", { min: MIN_RESEARCH_BUDGET_USD, max: MAX_RESEARCH_BUDGET_USD })}</FieldDescription>
@@ -141,7 +145,7 @@ export function AdminProviders({ initialData }: { initialData: ProviderSettingsR
                 {changed ? t("unsaved") : data.settings.updatedAt ? t("lastSaved", { date: formats.date(data.settings.updatedAt, true) }) : t("defaults")}
               </p>
               <div className="flex flex-wrap items-center gap-2">
-                {changed && <Button type="button" variant="ghost" disabled={saving} onClick={() => { setDraft(null); setSaveError(null); }}>{t("discard")}</Button>}
+                {changed && <Button type="button" variant="ghost" disabled={saving} onClick={() => { setDraft(null); setBudgetText(null); setSaveError(null); }}>{t("discard")}</Button>}
                 <Button type="submit" disabled={!changed || saving || !!loadError || !configured || !primaryFits}>
                   {saving ? <LoaderCircle className="animate-spin motion-reduce:animate-none" aria-hidden="true" data-icon="inline-start" /> : <Check aria-hidden="true" data-icon="inline-start" />}
                   {saving ? t("saving") : t("save")}

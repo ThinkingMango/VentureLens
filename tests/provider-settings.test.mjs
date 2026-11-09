@@ -247,7 +247,7 @@ test("model pricing applies published future price changes rather than an expire
 });
 
 test("the protected page and browser bundle never trust client roles or expose provider credentials", () => {
-  const page = readFileSync(new URL("../app/(workspace)/admin/page.tsx", import.meta.url), "utf8");
+  const page = readFileSync(new URL("../app/(admin)/admin/page.tsx", import.meta.url), "utf8");
   assert.match(page, /if \(!isAdministrator\(user\)\) notFound\(\)/);
   const client = readFileSync(new URL("../components/admin-providers.tsx", import.meta.url), "utf8");
   assert.doesNotMatch(client, /SUPABASE_SERVICE_ROLE_KEY|SUPABASE_SECRET_KEY|DASHSCOPE_API_KEY|GOOGLE_GENERATIVE_AI_API_KEY|localStorage/);
@@ -549,6 +549,8 @@ test("the actual progress view renders blocked-request costs and a usable recove
     "@/components/shared": { PageHeader: ({ title, description }) => createElement("header", null, createElement("h1", null, title), createElement("p", null, description)) },
     "@/components/demo-provider": { useDemo: () => ({ refresh: async () => undefined }) },
     "@/components/research-report": { ResearchReportView: () => null },
+    // The real model badge, so the rendered model and provider names are checked.
+    "@/components/model-tag": loadModule("../components/model-tag.tsx", { "@/components/ui/badge": { Badge: ({ children, ...props }) => createElement("span", props, children) }, "@/lib/research-models": models, "@/i18n/use-copy": { useCopy: () => (text, values = {}) => text.replace(/\{(\w+)\}/g, (_match, key) => values[key] ?? key) } }),
     "@/lib/research-core": researchCore,
     "@/lib/research-models": models,
     "@/components/ui/badge": { Badge: ({ children, ...props }) => createElement("span", props, children) },
@@ -578,6 +580,8 @@ test("a failed run says whether its slot was returned, from the server's refund 
       "@/components/shared": { PageHeader: ({ title }) => createElement("h1", null, title) },
       "@/components/demo-provider": { useDemo: () => ({ refresh: async () => undefined }) },
       "@/components/research-report": { ResearchReportView: () => null },
+      // The real model badge, so the rendered model and provider names are checked.
+      "@/components/model-tag": loadModule("../components/model-tag.tsx", { "@/components/ui/badge": { Badge: ({ children, ...props }) => createElement("span", props, children) }, "@/lib/research-models": models, "@/i18n/use-copy": { useCopy: () => (text, values = {}) => text.replace(/\{(\w+)\}/g, (_match, key) => values[key] ?? key) } }),
       "@/lib/research-core": researchCore, "@/lib/research-models": models,
       "@/components/ui/badge": { Badge: ({ children }) => createElement("span", null, children) },
       "@/i18n/use-copy": { useCopy: () => (text, values = {}) => text.replace(/\{(\w+)\}/g, (_m, key) => values[key] ?? key), useFormats: () => ({ usd: value => `$${value}`, number: String, date: String }) },

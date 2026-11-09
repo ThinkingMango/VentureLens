@@ -35,7 +35,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { useDemo } from "@/components/demo-provider";
-import { ResearchAccessCard } from "@/components/live-workspace";
+import { ResearchAccessCard } from "@/components/research-access-card";
 import { cn } from "@/lib/utils";
 const nav = [
   { title: "Overview", href: "/dashboard", icon: LayoutDashboard },
@@ -100,7 +100,7 @@ export function AppShell({
       </div>
       <div className="flex flex-1 flex-col px-4 py-3">
         <div className="mb-5 flex items-center gap-3 rounded-lg border p-3">
-          <span className="flex size-8 items-center justify-center rounded-md bg-secondary font-semibold text-primary">
+          <span aria-hidden="true" className="flex size-8 items-center justify-center rounded-md bg-secondary font-semibold text-primary">
             {profile.name.slice(0, 1) || copy("F")}
           </span>
           <div className="flex-1">
@@ -239,7 +239,7 @@ export function AppShell({
         onClick={() => setOpen(false)}
         className="flex items-center gap-3 border-t px-6 py-5"
       >
-        <span className="flex size-9 items-center justify-center rounded-full bg-secondary font-semibold text-primary">
+        <span aria-hidden="true" className="flex size-9 items-center justify-center rounded-full bg-secondary font-semibold text-primary">
           {profile.name.slice(0, 1)}
         </span>
         <div className="flex-1">
@@ -322,7 +322,7 @@ export function AppShell({
             >
               <CircleHelp className="size-[18px]" />
             </button>
-            <span className="hidden size-8 items-center justify-center rounded-full bg-secondary font-medium text-primary sm:flex">
+            <span aria-hidden="true" className="hidden size-8 items-center justify-center rounded-full bg-secondary font-medium text-primary sm:flex">
               {profile.name.slice(0, 1)}
             </span>
           </div>

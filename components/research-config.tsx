@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { useDemo } from "@/components/demo-provider";
 import { PageHeader, DemoNote } from "@/components/shared";
-import { ResearchAccessCard } from "@/components/live-workspace";
+import { ResearchAccessCard } from "@/components/research-access-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {

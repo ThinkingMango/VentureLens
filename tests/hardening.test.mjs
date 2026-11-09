@@ -83,7 +83,7 @@ test("live billing shows the same research allowance as the sidebar and never cl
     "@/components/ui/button": { Button: passthrough }, "@/components/ui/badge": { Badge: passthrough },
     "@/components/pricing": { PricingCards: () => null },
     "@/components/demo-provider": { useDemo: () => ({ isDemo: false }) },
-    "@/components/live-workspace": { ResearchAccessCard: () => createElement("aside", null, "ACCESS-CARD") },
+    "@/components/research-access-card": { ResearchAccessCard: () => createElement("aside", null, "ACCESS-CARD") },
   });
   const html = renderToStaticMarkup(createElement(Billing));
   assert.match(html, /ACCESS-CARD/);
@@ -105,6 +105,15 @@ test("every route sends anti-framing headers and a CSP that leaves scripts alone
   assert.doesNotMatch(csp, /script-src|default-src/, "no directive that would block Next.js inline scripts without nonces");
   // Framing protection must not depend on a route allowlist, which previously left /admin and /auth/confirm out.
   assert.ok(!rules.some(rule => rule !== all && rule.headers.some(h => h.key === "X-Frame-Options")));
+});
+
+test("password-era routes are permanent router redirects to email sign-in", async () => {
+  const config = loadModule("../next.config.ts", {
+    "workflow/next": { withWorkflow: value => value },
+    "next-intl/plugin": { default: () => value => value },
+  }).default;
+  const redirects = await config.redirects();
+  assert.deepEqual(redirects, ["/forgot-password", "/reset-password", "/verify-email"].map(source => ({ source, destination: "/login", permanent: true })));
 });
 
 test("live workspace components never import demo fixtures or the chart statically", () => {

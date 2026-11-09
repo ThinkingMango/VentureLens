@@ -3,6 +3,7 @@ import { MobileDisclosure } from "@/components/mobile-disclosure";
 import { useCopy } from "@/i18n/use-copy";
 
 import { useState } from "react";
+import { useLocale } from "next-intl";
 import Link from "@/components/workspace-link";
 import {
   ArrowLeft,
@@ -28,6 +29,7 @@ export function DemoResearchResults({
   savedOnly?: boolean;
 }) {
   const copy = useCopy();
+  const locale = useLocale();
   const { opportunities } = useDemoContent();
   const { run, saved, isDemo } = useDemo();
   const [query, setQuery] = useState("");
@@ -46,7 +48,7 @@ export function DemoResearchResults({
     .sort((a, b) =>
       sort === "Highest score"
         ? b.score - a.score
-        : a.title.localeCompare(b.title),
+        : a.title.localeCompare(b.title, locale),
     );
   function download() {
     const text = [
@@ -81,7 +83,8 @@ export function DemoResearchResults({
     a.href = url;
     a.download = "venturelens-demo-research.txt";
     a.click();
-    URL.revokeObjectURL(url);
+    // Revoking synchronously can cancel the download in some browsers.
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
   return (
     <>
@@ -181,6 +184,7 @@ export function DemoResearchResults({
           </h2>
           <div
             className="flex rounded-md border bg-card p-1"
+            role="group"
             aria-label={copy("Results view")}
           >
             <Button

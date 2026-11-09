@@ -13,11 +13,11 @@ export default function NotFound() {
     <main className="flex min-h-dvh flex-col items-center justify-center gap-6 p-6 text-center">
       <Brand />
       <h1 className="text-3xl font-semibold">
-        {copy("This opportunity isn’t here.")}
+        {copy("This page isn’t here.")}
       </h1>
       <p className="text-muted-foreground">
         {copy(
-          "The page may have moved, or the demo opportunity doesn’t exist.",
+          "The link may be out of date, or the page has moved.",
         )}
       </p>
       <Button asChild>

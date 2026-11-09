@@ -2,18 +2,8 @@
 import { useCopy } from "@/i18n/use-copy";
 
 import Link from "@/components/workspace-link";
-import {
-  Aperture,
-  ArrowUpRight,
-  Info,
-  FileText,
-  Headphones,
-  ChartNoAxesCombined,
-  Workflow,
-  ArrowRight,
-} from "lucide-react";
+import { Aperture, Info, ArrowRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { demoNotice } from "@/lib/demo-notice";
 import { useOptionalWorkspace } from "@/components/demo-provider";
@@ -118,12 +108,6 @@ export function SectionTitle({
     </div>
   );
 }
-export const opportunityIcons = {
-  file: FileText,
-  headset: Headphones,
-  chart: ChartNoAxesCombined,
-  workflow: Workflow,
-};
 const confidenceLabels: Record<string, string> = {
   moderate: "Moderate: primary validation still needed",
   limited: "Limited: few independent sources",
@@ -137,22 +121,5 @@ export function Confidence({ level }: { level: string }) {
         ? copy("{level} confidence", { level: copy(level) })
         : copy(confidenceLabels[level] ?? level)}
     </Badge>
-  );
-}
-export function TextLink({
-  href,
-  children,
-}: {
-  href: string;
-  children: React.ReactNode;
-}) {
-  const copy = useCopy();
-  return (
-    <Button asChild variant="link" className="h-auto p-0">
-      <Link href={href}>
-        {children}
-        <ArrowUpRight data-icon="inline-end" />
-      </Link>
-    </Button>
   );
 }

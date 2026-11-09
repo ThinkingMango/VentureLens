@@ -205,7 +205,7 @@ export function Landing() {
           <div className="max-w-2xl">
             <p className="eyebrow">{copy("How it works")}</p>
             <h2 className="editorial-title mt-3 text-balance text-4xl md:text-5xl">
-              {copy("A better question than")} {copy("“What should I build?”")}
+              {copy("A better question than “What should I build?”")}
             </h2>
             <p className="mt-4 max-w-xl text-muted-foreground">
               {copy(

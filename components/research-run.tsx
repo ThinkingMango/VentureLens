@@ -2,13 +2,13 @@
 import { useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
-import { Check, Circle, LoaderCircle, ArrowLeft, Cpu } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { Check, Circle, LoaderCircle, ArrowLeft } from "lucide-react";
 import { researchModels } from "@/lib/research-models";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/shared";
 import { useDemo } from "@/components/demo-provider";
 import { ResearchReportView } from "@/components/research-report";
+import { ModelTag } from "@/components/model-tag";
 import { researchErrors, stageLabels } from "@/lib/research-core";
 import type { ResearchDetail } from "@/lib/research-types";
 import { useCopy, useFormats } from "@/i18n/use-copy";
@@ -24,23 +24,6 @@ const stageHints: Record<string, string> = {
   review: "Running an adversarial critique that can reject ideas or deduct points.",
   finalizing: "Saving the report and linked sources to your workspace.",
 };
-const providerNames: Record<string, string> = {
-  "dashscope-beijing": "Qwen via DashScope",
-  "google-gemini": "Gemini via Google",
-};
-export function ModelTag({ model, provider, planned = false }: { model: string | null; provider?: string | null; planned?: boolean }) {
-  const copy = useCopy();
-  if (!model) return null;
-  const name = model === "mixed" ? copy("Mixed models") : (researchModels as Record<string, { name: string }>)[model]?.name ?? model;
-  const vendor = provider ? providerNames[provider] : undefined;
-  return (
-    <Badge variant="secondary" className="gap-1.5 rounded-md font-medium" title={model}>
-      <Cpu className="size-3.5" aria-hidden="true" />
-      {planned ? copy("Planned model: {model}", { model: name }) : copy("Model: {model}", { model: name })}
-      {vendor && <span className="font-normal text-muted-foreground">· {copy(vendor)}</span>}
-    </Badge>
-  );
-}
 const stages = [
   "discovery",
   "retrieval",
