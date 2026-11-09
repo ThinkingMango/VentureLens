@@ -437,6 +437,38 @@ test("full CJK evidence is classified, evaluated, and reviewed in resumable boun
   assert.equal(fixture.calls.length, 12, "Recovery reuses billed batch checkpoints");
 });
 
+test("finalizing counts only supporting evidence and saves counter-evidence with its stance", async () => {
+  const checkpoints = new Map();
+  const candidates = Array.from({ length: 5 }, (_, i) => ({ key: `c${i + 1}`, title: `Candidate ${i + 1}`, buyer: "Agencies", pain: "Slow proposals", solution: "Drafting assistant", advantage: "Domain network", query: "agency proposal preparation time survey" }));
+  checkpoints.set("discovery", { candidates });
+  const page = (key, candidate, url, text) => ({ source_key: key, candidate_id: candidate, url, title: "Source", excerpt: text, retrieved_at: "2026-11-09T00:00:00.000Z", published_at: null });
+  const evidence = [
+    page("c1-s1", "c1", "https://buyers.org/pain", "Agencies report spending ten hours every week preparing proposals."),
+    page("c1-s2", "c1", "https://survey.org/analysis", "An independent survey confirms proposal preparation delays agency sales."),
+    page("c1-s3", "c1", "https://critics.net/review", "Critics argue that proposal software rarely changes agency win rates."),
+    page("c2-s1", "c2", "https://buyers.org/other", "Agencies report spending ten hours every week on client reporting."),
+    page("c2-s2", "c2", "https://critics.net/other", "Critics argue that reporting tools rarely change client retention."),
+    page("c2-s3", "c2", "https://skeptics.io/note", "Skeptics note that most agencies already automate client reporting."),
+  ];
+  const stance = { "c1-s3": "contradicts", "c2-s2": "contradicts", "c2-s3": "contradicts" };
+  checkpoints.set("classification", { items: evidence.map(e => ({ source_key: e.source_key, relevant: true, kind: "pain", reliability: "secondary", stance: stance[e.source_key] ?? "supports", quote: e.excerpt, claim: "Buyer pain" })) });
+  const dimensions = { pain: 100, demand: 100, economics: 100, feasibility: 100, advantage: 100 };
+  checkpoints.set("evaluation", { items: ["c1", "c2"].map(id => ({ candidate_id: id, description: "Drafting assistant", category: "Services", revenue: "Assumed, unverified", cost: "Assumed, unverified", risk: "Unverified demand", assumptions: ["Unverified"], validation: ["Interview buyers"], dimensions, rationale: "Cites c1-s1" })) });
+  checkpoints.set("review", { items: ["c1", "c2"].map(id => ({ candidate_id: id, reject: false, critique: "Needs interviews", penalty: 0, falsification: "Run a paid pilot" })) });
+  const fixture = researchFixture({ spent: 0, evidence, checkpoints });
+  await fixture.engine.executeResearchStage(fixture.context, "finalizing");
+  const report = fixture.reservations.find(call => call.p_report)?.p_report;
+  assert.ok(report, "finish_research received the report");
+  // c2 had one supporting domain and two contradicting ones: it is no longer reported at all.
+  assert.deepEqual(report.opportunities.map(o => o.candidate_id), ["c1"]);
+  const [c1] = report.opportunities;
+  assert.equal(c1.confidence, "limited", "Two supporting domains are limited confidence, whatever else is attached");
+  assert.equal(c1.score, 70, "The 85 cap needs three independent supporting domains");
+  assert.deepEqual(c1.evidence.map(e => [e.source_key, e.stance]), [["c1-s1", "supports"], ["c1-s2", "supports"], ["c1-s3", "contradicts"]]);
+  // The stance survives the workspace read path, so the report can label counter-evidence.
+  assert.deepEqual(workspaceSchema.opportunitySchema.parse(c1).evidence.map(e => e.stance), ["supports", "supports", "contradicts"]);
+});
+
 test("concurrent dispatches share a durable hook and manual retries get a new identity", async () => {
   const row = { status: "pending", workflow_id: null, retry_count: 0 };
   const hooks = new Map(), requests = [], updates = [];
@@ -534,6 +566,30 @@ test("the actual progress view renders blocked-request costs and a usable recove
   assert.match(html, /Existing progress and costs remain saved/);
   assert.match(html, /Model: Gemini 4 Argon/);
   assert.match(html, /Gemini via Google/);
+});
+
+test("a failed run says whether its slot was returned, from the server's refund decision", () => {
+  const render = quota_released => {
+    const data = { id: "run", status: "failed", stage: "classification", error_code: "INVALID_OUTPUT", retry_count: 0, quota_released, model: { provider: "dashscope-beijing", model: "qwen3.8-flash", planned: false, used: ["qwen3.8-flash"] }, configuration: { brief: { name: "Test" } }, report: null, steps: [{ stage_key: "discovery" }], usage: { estimated_usd: 0.04, committed_usd: 0.04, budget_usd: 0.25, uncertain_calls: 0, input_tokens: 1, output_tokens: 1, search_requests: 1 } };
+    const { ResearchRunView } = loadModule("../components/research-run.tsx", {
+      "next/link": { default: ({ children, ...props }) => createElement("a", props, children) },
+      "swr": { default: () => ({ data, mutate: async () => undefined }) },
+      "@/components/ui/button": { Button: ({ asChild, children, ...props }) => asChild ? cloneElement(children, props) : createElement("button", props, children) },
+      "@/components/shared": { PageHeader: ({ title }) => createElement("h1", null, title) },
+      "@/components/demo-provider": { useDemo: () => ({ refresh: async () => undefined }) },
+      "@/components/research-report": { ResearchReportView: () => null },
+      "@/lib/research-core": researchCore, "@/lib/research-models": models,
+      "@/components/ui/badge": { Badge: ({ children }) => createElement("span", null, children) },
+      "@/i18n/use-copy": { useCopy: () => (text, values = {}) => text.replace(/\{(\w+)\}/g, (_m, key) => values[key] ?? key), useFormats: () => ({ usd: value => `$${value}`, number: String, date: String }) },
+      "@/i18n/errors": { feedbackSource: (_code, fallback) => fallback }, "@/lib/api-client": apiClient,
+    });
+    return renderToStaticMarkup(createElement(ResearchRunView, { initialData: data }));
+  };
+  assert.match(render(true), /your allowance was restored/);
+  assert.match(render(undefined), /your allowance was restored/, "runs saved before the field existed keep the old message");
+  const kept = render(false);
+  assert.match(kept, /reached its limit of returned failed runs/);
+  assert.doesNotMatch(kept, /your allowance was restored/, "a run that kept its slot never claims it was returned");
 });
 
 test("structured output that does not parse is retried once, and each attempt is metered separately", async () => {

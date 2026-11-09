@@ -18,6 +18,14 @@ Read from `supabase_migrations.schema_migrations` on the live project:
 
 "Identical" means the MD5 of the SQL with all whitespace removed matches between the repository file and the `statements` column of the applied migration.
 
+## Pending (in the repository, not yet applied to the live project)
+
+| Version | Name | Notes |
+| --- | --- | --- |
+| `20261109150000` | `cap_failed_run_refunds` | Adds `research_dev_access.runs_refunded` and `max_refunds` (default 3, bounded 0–100) and replaces `release_failed_research_run()`. Failures on our side (`DISPATCH_FAILED`, `WORKFLOW_INTERRUPTED`, `TRANSIENT_PROVIDER`, `PROVIDER_CONFIGURATION`, `PROVIDER_CREDITS_REQUIRED`) and runs with no recorded spend are always returned; other failed runs are returned only while `runs_refunded < max_refunds`. Existing accounts start at `runs_refunded = 0`. Tested on PostgreSQL 16 with `pnpm test:sql` on top of the full migration history. |
+
+Apply it with `supabase db push`, or with `apply_migration` using the name `cap_failed_run_refunds` and then rename the file to the version it assigns (rule 1 below). Move the row into the applied table once done.
+
 ## Reconciliation performed on 2026-11-05
 
 The repository previously carried four files whose version prefixes did **not** match the applied history, plus one duplicate:

@@ -53,7 +53,7 @@ async function startResearchWorkflow(id: string, userId: string, retryCount: num
   }
 }
 export async function researchDetail(supabase: Awaited<ReturnType<typeof createClient>>, userId: string, id: string): Promise<ResearchDetail | null> {
-  const result = await supabase.from("research_runs").select("id,status,stage,error_code,retry_count,configuration,report,created_at,completed_at,workflow_id,updated_at,budget_usd").eq("id", id).eq("user_id", userId).maybeSingle();
+  const result = await supabase.from("research_runs").select("id,status,stage,error_code,retry_count,configuration,report,created_at,completed_at,workflow_id,updated_at,budget_usd,quota_released").eq("id", id).eq("user_id", userId).maybeSingle();
   if (result.error) throw new Error("WORKFLOW_INTERRUPTED");
   if (!result.data) return null;
   const run = result.data;
@@ -69,9 +69,10 @@ export async function researchDetail(supabase: Awaited<ReturnType<typeof createC
     } else if (Date.now() - new Date(run.updated_at).getTime() > 300000) interrupted = "DISPATCH_FAILED";
     if (interrupted) {
       const completedAt = new Date().toISOString();
-      const { data: recovered, error } = await createAdminClient().from("research_runs").update({ status: "failed", error_code: interrupted, completed_at: completedAt }).eq("id", id).eq("user_id", userId).eq("status", run.status).eq("updated_at", run.updated_at).select("id");
+      const { data: recovered, error } = await createAdminClient().from("research_runs").update({ status: "failed", error_code: interrupted, completed_at: completedAt }).eq("id", id).eq("user_id", userId).eq("status", run.status).eq("updated_at", run.updated_at).select("id,quota_released");
       if (error) throw new Error("WORKFLOW_INTERRUPTED");
-      if (recovered?.length) { run.status = "failed"; run.error_code = interrupted; run.completed_at = completedAt; }
+      // The refund trigger decides quota_released in the same update, so read it back rather than assume it.
+      if (recovered?.length) { run.status = "failed"; run.error_code = interrupted; run.completed_at = completedAt; run.quota_released = recovered[0].quota_released; }
     }
   }
   const [steps, usage, budgetBlock, setup] = await Promise.all([
@@ -92,7 +93,7 @@ export async function researchDetail(supabase: Awaited<ReturnType<typeof createC
   const budget_block = run.status === "failed" && run.error_code === "BUDGET_EXCEEDED" && blocked && typeof blocked.model === "string" && Number.isFinite(blocked.required_usd)
     ? { model: blocked.model, required_usd: Number(blocked.required_usd), remaining_usd: Math.max(0, Number(run.budget_usd) - totals.committed_usd), kind: blocked.kind === "estimate" ? "estimate" as const : "reservation" as const }
     : undefined;
-  return { id: run.id, status: run.status, stage: run.stage, model, error_code: run.error_code, retry_count: run.retry_count, configuration: { brief: run.configuration.brief }, report: run.report, created_at: run.created_at, completed_at: run.completed_at, steps: steps.data ?? [], usage: { ...totals, budget_usd: Number(run.budget_usd) }, ...(budget_block ? { budget_block } : {}) };
+  return { id: run.id, status: run.status, stage: run.stage, model, error_code: run.error_code, retry_count: run.retry_count, quota_released: run.quota_released, configuration: { brief: run.configuration.brief }, report: run.report, created_at: run.created_at, completed_at: run.completed_at, steps: steps.data ?? [], usage: { ...totals, budget_usd: Number(run.budget_usd) }, ...(budget_block ? { budget_block } : {}) };
 }
 
 // Which model a run uses: the recorded choice once the run has initialized, otherwise the configured primary.
