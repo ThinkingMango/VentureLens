@@ -20,6 +20,13 @@ import { useDemo } from "@/components/demo-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field, FieldLabel, FieldGroup } from "@/components/ui/field";
+import { ProfileChoice } from "@/components/profile-choice";
+import {
+  founderRoles,
+  founderIndustries,
+  founderGoals,
+  skillSuggestions,
+} from "@/lib/profile-options";
 import { cn } from "@/lib/utils";
 const steps = [
   {
@@ -49,7 +56,9 @@ export function Onboarding({ editing = false }: { editing?: boolean }) {
   const [error, setError] = useState("");
   const [draft, setDraft] = useState(profile);
   const [step, setStep] = useState(0);
-  const [invalidField, setInvalidField] = useState<"name" | "skills" | null>(null);
+  const [invalidField, setInvalidField] = useState<"name" | "skills" | null>(
+    null,
+  );
   const stepHeading = useRef<HTMLHeadingElement>(null);
   const previousStep = useRef(step);
   const StepHeading = editing ? "h2" : "h1";
@@ -124,10 +133,17 @@ export function Onboarding({ editing = false }: { editing?: boolean }) {
               {copy("Step {step} of {total}", { step: step + 1, total: 4 })}
             </p>
             <div className="progress-track flex-1" aria-hidden="true">
-              <div className="progress-fill" style={{ width: `${((step + 1) / 4) * 100}%` }} />
+              <div
+                className="progress-fill"
+                style={{ width: `${((step + 1) / 4) * 100}%` }}
+              />
             </div>
           </div>
-          <StepHeading ref={stepHeading} tabIndex={-1} className="text-2xl font-semibold">
+          <StepHeading
+            ref={stepHeading}
+            tabIndex={-1}
+            className="text-2xl font-semibold"
+          >
             {copy(steps[step].title)}
           </StepHeading>
           <p className="text-muted-foreground">
@@ -141,21 +157,33 @@ export function Onboarding({ editing = false }: { editing?: boolean }) {
             if (busy) return;
             setError("");
             setInvalidField(null);
-            const missing = step === 0 && !draft.name.trim()
-              ? "name"
-              : step === 1 && !draft.skills.trim()
-                ? "skills"
-                : null;
+            const missing =
+              step === 0 && !draft.name.trim()
+                ? "name"
+                : step === 1 && !draft.skills.trim()
+                  ? "skills"
+                  : null;
             if (missing) {
               setInvalidField(missing);
-              setError(missing === "name" ? "Enter your name." : "Add your skills or experience.");
+              setError(
+                missing === "name"
+                  ? "Enter your name."
+                  : "Add your skills or experience.",
+              );
               document.getElementById(missing)?.focus();
               return;
             }
             if (step < 3) setStep(step + 1);
             else {
               try {
-                await setProfile({ ...draft, name: draft.name.trim(), skills: draft.skills.trim() });
+                await setProfile({
+                  ...draft,
+                  name: draft.name.trim(),
+                  skills: draft.skills.trim(),
+                  role: draft.role.trim(),
+                  industry: draft.industry.trim(),
+                  goal: draft.goal.trim(),
+                });
                 toast.success(
                   isDemo
                     ? copy("Demo profile updated")
@@ -194,30 +222,36 @@ export function Onboarding({ editing = false }: { editing?: boolean }) {
                     autoComplete="given-name"
                     disabled={busy}
                     aria-invalid={invalidField === "name"}
-                    aria-describedby={invalidField === "name" ? "profile-error" : undefined}
+                    aria-describedby={
+                      invalidField === "name" ? "profile-error" : undefined
+                    }
                     required
                     onChange={(e) => update("name", e.target.value)}
                     placeholder={copy("Your first name")}
                   />
                 </Field>
-                {select("role", "Where are you in your founder journey?", [
-                  "Aspiring founder",
-                  "Exploring a side business",
-                  "Experienced founder",
-                  "Independent professional",
-                ])}
+                <ProfileChoice
+                  id="role"
+                  label="Where are you in your founder journey?"
+                  value={draft.role}
+                  options={founderRoles}
+                  maxLength={100}
+                  disabled={busy}
+                  onChange={(value) => update("role", value)}
+                />
               </>
             )}
             {step === 1 && (
               <>
-                {select("industry", "Which industry do you know best?", [
-                  "Professional services",
-                  "B2B SaaS",
-                  "Finance & operations",
-                  "Healthcare",
-                  "Education",
-                  "Other",
-                ])}
+                <ProfileChoice
+                  id="industry"
+                  label="Which industry do you know best?"
+                  value={draft.industry}
+                  options={founderIndustries}
+                  maxLength={100}
+                  disabled={busy}
+                  onChange={(value) => update("industry", value)}
+                />
                 <Field data-invalid={invalidField === "skills"}>
                   <FieldLabel htmlFor="skills">
                     {copy("What skills or experiences can you build on?")}
@@ -228,7 +262,11 @@ export function Onboarding({ editing = false }: { editing?: boolean }) {
                     value={draft.skills}
                     disabled={busy}
                     aria-invalid={invalidField === "skills"}
-                    aria-describedby={invalidField === "skills" ? "skills-help profile-error" : "skills-help"}
+                    aria-describedby={
+                      invalidField === "skills"
+                        ? "skills-help profile-error"
+                        : "skills-help"
+                    }
                     required
                     maxLength={500}
                     onChange={(e) => update("skills", e.target.value)}
@@ -239,6 +277,38 @@ export function Onboarding({ editing = false }: { editing?: boolean }) {
                     )}
                   </p>
                 </Field>
+                <div className="flex flex-col gap-3">
+                  <p className="text-sm text-muted-foreground">
+                    {copy(
+                      "Need a starting point? Add an example, then make it your own.",
+                    )}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {skillSuggestions.map((suggestion) => {
+                      const text = copy(suggestion);
+                      const next = draft.skills.trim()
+                        ? `${draft.skills.trim()}; ${text}`
+                        : text;
+                      return (
+                        <Button
+                          key={suggestion}
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="min-h-11 text-left"
+                          disabled={
+                            busy ||
+                            draft.skills.includes(text) ||
+                            next.length > 500
+                          }
+                          onClick={() => update("skills", next)}
+                        >
+                          {text}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                </div>
               </>
             )}
             {step === 2 && (
@@ -260,12 +330,15 @@ export function Onboarding({ editing = false }: { editing?: boolean }) {
             )}
             {step === 3 && (
               <>
-                {select("goal", "What are you working toward?", [
-                  "Build a sustainable side business",
-                  "Transition to full-time entrepreneurship",
-                  "Find a scalable startup opportunity",
-                  "Expand my consulting practice",
-                ])}
+                <ProfileChoice
+                  id="goal"
+                  label="What are you working toward?"
+                  value={draft.goal}
+                  options={founderGoals}
+                  maxLength={150}
+                  disabled={busy}
+                  onChange={(value) => update("goal", value)}
+                />
                 <div className="rounded-lg bg-background p-5">
                   <p className="font-medium">
                     {copy("Your profile, at a glance")}
@@ -293,7 +366,11 @@ export function Onboarding({ editing = false }: { editing?: boolean }) {
             )}
           </FieldGroup>
           {error && (
-            <p id="profile-error" role="alert" className="rounded-lg border p-4 text-sm">
+            <p
+              id="profile-error"
+              role="alert"
+              className="rounded-lg border p-4 text-sm"
+            >
               {copy(error)}
             </p>
           )}
@@ -362,7 +439,9 @@ export function Onboarding({ editing = false }: { editing?: boolean }) {
           </h2>
           <p className="max-w-xl text-muted-foreground">
             {copy("Let’s build a picture of the founder behind the idea.")}{" "}
-            {copy("Your answers shape which opportunities are discovered and how they are scored.")}
+            {copy(
+              "Your answers shape which opportunities are discovered and how they are scored.",
+            )}
           </p>
         </div>
         {form}

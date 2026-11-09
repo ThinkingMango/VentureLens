@@ -2,20 +2,8 @@ import { z } from "zod";
 
 export const profileSchema = z.object({
   name: z.string().trim().min(1, "Enter your name.").max(80),
-  role: z.enum([
-    "Aspiring founder",
-    "Exploring a side business",
-    "Experienced founder",
-    "Independent professional",
-  ]),
-  industry: z.enum([
-    "Professional services",
-    "B2B SaaS",
-    "Finance & operations",
-    "Healthcare",
-    "Education",
-    "Other",
-  ]),
+  role: z.string().trim().min(1).max(100),
+  industry: z.string().trim().min(1).max(100),
   skills: z.string().trim().min(1, "Add your skills or experience.").max(500),
   hours: z.enum([
     "Under 5 hours",
@@ -25,12 +13,7 @@ export const profileSchema = z.object({
     "Full time",
   ]),
   budget: z.enum(["Under $1,000", "$1,000–5,000", "$5,000–15,000", "$15,000+"]),
-  goal: z.enum([
-    "Build a sustainable side business",
-    "Transition to full-time entrepreneurship",
-    "Find a scalable startup opportunity",
-    "Expand my consulting practice",
-  ]),
+  goal: z.string().trim().min(1).max(150),
 });
 export type Profile = z.infer<typeof profileSchema>;
 export const projectSchema = z.object({
