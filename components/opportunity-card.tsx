@@ -1,9 +1,7 @@
 "use client";
-import { MobileDisclosure } from "@/components/mobile-disclosure";
-import { useCopy } from "@/i18n/use-copy";
 
 import Link from "@/components/workspace-link";
-import { Bookmark, ArrowRight } from "lucide-react";
+import { Bookmark, ArrowRight, Users, WalletCards, ShieldAlert } from "lucide-react";
 import {
   Card,
   CardHeader,
@@ -19,6 +17,7 @@ import { reportEvidenceCount } from "@/lib/report-presentation";
 import { useDemo } from "@/components/demo-provider";
 import { cn } from "@/lib/utils";
 import { useDemoContent } from "@/i18n/demo";
+import { useCopy } from "@/i18n/use-copy";
 
 export function OpportunityCard({
   opportunity: original,
@@ -29,109 +28,116 @@ export function OpportunityCard({
   const { saved, toggleSave, isDemo, busy } = useDemo();
   const content = useDemoContent();
   const o = isDemo ? content.opportunity(original) : original;
+  const isSaved = saved.includes(o.id);
+
   return (
     <Card
       role="article"
       aria-label={o.title}
-      className="flex h-full min-w-0 flex-col overflow-hidden transition-colors hover:border-primary/40"
+      className="lift flex h-full min-w-0 flex-col overflow-hidden"
     >
-      <CardHeader className="gap-3 p-5 sm:p-6">
-        <div className="flex items-center justify-between gap-3">
-          <p className="rounded-md border border-primary/20 bg-secondary/50 px-3 py-1.5 text-xs text-muted-foreground">
-            <strong className="mr-2 text-xl font-semibold tabular-nums text-foreground">
-              {o.score}
-              <span className="text-sm font-normal">/100</span>
-            </strong>
-            {isDemo ? copy("Demo score") : copy("Research score")}
-          </p>
+      <CardHeader className="gap-4 p-5 pb-4 sm:p-6 sm:pb-5">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <p className="flex items-baseline gap-1 text-primary">
+              <strong className="text-3xl font-semibold tabular-nums tracking-tight">
+                {o.score}
+              </strong>
+              <span className="text-sm text-muted-foreground">/100</span>
+            </p>
+            <Confidence level={o.confidence} />
+          </div>
           <Button
             variant="ghost"
             size="icon"
+            className="-mr-2 -mt-2 shrink-0"
             aria-label={
-              saved.includes(o.id)
+              isSaved
                 ? copy("Unsave {title}", { title: o.title })
                 : copy("Save {title}", { title: o.title })
             }
-            aria-pressed={saved.includes(o.id)}
+            aria-pressed={isSaved}
             disabled={busy}
             onClick={() => toggleSave(o.id)}
           >
             <Bookmark
               className={cn(
                 "text-muted-foreground",
-                saved.includes(o.id) && "fill-primary/15 text-primary",
+                isSaved && "fill-primary/15 text-primary",
               )}
             />
           </Button>
         </div>
-        {!["combined", "founder", "market"].includes(
-          o.category.toLowerCase().trim(),
-        ) && <p className="text-sm text-muted-foreground">{o.category}</p>}
-        <CardTitle>
-          <h3 className="text-lg font-semibold leading-snug sm:text-xl">
-            <Link
-              href={`/opportunities/${o.id}`}
-              className="hover:text-primary"
-            >
-              {o.title}
-            </Link>
-          </h3>
-        </CardTitle>
-        <CardDescription className="leading-relaxed">
-          {o.description}
-        </CardDescription>
+        <div className="flex flex-col gap-2">
+          {!["combined", "founder", "market"].includes(
+            o.category.toLowerCase().trim(),
+          ) && (
+            <p className="text-sm font-medium text-muted-foreground">{o.category}</p>
+          )}
+          <CardTitle>
+            <h3 className="text-xl font-semibold leading-snug sm:text-2xl">
+              <Link
+                href={`/opportunities/${o.id}`}
+                className="rounded-sm hover:text-primary"
+              >
+                {o.title}
+              </Link>
+            </h3>
+          </CardTitle>
+          <CardDescription className="text-[15px] leading-relaxed">
+            {o.description}
+          </CardDescription>
+        </div>
       </CardHeader>
-      <CardContent className="flex flex-1 flex-col gap-5 px-5 pb-5 sm:px-6 sm:pb-6">
-        <dl className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1">
-            <dt className="text-sm text-muted-foreground">
+
+      <CardContent className="flex flex-1 flex-col gap-5 px-5 pb-6 sm:px-6">
+        <dl className="grid gap-5 sm:grid-cols-2">
+          <div className="flex flex-col gap-2">
+            <dt className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+              <Users className="size-4" aria-hidden="true" />
               {copy("Likely buyer")}
             </dt>
-            <dd className="font-medium">{o.buyer}</dd>
+            <dd className="font-medium leading-relaxed">{o.buyer}</dd>
+          </div>
+          <div className="flex flex-col gap-2">
+            <dt className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+              <WalletCards className="size-4" aria-hidden="true" />
+              {copy(
+                isDemo
+                  ? "Monthly price hypothesis"
+                  : "Business model and pricing assumptions",
+              )}
+            </dt>
+            <dd className="font-medium leading-relaxed tabular-nums">
+              {o.revenue}
+              {isDemo && (
+                <span className="ml-1 text-sm font-normal text-muted-foreground">
+                  {copy("USD / customer")}
+                </span>
+              )}
+            </dd>
           </div>
         </dl>
-        <MobileDisclosure title={copy("Pricing, risks and confidence")}>
-          <dl className="flex flex-col gap-4">
-            <div className="flex flex-col gap-1">
-              <dt className="text-sm text-muted-foreground">
-                {copy(
-                  isDemo
-                    ? "Monthly price hypothesis"
-                    : "Business model and pricing assumptions",
-                )}
-              </dt>
-              <dd className="text-sm leading-relaxed tabular-nums">
-                {o.revenue}
-                {isDemo && (
-                  <span className="ml-1 font-normal text-muted-foreground">
-                    {copy("USD / customer")}
-                  </span>
-                )}
-              </dd>
-            </div>
-            <div className="flex flex-col gap-1 border-l-2 border-warm/60 pl-3">
-              <dt className="text-sm text-warm">
-                {copy("Key risk to validate")}
-              </dt>
-              <dd className="text-sm leading-relaxed">{o.risk}</dd>
-            </div>
-            {!isDemo && original.validation?.[0] && (
-              <div className="flex flex-col gap-1">
-                <dt className="text-sm text-muted-foreground">
-                  {copy("Next validation step")}
-                </dt>
-                <dd className="text-sm leading-relaxed">
-                  {original.validation[0]}
-                </dd>
-              </div>
-            )}
-          </dl>
-          <div className="flex flex-wrap items-center gap-2">
-            <Confidence level={o.confidence} />
+
+        <div className="rounded-xl bg-warm-soft p-4">
+          <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+            <ShieldAlert className="size-4 text-warm" aria-hidden="true" />
+            {copy("Key risk to validate")}
           </div>
-        </MobileDisclosure>
+          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{o.risk}</p>
+        </div>
+
+        {!isDemo && original.validation?.[0] && (
+          <div className="flex flex-col gap-1.5">
+            <p className="text-sm font-medium text-muted-foreground">
+              {copy("Next validation step")}
+            </p>
+            <p className="text-sm leading-relaxed">{original.validation[0]}</p>
+          </div>
+        )}
       </CardContent>
-      <CardFooter className="flex-col items-stretch gap-3 border-t bg-background/30 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+
+      <CardFooter className="flex-col items-stretch gap-4 border-t bg-background/45 px-5 py-5 sm:px-6">
         <p className="text-sm text-muted-foreground">
           {isDemo
             ? copy("Demo assessment")
@@ -140,7 +146,7 @@ export function OpportunityCard({
                 { count: reportEvidenceCount([original]) },
               )}
         </p>
-        <Button asChild variant="outline" className="w-full sm:w-auto">
+        <Button asChild className="w-full">
           <Link
             href={`/opportunities/${o.id}`}
             aria-label={copy("Read report: {title}", { title: o.title })}

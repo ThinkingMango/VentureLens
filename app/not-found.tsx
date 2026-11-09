@@ -10,7 +10,7 @@ export default function NotFound() {
   const pathname = usePathname();
   const workspaceHref = pathname?.startsWith("/demo/") ? "/demo/dashboard" : "/dashboard";
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-6 p-6 text-center">
+    <main className="flex min-h-dvh flex-col items-center justify-center gap-6 p-6 text-center">
       <Brand />
       <h1 className="text-3xl font-semibold">
         {copy("This opportunity isn’t here.")}

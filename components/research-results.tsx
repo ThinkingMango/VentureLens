@@ -138,33 +138,31 @@ export function ResearchResults({
         </div>
       </MobileDisclosure>
       {!savedOnly && (
-        <MobileDisclosure title={copy("Research summary")}>
-          <section
-            aria-labelledby="research-summary"
-            className="surface flex flex-col gap-4 p-5 md:p-6"
-          >
-            <h2 id="research-summary" className="text-lg font-semibold">
-              {copy("Research summary")}
-            </h2>
-            <p className="max-w-3xl leading-relaxed">
-              {copy(
-                "Proposal preparation leads this four-workflow demo. Buyer access, review effort, and willingness to pay remain unvalidated for every opportunity.",
-              )}
-            </p>
-            <div className="flex border-t pt-4">
-              <Button
-                variant="link"
-                asChild
-                className="h-auto justify-start p-0"
-              >
-                <Link href="/opportunities/proposal-copilot">
-                  {copy("Review leading hypothesis")}
-                  <ArrowRight data-icon="inline-end" />
-                </Link>
-              </Button>
-            </div>
-          </section>
-        </MobileDisclosure>
+        <section
+          aria-labelledby="research-summary"
+          className="surface flex flex-col gap-4 p-5 md:p-6"
+        >
+          <h2 id="research-summary" className="text-lg font-semibold">
+            {copy("Research summary")}
+          </h2>
+          <p className="max-w-3xl leading-relaxed">
+            {copy(
+              "Proposal preparation leads this four-workflow demo. Buyer access, review effort, and willingness to pay remain unvalidated for every opportunity.",
+            )}
+          </p>
+          <div className="flex border-t pt-4">
+            <Button
+              variant="link"
+              asChild
+              className="h-auto min-h-11 justify-start p-0"
+            >
+              <Link href="/opportunities/proposal-copilot">
+                {copy("Review leading hypothesis")}
+                <ArrowRight data-icon="inline-end" />
+              </Link>
+            </Button>
+          </div>
+        </section>
       )}
       <section className="flex flex-col gap-5">
         <div className="flex flex-wrap items-center justify-between gap-4">
@@ -207,7 +205,7 @@ export function ResearchResults({
             </Button>
           </div>
         </div>
-        <FieldGroup className="grid grid-cols-2 gap-4 md:flex md:flex-row md:items-end">
+        <FieldGroup className="surface grid grid-cols-1 gap-4 p-4 sm:grid-cols-2 md:flex md:flex-row md:items-end md:p-5">
           <Field className="col-span-2 min-w-0 md:flex-1">
             <FieldLabel htmlFor="opportunity-search">
               {copy("Search opportunities")}

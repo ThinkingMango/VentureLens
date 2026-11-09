@@ -283,8 +283,8 @@ export function AppShell({
         </DialogContent>
       </Dialog>
       <div className="lg:pl-64">
-        <header className="sticky top-0 z-20 flex min-h-16 flex-wrap items-center justify-between gap-3 border-b bg-card/95 px-4 py-3 backdrop-blur md:px-8">
-          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+        <header className="sticky top-0 z-20 flex min-h-16 flex-nowrap items-center justify-between gap-3 border-b bg-card/95 px-4 py-3 backdrop-blur md:px-8">
+          <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
             <Button
               variant="ghost"
               size="icon"
@@ -299,7 +299,7 @@ export function AppShell({
               {copy("Workspace")}
             </span>
             <span className="hidden text-muted-foreground sm:inline">/</span>
-            <span className="font-medium">{copy(title)}</span>
+            <span className="min-w-0 truncate font-medium">{copy(title)}</span>
           </div>
           <div className="ml-auto flex shrink-0 flex-wrap items-center gap-1 sm:gap-3">
             <LanguageSwitcher />
@@ -329,7 +329,8 @@ export function AppShell({
         </header>
         <main
           id="main-content"
-          className="mx-auto flex min-w-0 max-w-[1600px] flex-col gap-5 p-4 md:gap-6 md:p-7"
+          tabIndex={-1}
+          className="workspace-main mx-auto flex min-w-0 max-w-[1600px] flex-col gap-6 p-4 md:gap-7 md:p-8"
         >
           {children}
           <footer className="flex flex-wrap items-center justify-between gap-2 border-t pt-5 text-sm text-muted-foreground">
@@ -352,6 +353,31 @@ export function AppShell({
           </footer>
         </main>
       </div>
+      <nav
+        aria-label={copy("Mobile workspace navigation")}
+        className="mobile-workspace-nav fixed inset-x-0 bottom-0 z-20 grid grid-cols-4 border-t lg:hidden"
+      >
+        {nav.map((item) => {
+          const active =
+            path === item.href ||
+            (item.href === "/research" &&
+              (path.startsWith("/research/") || path.startsWith("/opportunities/")));
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              aria-current={active ? "page" : undefined}
+              className={cn(
+                "flex min-h-16 flex-col items-center justify-center gap-1 px-1 py-2 text-[11px] font-medium leading-4 text-muted-foreground",
+                active && "bg-secondary text-primary",
+              )}
+            >
+              <item.icon className="size-5" aria-hidden="true" />
+              <span>{copy(item.title === "Saved opportunities" ? "Saved" : item.title === "Founder profile" ? "Profile" : item.title)}</span>
+            </Link>
+          );
+        })}
+      </nav>
       <Dialog open={help} onOpenChange={setHelp}>
         <DialogContent
           onCloseAutoFocus={(event) => {

@@ -76,7 +76,7 @@ export function OpportunityDetail({
         <ArrowLeft className="size-4" />
         {copy("Research results")}
       </Link>
-      <header className="flex flex-col gap-5">
+      <header className="surface flex flex-col gap-5 p-5 sm:p-6">
         <div className="flex flex-col items-start justify-between gap-4 xl:flex-row">
           <div className="flex max-w-3xl flex-col gap-3">
             <h1 className="page-heading text-balance">{o.title}</h1>

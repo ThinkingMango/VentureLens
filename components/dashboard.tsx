@@ -44,7 +44,7 @@ export function Dashboard() {
           </Link>
         </Button>
       </PageHeader>
-      <MobileDisclosure title={copy("Workspace statistics")}>
+      <div>
         <section
           aria-label={copy("Workspace statistics")}
           className="terminal-stats"
@@ -89,7 +89,7 @@ export function Dashboard() {
             </div>
           ))}
         </section>
-      </MobileDisclosure>
+      </div>
       <section className="flex flex-col gap-5">
         <SectionTitle
           title={copy("Opportunities worth a closer look")}

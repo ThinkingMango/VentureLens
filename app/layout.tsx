@@ -1,16 +1,23 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Noto_Sans_SC } from "next/font/google";
+import { Geist, Newsreader, Noto_Sans_SC } from "next/font/google";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getTranslations } from "next-intl/server";
 import { LocalizedToaster } from "@/components/localized-toaster";
 import "./globals.css";
+
 const geist = Geist({ subsets: ["latin"], variable: "--font-geist" });
+const newsreader = Newsreader({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-newsreader",
+});
 const cjk = Noto_Sans_SC({
   weight: "400",
   display: "swap",
   preload: false,
   variable: "--font-cjk",
 });
+
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("metadata");
   return {
@@ -18,11 +25,13 @@ export async function generateMetadata(): Promise<Metadata> {
     description: t("description"),
   };
 }
+
 export const viewport: Viewport = {
-  themeColor: "#101318",
+  themeColor: "#F5F3ED",
   width: "device-width",
   initialScale: 1,
 };
+
 export default async function RootLayout({
   children,
 }: {
@@ -32,7 +41,7 @@ export default async function RootLayout({
   return (
     <html
       lang={locale}
-      className={`bg-background ${geist.variable} ${cjk.variable}`}
+      className={`bg-background ${geist.variable} ${newsreader.variable} ${cjk.variable}`}
     >
       <body className="font-sans antialiased">
         <NextIntlClientProvider>

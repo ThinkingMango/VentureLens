@@ -425,7 +425,7 @@ export function Onboarding({ editing = false }: { editing?: boolean }) {
       </>
     );
   return (
-    <div className="hero-bg min-h-screen">
+    <div className="hero-bg min-h-dvh">
       <header className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-5 py-7">
         <Brand />
         <LanguageSwitcher />

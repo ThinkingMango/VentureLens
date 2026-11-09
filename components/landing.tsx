@@ -1,7 +1,5 @@
 "use client";
 
-import { MobileDisclosure } from "@/components/mobile-disclosure";
-import { useCopy } from "@/i18n/use-copy";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -10,7 +8,6 @@ import {
   ScanLine,
   Users,
   SlidersHorizontal,
-  ShieldCheck,
   Link2,
   Scale,
   Swords,
@@ -22,11 +19,11 @@ import {
   BriefcaseBusiness,
   Compass,
   Sparkles,
-  Languages,
 } from "lucide-react";
 import { PublicShell } from "@/components/public-shell";
 import { Button } from "@/components/ui/button";
 import { EvidencePreview } from "@/components/evidence-preview";
+import { useCopy } from "@/i18n/use-copy";
 
 const reportParts = [
   {
@@ -152,27 +149,24 @@ export function Landing() {
   const copy = useCopy();
   return (
     <PublicShell>
-      <main id="main-content">
-        <section className="hero-bg relative overflow-hidden">
-          <div className="hero-layout relative mx-auto max-w-7xl px-5 py-8 md:px-8 md:py-12">
-            <div className="terminal-masthead">
-              <span>
-                {copy("Evidence-first opportunity research for founders")}
-              </span>
-              <span>{copy("English · 简体中文 · 繁體中文")}</span>
-            </div>
+      <main id="main-content" tabIndex={-1}>
+        <section className="hero-bg overflow-hidden border-b">
+          <div className="hero-layout mx-auto max-w-7xl px-5 py-10 md:px-8 md:py-16 lg:py-20">
             <div className="hero-copy">
-              <h1 className="max-w-4xl text-balance text-4xl font-semibold leading-[1.08] tracking-[-0.045em] sm:text-5xl md:text-6xl">
+              <p className="eyebrow">
+                {copy("Evidence-first opportunity research for founders")}
+              </p>
+              <h1 className="text-balance">
                 {copy("Find a business worth building.")}
                 <br />
-                <span>{copy("Then prove it.")}</span>
+                <span className="italic">{copy("Then prove it.")}</span>
               </h1>
-              <p className="text-pretty text-sm leading-relaxed text-muted-foreground md:text-base">
+              <p className="max-w-xl text-pretty text-base leading-relaxed text-muted-foreground md:text-lg">
                 {copy(
-                  "VentureLens turns your experience into a shortlist of GenAI-enabled, recurring-revenue businesses—each backed by linked sources, an explainable score, a critique, and a validation plan.",
+                  "Turn your experience into evidence-backed business ideas, with scores, risks, and a practical validation plan.",
                 )}
               </p>
-              <div className="hero-actions flex flex-wrap gap-3">
+              <div className="hero-actions flex flex-wrap gap-3 pt-2">
                 <Button asChild size="lg">
                   <Link href="/demo/dashboard">
                     {copy("Explore the live demo")}
@@ -186,183 +180,136 @@ export function Landing() {
                   </Link>
                 </Button>
               </div>
-              <ul className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-muted-foreground">
-                <li className="flex items-center gap-1.5">
-                  <ShieldCheck className="size-4 text-primary" />
-                  {copy("No credit card")}
-                </li>
-                <li className="flex items-center gap-1.5">
-                  <Check className="size-4 text-primary" />
-                  {copy("Private workspace")}
-                </li>
-                <li className="flex items-center gap-1.5">
-                  <Languages className="size-4 text-primary" />
-                  {copy("English · 简体中文 · 繁體中文")}
-                </li>
-              </ul>
             </div>
-            <MobileDisclosure title={copy("Preview a sample report")}>
-              <EvidencePreview />
-            </MobileDisclosure>
+            <EvidencePreview />
           </div>
         </section>
-        <section className="border-y bg-background">
-          <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-center gap-x-12 gap-y-4 px-5 py-7 text-sm text-muted-foreground">
+
+        <section className="border-b bg-card">
+          <div className="mx-auto grid max-w-7xl gap-4 px-5 py-6 text-sm text-muted-foreground sm:grid-cols-2 lg:grid-cols-4 md:px-8">
             {[
               "Built around your founder profile",
               "Evidence before enthusiasm",
               "Recurring-revenue thinking",
               "Validation, not speculation",
-            ].map((t) => (
-              <span key={t} className="flex items-center gap-2">
-                <Check className="size-4 text-primary" />
-                {copy(t)}
-              </span>
+            ].map((text) => (
+              <p key={text} className="flex items-center gap-2">
+                <Check className="size-4 shrink-0 text-primary" />
+                {copy(text)}
+              </p>
             ))}
           </div>
         </section>
-        <section
-          id="whats-inside"
-          className="mx-auto max-w-7xl px-5 py-20 md:px-8"
-        >
-          <div className="flex flex-col gap-4 md:max-w-2xl">
-            <p className="eyebrow">{copy("What you get")}</p>
-            <h2 className="text-balance text-3xl font-semibold md:text-4xl">
-              {copy("Inside every research report")}
+
+        <section id="how-it-works" className="mx-auto max-w-7xl px-5 py-20 md:px-8 md:py-24">
+          <div className="max-w-2xl">
+            <p className="eyebrow">{copy("How it works")}</p>
+            <h2 className="editorial-title mt-3 text-balance text-4xl md:text-5xl">
+              {copy("A better question than")} {copy("“What should I build?”")}
             </h2>
-            <p className="text-base text-muted-foreground">
+            <p className="mt-4 max-w-xl text-muted-foreground">
               {copy(
-                "Not a chat transcript. A structured, saved brief you can read in ten minutes and act on the same day.",
+                "Find the intersection of what you can build, who needs it, and what they might pay for.",
               )}
             </p>
           </div>
-          <div className="mt-10 grid gap-x-10 sm:grid-cols-2 lg:grid-cols-3">
-            {reportParts.map((part) => (
-              <article
-                key={part.title}
-                className="flex flex-col gap-3 border-t py-6"
-              >
-                <span className="text-primary">
-                  <part.icon className="size-5" />
-                </span>
-                <h3 className="text-lg font-semibold">{copy(part.title)}</h3>
-                <p className="text-sm leading-relaxed text-muted-foreground">
-                  {copy(part.text)}
-                </p>
-              </article>
+          <ol className="mt-12 grid gap-5 md:grid-cols-3">
+            {steps.map((step, index) => (
+              <li key={step.title} className="surface flex flex-col gap-5 p-6">
+                <div className="flex items-center justify-between">
+                  <span className="step-number">{index + 1}</span>
+                  <step.icon className="size-5 text-muted-foreground" />
+                </div>
+                <h3 className="text-xl font-semibold">{copy(step.title)}</h3>
+                <p className="leading-relaxed text-muted-foreground">{copy(step.text)}</p>
+                <p className="mt-auto pt-2 text-sm font-medium text-primary">{copy(step.detail)}</p>
+              </li>
             ))}
-          </div>
+          </ol>
         </section>
-        <section id="how-it-works" className="border-y bg-background">
-          <div className="mx-auto max-w-7xl px-5 py-20 md:px-8">
-            <div className="flex flex-col justify-between gap-5 md:flex-row md:items-end">
-              <div className="flex flex-col gap-4">
-                <p className="eyebrow">{copy("How it works")}</p>
-                <h2 className="max-w-xl text-balance text-3xl font-semibold md:text-4xl">
-                  {copy("A better question than")}
-                  <br />
-                  {copy("“What should I build?”")}
-                </h2>
-              </div>
-              <p className="max-w-md text-base text-muted-foreground">
-                {copy(
-                  "Find the intersection of what you can build, who needs it, and what they might pay for.",
-                )}
-              </p>
-            </div>
-            <ol className="mt-12 grid gap-6 md:grid-cols-3">
-              {steps.map((f, i) => (
-                <li key={f.title} className="flex flex-col gap-5 border-t py-6">
-                  <div className="flex items-center justify-between">
-                    <span className="step-number">{i + 1}</span>
-                    <f.icon className="size-5 text-muted-foreground" />
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <h3 className="text-xl font-semibold">{copy(f.title)}</h3>
-                    <p className="text-base leading-relaxed text-muted-foreground">
-                      {copy(f.text)}
-                    </p>
-                  </div>
-                  <p className="mt-auto border-t pt-4 text-sm text-muted-foreground">
-                    {copy(f.detail)}
-                  </p>
-                </li>
-              ))}
-            </ol>
-          </div>
-        </section>
-        <section className="band-dark">
-          <div className="mx-auto max-w-7xl px-5 py-20 md:px-8">
-            <div className="flex flex-col gap-4 md:max-w-2xl">
-              <p className="eyebrow text-[#9fb7ff]">
-                {copy("Honest by design")}
-              </p>
-              <h2 className="text-balance text-3xl font-semibold md:text-4xl">
-                {copy("Rules the research engine cannot break")}
+
+        <section id="whats-inside" className="border-y bg-card">
+          <div className="mx-auto max-w-7xl px-5 py-20 md:px-8 md:py-24">
+            <div className="max-w-2xl">
+              <h2 className="editorial-title text-balance text-4xl md:text-5xl">
+                {copy("Inside every research report")}
               </h2>
-              <p className="muted-on-dark text-base">
+              <p className="mt-4 text-muted-foreground">
                 {copy(
-                  "Most AI tools are optimized to sound convincing. VentureLens is built to be checkable. These rules are enforced in code, not in a prompt.",
+                  "Not a chat transcript. A structured, saved brief you can read in ten minutes and act on the same day.",
                 )}
               </p>
             </div>
             <div className="mt-12 grid gap-5 sm:grid-cols-2">
-              {rules.map((rule) => (
-                <article
-                  key={rule.title}
-                  className="flex gap-4 rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur"
-                >
-                  <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-white/10 text-[#9fb7ff]">
-                    <rule.icon className="size-5" />
+              {reportParts.map((part) => (
+                <article key={part.title} className="flex gap-4 rounded-2xl bg-background p-5 sm:p-6">
+                  <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-secondary text-primary">
+                    <part.icon className="size-5" />
                   </span>
-                  <div className="flex flex-col gap-2">
-                    <h3 className="text-lg font-semibold">
-                      {copy(rule.title)}
-                    </h3>
-                    <p className="muted-on-dark text-sm leading-relaxed">
-                      {copy(rule.text)}
-                    </p>
+                  <div>
+                    <h3 className="text-lg font-semibold">{copy(part.title)}</h3>
+                    <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{copy(part.text)}</p>
                   </div>
                 </article>
               ))}
             </div>
           </div>
         </section>
-        <section className="mx-auto max-w-7xl px-5 py-20 md:px-8">
-          <div className="flex flex-col gap-4 md:max-w-2xl">
-            <p className="eyebrow">{copy("Who it’s for")}</p>
-            <h2 className="text-balance text-3xl font-semibold md:text-4xl">
-              {copy("Built for people who would rather test than guess")}
-            </h2>
-          </div>
-          <div className="mt-12 grid gap-5 md:grid-cols-3">
-            {audiences.map((a) => (
-              <article
-                key={a.title}
-                className="flex flex-col gap-4 rounded-2xl bg-secondary p-6"
-              >
-                <a.icon className="size-6 text-primary" />
-                <h3 className="text-lg font-semibold">{copy(a.title)}</h3>
-                <p className="text-sm leading-relaxed text-muted-foreground">
-                  {copy(a.text)}
-                </p>
-              </article>
-            ))}
-          </div>
-        </section>
-        <section id="faq" className="border-t bg-background">
-          <div className="mx-auto grid max-w-7xl gap-10 px-5 py-20 md:grid-cols-[1fr_1.6fr] md:px-8">
-            <div className="flex flex-col gap-4">
-              <p className="eyebrow">{copy("Questions")}</p>
-              <h2 className="text-balance text-3xl font-semibold md:text-4xl">
-                {copy("Straight answers before you start")}
+
+        <section className="mx-auto max-w-7xl px-5 py-20 md:px-8 md:py-24">
+          <div className="grid gap-10 lg:grid-cols-[0.85fr_1.15fr] lg:items-start">
+            <div className="lg:sticky lg:top-28">
+              <p className="eyebrow">{copy("Honest by design")}</p>
+              <h2 className="editorial-title mt-3 text-balance text-4xl md:text-5xl">
+                {copy("Rules the research engine cannot break")}
               </h2>
-              <p className="text-base text-muted-foreground">
+              <p className="mt-4 max-w-lg text-muted-foreground">
                 {copy(
-                  "Still unsure? Open the demo and read a full sample report first.",
+                  "Most AI tools are optimized to sound convincing. VentureLens is built to be checkable. These rules are enforced in code, not in a prompt.",
                 )}
               </p>
-              <Button asChild variant="outline" className="w-fit">
+            </div>
+            <div className="grid gap-4">
+              {rules.map((rule) => (
+                <article key={rule.title} className="surface flex gap-4 p-5 sm:p-6">
+                  <rule.icon className="mt-1 size-5 shrink-0 text-primary" />
+                  <div>
+                    <h3 className="text-lg font-semibold">{copy(rule.title)}</h3>
+                    <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{copy(rule.text)}</p>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="border-y bg-secondary/60">
+          <div className="mx-auto max-w-7xl px-5 py-20 md:px-8">
+            <h2 className="editorial-title max-w-3xl text-balance text-4xl md:text-5xl">
+              {copy("Built for people who would rather test than guess")}
+            </h2>
+            <div className="mt-10 grid gap-8 md:grid-cols-3">
+              {audiences.map((audience) => (
+                <article key={audience.title} className="border-t border-primary/20 pt-5">
+                  <audience.icon className="size-6 text-primary" />
+                  <h3 className="mt-4 text-lg font-semibold">{copy(audience.title)}</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{copy(audience.text)}</p>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section id="faq" className="mx-auto max-w-7xl px-5 py-20 md:px-8 md:py-24">
+          <div className="grid gap-10 md:grid-cols-[1fr_1.5fr]">
+            <div>
+              <h2 className="editorial-title text-balance text-4xl md:text-5xl">
+                {copy("Straight answers before you start")}
+              </h2>
+              <p className="mt-4 text-muted-foreground">
+                {copy("Still unsure? Open the demo and read a full sample report first.")}
+              </p>
+              <Button asChild variant="outline" className="mt-6 w-full sm:w-auto">
                 <Link href="/demo/research/results">
                   {copy("Read a sample report")}
                   <ArrowRight />
@@ -370,50 +317,33 @@ export function Landing() {
               </Button>
             </div>
             <div className="flex flex-col gap-3">
-              {faqs.map((f) => (
-                <details key={f.q} className="surface group p-5">
-                  <summary className="flex cursor-pointer items-center justify-between gap-4 font-medium">
-                    {copy(f.q)}
+              {faqs.map((faq) => (
+                <details key={faq.q} className="surface group p-5">
+                  <summary className="flex min-h-11 items-center justify-between gap-4 font-medium">
+                    {copy(faq.q)}
                     <ArrowRight className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-90" />
                   </summary>
-                  <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-                    {copy(f.a)}
-                  </p>
+                  <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{copy(faq.a)}</p>
                 </details>
               ))}
             </div>
           </div>
         </section>
-        <section className="mx-5 mb-20 mt-20 flex max-w-7xl flex-col items-center gap-6 rounded-lg border bg-card px-6 py-16 text-center text-white md:mx-8 xl:mx-auto">
-          <h2 className="text-balance text-3xl font-semibold md:text-4xl">
-            {copy("Your next chapter deserves a clearer lens.")}
-          </h2>
-          <p className="max-w-xl text-base text-white/80">
-            {copy(
-              "You don’t need another list of startup ideas. You need a thoughtful starting point for a business that fits you.",
-            )}
-          </p>
-          <div className="flex flex-wrap justify-center gap-3">
-            <Button
-              asChild
-              size="lg"
-              variant="outline"
-              className="border-border bg-primary text-primary-foreground hover:bg-[var(--primary-deep)]"
-            >
+
+        <section className="mx-5 mb-20 rounded-2xl bg-primary px-6 py-14 text-primary-foreground md:mx-8 xl:mx-auto xl:max-w-7xl">
+          <div className="mx-auto flex max-w-2xl flex-col items-center gap-6 text-center">
+            <h2 className="editorial-title text-balance text-4xl md:text-5xl">
+              {copy("Your next chapter deserves a clearer lens.")}
+            </h2>
+            <p className="max-w-xl text-primary-foreground/85">
+              {copy(
+                "You don’t need another list of startup ideas. You need a thoughtful starting point for a business that fits you.",
+              )}
+            </p>
+            <Button asChild size="lg" variant="outline" className="border-card bg-card text-primary hover:bg-secondary">
               <Link href="/signup">
                 {copy("Build your founder profile")}
                 <ArrowRight />
-              </Link>
-            </Button>
-            <Button
-              asChild
-              size="lg"
-              variant="ghost"
-              className="text-white hover:bg-white/10 hover:text-white"
-            >
-              <Link href="/demo/dashboard">
-                {copy("Explore the demo")}
-                <ArrowUpRight />
               </Link>
             </Button>
           </div>
