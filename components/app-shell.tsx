@@ -262,7 +262,7 @@ export function AppShell({ children, isAdmin = false }: { children: React.ReactN
         </DialogContent>
       </Dialog>
       <div className="lg:pl-64">
-        <header className="flex min-h-20 flex-wrap items-center justify-between gap-3 border-b bg-card px-4 py-3 md:px-8">
+        <header className="flex min-h-16 items-center justify-between gap-2 border-b bg-card px-3 py-2 sm:min-h-20 sm:gap-3 sm:px-4 sm:py-3 md:px-8">
           <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             <Button
               variant="ghost"
@@ -278,13 +278,15 @@ export function AppShell({ children, isAdmin = false }: { children: React.ReactN
               {copy("Workspace")}
             </span>
             <span className="hidden text-muted-foreground sm:inline">/</span>
-            <span className="font-medium">{copy(title)}</span>
+            <span className="truncate font-medium">{copy(title)}</span>
           </div>
-          <div className="ml-auto flex shrink-0 flex-wrap items-center gap-1 sm:gap-3">
+          <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-3">
             <LanguageSwitcher />
+            {/* On phones the sidebar and page notices already say which
+                workspace this is; the badge would push the header to two rows. */}
             <Badge
               variant="secondary"
-              className="gap-1.5 rounded-md font-normal"
+              className="hidden gap-1.5 rounded-md font-normal sm:inline-flex"
             >
               <FlaskConical className="size-3.5" />
               <span>

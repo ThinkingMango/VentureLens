@@ -487,7 +487,7 @@ export function Landing() {
             )}
           </p>
           <div className="flex flex-wrap justify-center gap-3">
-            <Button asChild size="lg" variant="outline" className="border-white/20 bg-white text-foreground hover:bg-white/90">
+            <Button asChild size="lg" variant="outline" className="border-white/20 bg-white text-[#10213f] hover:bg-white/90 hover:text-[#10213f]">
               <Link href="/signup">
                 {copy("Build your founder profile")}
                 <ArrowRight />

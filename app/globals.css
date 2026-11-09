@@ -8,7 +8,7 @@
   --color-popover: var(--card);
   --color-popover-foreground: var(--foreground);
   --color-primary: var(--primary);
-  --color-primary-foreground: var(--card);
+  --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--primary);
   --color-muted: var(--background);
@@ -23,7 +23,7 @@
   --color-input: var(--border);
   --color-ring: var(--primary);
   --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--card);
+  --color-destructive-foreground: var(--destructive-foreground);
   --radius-sm: 0.5rem;
   --radius-md: 0.625rem;
   --radius-lg: 0.875rem;
@@ -32,24 +32,60 @@
   --shadow-card: var(--shadow-card);
   --shadow-float: var(--shadow-float);
 }
+/*
+ * Colour tokens. Every component reads these through Tailwind
+ * (bg-card, text-primary, …), so the dark palette below is the whole
+ * dark-mode implementation. Contrast (WCAG AA) was checked for every
+ * text/background pair in both schemes; keep it that way when editing.
+ */
 :root {
+  color-scheme: light;
   --background: #f5f7fb;
   --foreground: #10213f;
   --card: #ffffff;
   --primary: #2f55d4;
   --primary-deep: #1f3fae;
+  --primary-foreground: #ffffff;
   --secondary: color-mix(in srgb, var(--primary) 9%, var(--card));
   --muted-foreground: #5b6b84;
-  --warm: #d98a1a;
+  /* warm: 3.98:1 on white (icons and accents); success: 5.31:1 on white */
+  --warm: #b86e0e;
   --warm-soft: #fff4e2;
-  --success: #1f8f65;
+  --success: #177a55;
   --success-soft: #e6f6ee;
   --destructive: #c23b3b;
+  --destructive-foreground: #ffffff;
   --border: color-mix(in srgb, var(--muted-foreground) 18%, var(--card));
   --radius: 0.875rem;
   --chart-1: var(--primary);
+  --score-track: color-mix(in srgb, var(--primary) 12%, var(--card));
   --shadow-card: 0 1px 2px rgba(16, 33, 63, 0.04), 0 1px 1px rgba(16, 33, 63, 0.03);
   --shadow-float: 0 24px 60px -24px rgba(16, 33, 63, 0.28), 0 8px 24px -12px rgba(47, 85, 212, 0.18);
+  --shadow-primary: 0 10px 24px -12px color-mix(in srgb, var(--primary) 70%, transparent);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --background: #0c1426;
+    --foreground: #e6ecf7;
+    --card: #131d35;
+    --primary: #7c98ff;
+    --primary-deep: #9db2ff;
+    --primary-foreground: #0b1430;
+    --secondary: color-mix(in srgb, var(--primary) 14%, var(--card));
+    --muted-foreground: #98a6bf;
+    --warm: #f0a83c;
+    --warm-soft: color-mix(in srgb, var(--warm) 8%, var(--card));
+    --success: #47c995;
+    --success-soft: color-mix(in srgb, var(--success) 14%, var(--card));
+    --destructive: #ff7a7a;
+    --destructive-foreground: #1f0a0a;
+    --border: color-mix(in srgb, var(--muted-foreground) 20%, var(--card));
+    --score-track: color-mix(in srgb, var(--primary) 18%, var(--card));
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-float: 0 24px 60px -24px rgba(0, 0, 0, 0.6), 0 8px 24px -12px rgba(0, 0, 0, 0.4);
+    --shadow-primary: 0 10px 24px -14px color-mix(in srgb, var(--primary) 45%, transparent);
+  }
 }
 * {
   border-color: var(--border);
@@ -85,6 +121,19 @@ button:disabled {
 :focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 4px;
+}
+/*
+ * A link whose hit area covers its nearest positioned ancestor (a card).
+ * The card draws the focus ring (has-[a:focus-visible]), so the link does not.
+ * Interactive children of the card need `relative z-10` to stay clickable.
+ */
+.stretched-link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+.stretched-link:focus-visible {
+  outline: none;
 }
 input,
 textarea {
@@ -190,11 +239,12 @@ button {
   color: transparent;
 }
 .brand-gradient {
-  background: linear-gradient(135deg, var(--primary-deep), var(--primary) 60%, #5b8def);
+  /* Fixed brand blues: these surfaces carry white text in both schemes. */
+  background: linear-gradient(135deg, #1f3fae, #2f55d4 60%, #4a76e0);
 }
 .band-dark {
   background:
-    radial-gradient(70% 60% at 20% 0%, color-mix(in srgb, var(--primary) 55%, transparent), transparent 70%),
+    radial-gradient(70% 60% at 20% 0%, color-mix(in srgb, #2f55d4 55%, transparent), transparent 70%),
     radial-gradient(50% 50% at 90% 100%, color-mix(in srgb, #5b8def 40%, transparent), transparent 70%),
     #0f1d3f;
   color: #fff;
@@ -233,8 +283,8 @@ html:lang(zh-Hant) .eyebrow {
   font-weight: 600;
   font-size: 1.125rem;
   color: #fff;
-  background: linear-gradient(135deg, var(--primary-deep), var(--primary));
-  box-shadow: 0 10px 24px -12px rgba(47, 85, 212, 0.65);
+  background: linear-gradient(135deg, #1f3fae, #2f55d4);
+  box-shadow: var(--shadow-primary);
 }
 @layer components {
   .field-select {

@@ -13,7 +13,7 @@ import {
 import { toast } from "sonner";
 import { type Opportunity, scoreLabels } from "@/lib/demo-data";
 import { useDemo } from "@/components/demo-provider";
-import { DemoNote, Confidence, SectionTitle } from "@/components/shared";
+import { DemoNote, Confidence, SectionTitle, ScoreRing } from "@/components/shared";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -457,11 +457,13 @@ export function OpportunityDetail({
               </h2>
               <Badge variant="outline">{copy("Demo")}</Badge>
             </div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-4xl font-semibold tabular-nums tracking-tight">
-                {o.score}
-              </span>
-              <span className="text-sm text-muted-foreground">/ 100</span>
+            <div className="flex items-center gap-4">
+              <ScoreRing
+                size="lg"
+                score={o.score}
+                label={copy("Demo score: {score} out of 100", { score: o.score })}
+              />
+              <span className="text-sm text-muted-foreground">{copy("out of 100")}</span>
             </div>
             <Confidence level={o.confidence} />
             <dl className="flex flex-col gap-4 border-t pt-5">

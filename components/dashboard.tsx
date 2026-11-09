@@ -10,14 +10,11 @@ import {
   Lightbulb,
   Bookmark,
   Target,
-  Sparkles,
   Check,
-  Compass,
   FileText,
   Clock3,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { PageHeader, SectionTitle, DemoNote } from "@/components/shared";
 import { OpportunityCard } from "@/components/opportunity-card";
@@ -46,51 +43,6 @@ export function Dashboard() {
           </Link>
         </Button>
       </PageHeader>
-      <section className="relative flex flex-col justify-between gap-7 overflow-hidden rounded-xl border border-primary/15 bg-secondary p-6 sm:flex-row sm:items-center xl:p-8">
-        <div className="flex max-w-xl flex-col items-start gap-4">
-          <Badge
-            variant="outline"
-            className="gap-1.5 rounded-md border-primary/20 bg-card/70 text-primary"
-          >
-            <Sparkles className="size-3.5" />
-            {copy("Your next chapter starts with evidence")}
-          </Badge>
-          <div className="flex flex-col gap-2">
-            <h2 className="text-2xl font-semibold tracking-tight text-balance">
-              {copy("Big ideas deserve a closer look.")}
-            </h2>
-            <p className="max-w-lg leading-relaxed text-muted-foreground">
-              {copy(
-                "Find recurring-revenue opportunities that fit your strengths. Move beyond inspiration—with a clearer view of the buyer, the market, and your next step.",
-              )}
-            </p>
-          </div>
-          <Button asChild className="mt-1">
-            <Link href="/research/new">
-              {copy("Explore new opportunities")}
-              <ArrowRight />
-            </Link>
-          </Button>
-        </div>
-        <div
-          className="hidden h-36 w-48 shrink-0 items-center justify-center lg:flex"
-          aria-hidden="true"
-        >
-          <div className="relative flex size-32 items-center justify-center rounded-full border border-primary/15">
-            <div className="flex size-24 items-center justify-center rounded-full border border-primary/25">
-              <div className="flex size-14 items-center justify-center rounded-full bg-card shadow-sm">
-                <Compass className="size-8 text-primary" strokeWidth={1.4} />
-              </div>
-            </div>
-            <span className="absolute right-0 top-1 flex size-8 items-center justify-center rounded-lg border bg-card text-primary">
-              <Sparkles className="size-4" />
-            </span>
-            <span className="absolute bottom-0 left-1 flex size-8 items-center justify-center rounded-lg border bg-card text-primary">
-              <Target className="size-4" />
-            </span>
-          </div>
-        </div>
-      </section>
       <section
         aria-label={copy("Workspace statistics")}
         className="grid grid-cols-2 gap-4 xl:grid-cols-4"

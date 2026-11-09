@@ -128,15 +128,102 @@ const confidenceLabels: Record<string, string> = {
   moderate: "Moderate: primary validation still needed",
   limited: "Limited: few independent sources",
 };
+// How many of the three signal bars a confidence level fills.
+const confidenceStrength: Record<string, number> = {
+  Higher: 3,
+  Medium: 2,
+  moderate: 2,
+  Lower: 1,
+  limited: 1,
+};
 export function Confidence({ level }: { level: string }) {
   const copy = useCopy();
+  const strength = confidenceStrength[level] ?? 2;
   return (
-    <Badge variant="secondary" className="gap-1.5 rounded-md font-medium">
-      <span className="demo-dot" />
+    <Badge variant="secondary" className="gap-2 rounded-md font-medium">
+      {/* Signal bars encode the level visually; the text carries it for assistive tech. */}
+      <span className="flex h-3 items-end gap-[2px]" aria-hidden="true">
+        {[1, 2, 3].map((bar) => (
+          <span
+            key={bar}
+            className={cn(
+              "w-[3px] rounded-[1px]",
+              bar <= strength ? "bg-current" : "bg-current opacity-25",
+            )}
+            style={{ height: `${bar * 4}px` }}
+          />
+        ))}
+      </span>
       {["Higher", "Medium", "Lower"].includes(level)
         ? copy("{level} confidence", { level: copy(level) })
         : copy(confidenceLabels[level] ?? level)}
     </Badge>
+  );
+}
+/**
+ * A score out of 100 drawn as a ring, so the number people compare first
+ * is also the first thing the eye lands on. The ring is a gauge, not
+ * decoration: its fill is the score.
+ */
+export function ScoreRing({
+  score,
+  label,
+  size = "md",
+}: {
+  score: number;
+  /** Accessible name, e.g. "Demo score: 87 out of 100". */
+  label: string;
+  size?: "md" | "lg";
+}) {
+  const px = size === "lg" ? 96 : 60;
+  const stroke = size === "lg" ? 8 : 5;
+  const radius = (px - stroke) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const value = Math.max(0, Math.min(100, score));
+  return (
+    <div
+      role="img"
+      aria-label={label}
+      className="relative inline-flex shrink-0 items-center justify-center"
+      style={{ width: px, height: px }}
+    >
+      <svg
+        width={px}
+        height={px}
+        viewBox={`0 0 ${px} ${px}`}
+        className="-rotate-90"
+        aria-hidden="true"
+      >
+        <circle
+          cx={px / 2}
+          cy={px / 2}
+          r={radius}
+          fill="none"
+          stroke="var(--score-track)"
+          strokeWidth={stroke}
+        />
+        <circle
+          cx={px / 2}
+          cy={px / 2}
+          r={radius}
+          fill="none"
+          stroke="var(--primary)"
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={circumference * (1 - value / 100)}
+        />
+      </svg>
+      <span
+        aria-hidden="true"
+        className={cn(
+          "absolute font-semibold tabular-nums tracking-tight",
+          size === "lg" ? "text-3xl" : "text-lg",
+        )}
+      >
+        {score}
+      </span>
+    </div>
   );
 }
 export function TextLink({

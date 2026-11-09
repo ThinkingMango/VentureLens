@@ -158,6 +158,8 @@ The plan is unusually honest ("not a record of successful execution") and the mi
 
 ### 6.3 Still recommended (not done here)
 
+> Update: dark mode (item 5) and part of item 3 (per-card demo labels) are done; see [`UI_UX_REVIEW.md`](./UI_UX_REVIEW.md) for the follow-up review and the current UI/UX backlog.
+
 1. **Fix B3 (report language)** — the largest remaining UX defect for English users.
 2. **Live opportunity tabs** (Overview / Evidence / Economics / Validation) to reach demo parity; the demo component can be generalised.
 3. **Consolidate disclaimers** into one persistent demo banner and one per-report "How to read this" drawer.

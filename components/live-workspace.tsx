@@ -18,7 +18,7 @@ import {
   Telescope,
 } from "lucide-react";
 import { useDemo } from "@/components/demo-provider";
-import { PageHeader, SectionTitle, Confidence } from "@/components/shared";
+import { PageHeader, SectionTitle, Confidence, ScoreRing } from "@/components/shared";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { OpportunityCard } from "@/components/opportunity-card";
@@ -556,9 +556,13 @@ export function LiveOpportunityDetail({
               </h2>
               <Badge variant="outline">{copy("Evidence-driven")}</Badge>
             </div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-4xl font-semibold tabular-nums tracking-tight">{item.score}</span>
-              <span className="text-sm text-muted-foreground">/ 100</span>
+            <div className="flex items-center gap-4">
+              <ScoreRing
+                size="lg"
+                score={item.score}
+                label={copy("Research score: {score} out of 100", { score: item.score })}
+              />
+              <span className="text-sm text-muted-foreground">{copy("out of 100")}</span>
             </div>
             <Confidence level={item.confidence} />
             <dl className="flex flex-col gap-4 border-t pt-5">
