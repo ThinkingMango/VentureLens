@@ -16,7 +16,7 @@ export function LanguageSwitcher() {
       <label htmlFor={id} className="sr-only">
         {t("label")}
       </label>
-      <div className="flex min-h-11 items-center gap-1 rounded-md border bg-card px-2 text-foreground">
+      <div className="flex min-h-11 items-center gap-1 rounded-lg border bg-card px-2 text-foreground shadow-card">
         {pending ? (
           <LoaderCircle
             className="size-4 shrink-0 animate-spin"

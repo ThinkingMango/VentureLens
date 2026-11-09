@@ -29,7 +29,7 @@ export function OpportunityEvidence({
           return (
             <article
               key={source.source_key}
-              className="flex flex-col gap-2 border-t pt-4"
+              className="flex flex-col gap-3 rounded-xl bg-background/70 p-4 sm:p-5"
             >
               {url ? (
                 <a

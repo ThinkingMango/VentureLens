@@ -119,8 +119,8 @@ export function EvidencePreview() {
               </div>
             ))}
           </dl>
-          <div className="border-l-2 border-warm py-1 pl-3">
-            <p className="mb-1 text-xs text-warm">
+          <div className="rounded-xl bg-warm-soft p-4">
+            <p className="mb-1 text-xs font-semibold text-foreground">
               {copy("Key risk to validate")}
             </p>
             <p className="text-sm text-muted-foreground">{lead.risk}</p>

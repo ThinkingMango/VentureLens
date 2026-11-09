@@ -20,7 +20,7 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   const menuTrigger = useRef<HTMLButtonElement>(null);
   return (
-    <div className="min-h-screen bg-card text-foreground">
+    <div className="min-h-dvh bg-background text-foreground">
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 focus:rounded-md focus:bg-card focus:p-3"
@@ -53,6 +53,7 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
             ))}
           </nav>
           <div className="hidden items-center gap-4 lg:flex">
+            <LanguageSwitcher />
             <Link href="/login" className="text-sm font-medium">
               {copy("Log in")}
             </Link>
@@ -64,7 +65,7 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
             </Button>
           </div>
           <div className="flex items-center gap-2">
-            <LanguageSwitcher />
+            <div className="hidden sm:block lg:hidden"><LanguageSwitcher /></div>
             <Button
               variant="ghost"
               size="icon"
@@ -82,7 +83,7 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
         {open && (
           <nav
             id="public-mobile-menu"
-            className="flex flex-col gap-1 border-t bg-card p-5 lg:hidden [&>a]:flex [&>a]:min-h-11 [&>a]:items-center [&>a]:rounded-md [&>a]:px-3 [&>a]:font-medium"
+            className="flex flex-col gap-2 border-t bg-card p-5 lg:hidden [&>a]:flex [&>a]:min-h-11 [&>a]:items-center [&>a]:rounded-lg [&>a]:px-3 [&>a]:font-medium"
             aria-label={copy("Mobile main navigation")}
             onClick={(event) => {
               if ((event.target as HTMLElement).closest("a")) setOpen(false);
@@ -97,6 +98,7 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
             <Link href="/signup" className="text-primary">
               {copy("Get started")}
             </Link>
+            <div className="pt-2 sm:hidden"><LanguageSwitcher /></div>
           </nav>
         )}
       </header>

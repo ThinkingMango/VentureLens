@@ -319,7 +319,7 @@ export function LiveDashboard() {
         </section>
         <div className="flex flex-col gap-4">
           <ResearchAccessCard />
-          <MobileDisclosure title={copy("Workspace statistics")}>
+          <div>
             <section
               aria-label={copy("Workspace statistics")}
               className="grid grid-cols-2 gap-4"
@@ -338,7 +338,7 @@ export function LiveDashboard() {
                 </div>
               ))}
             </section>
-          </MobileDisclosure>
+          </div>
         </div>
       </div>
       {data.projects.length > 0 && (

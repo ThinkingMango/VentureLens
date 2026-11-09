@@ -103,6 +103,7 @@ export function ResearchConfig() {
         <section className="surface p-6 md:p-8">
           <form
             className="flex flex-col gap-7"
+            noValidate
             onSubmit={async (e) => {
               e.preventDefault();
               if (busy || submitting) return;
@@ -169,10 +170,14 @@ export function ResearchConfig() {
               }
             }}
           >
-            <h2 className="text-lg font-semibold">
-              {copy("Set your research focus")}
-            </h2>
             <FieldGroup>
+              <section
+                aria-labelledby="research-focus-group"
+                className="flex flex-col gap-5 rounded-xl bg-background/65 p-4 sm:p-5"
+              >
+                <h2 id="research-focus-group" className="text-lg font-semibold">
+                  {copy("Set your research focus")}
+                </h2>
               <Field data-invalid={!!nameError}>
                 <FieldLabel htmlFor="research-name">
                   {copy("Research name (required)")}
@@ -204,6 +209,14 @@ export function ResearchConfig() {
                   </FieldDescription>
                 )}
               </Field>
+              </section>
+              <section
+                aria-labelledby="discovery-preferences-group"
+                className="flex flex-col gap-5 rounded-xl bg-background/65 p-4 sm:p-5"
+              >
+                <h2 id="discovery-preferences-group" className="text-lg font-semibold">
+                  {copy("Discovery preferences")}
+                </h2>
               <Field>
                 <FieldLabel htmlFor="discovery-mode">
                   {copy("发现模式")}
@@ -318,6 +331,14 @@ export function ResearchConfig() {
                   ))}
                 </select>
               </Field>
+              </section>
+              <section
+                aria-labelledby="research-constraints-group"
+                className="flex flex-col gap-5 rounded-xl bg-background/65 p-4 sm:p-5"
+              >
+                <h2 id="research-constraints-group" className="text-lg font-semibold">
+                  {copy("Your real-world constraints")}
+                </h2>
               <Field>
                 <FieldLabel htmlFor="context">
                   {copy("Anything else to keep in mind?")}{" "}
@@ -348,13 +369,21 @@ export function ResearchConfig() {
                       )}
                 </FieldDescription>
               </Field>
+              </section>
             </FieldGroup>
+            <section
+              aria-labelledby="research-review-group"
+              className="flex flex-col gap-5 rounded-xl border bg-card p-4 sm:p-5"
+            >
+              <h2 id="research-review-group" className="text-lg font-semibold">
+                {copy("Review and start")}
+              </h2>
             {formError && (
               <p role="alert" className="rounded-lg border p-4 text-sm">
                 {copy(formError)}
               </p>
             )}
-            <div className="flex flex-wrap items-center justify-between gap-4 border-t pt-5">
+            <div className="flex flex-col items-stretch justify-between gap-4 border-t pt-5 sm:flex-row sm:items-center">
               <span className="flex items-center gap-2 text-sm text-muted-foreground">
                 {isDemo ? (
                   copy("0 credits used in demo mode")
@@ -388,6 +417,7 @@ export function ResearchConfig() {
                 <ArrowRight />
               </Button>
             </div>
+            </section>
           </form>
         </section>
         <aside className="flex flex-col gap-5">

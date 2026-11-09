@@ -23,15 +23,15 @@ export function Brand({ compact = false }: { compact?: boolean }) {
     <Link
       href="/"
       aria-label={copy("VentureLens AI home")}
-      className="inline-flex shrink-0 items-center gap-2.5"
+      className="inline-flex shrink-0 items-center gap-2.5 rounded-lg"
     >
-      <span className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-        <Aperture className="size-6" strokeWidth={1.7} />
+      <span className="flex size-10 items-center justify-center rounded-full border border-primary/20 bg-secondary text-primary">
+        <Aperture className="size-5" strokeWidth={1.6} />
       </span>
       {!compact && (
-        <span className="text-xl font-semibold tracking-tight">
+        <span className="font-display text-[1.65rem] leading-none tracking-[-0.035em]">
           {copy("VentureLens")}
-          <span className="ml-1 text-primary">AI</span>
+          <span className="ml-1.5 font-sans text-xs font-semibold tracking-normal text-primary">AI</span>
         </span>
       )}
     </Link>

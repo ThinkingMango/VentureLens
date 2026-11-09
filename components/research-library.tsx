@@ -112,12 +112,12 @@ export function ResearchLibrary() {
             )}
           </div>
         </div>
-        <div className="divide-y md:hidden">
+        <div className="grid gap-3 p-3 md:hidden">
           {runs.map((r) => (
             <Link
               key={r.id}
               href={r.target}
-              className="flex items-start gap-3 p-5 hover:bg-secondary/40"
+              className="flex items-start gap-3 rounded-xl border bg-card p-5 hover:border-primary/40 hover:bg-secondary/40"
             >
               <span className="rounded-lg bg-secondary p-2.5 text-primary">
                 <FileText className="size-5" />
