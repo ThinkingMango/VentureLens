@@ -10,15 +10,16 @@ import {
   Check,
   Circle,
   Compass,
+  FileSearch,
   FlaskConical,
   Link2,
   Lock,
   Plus,
+  SearchX,
   Sparkles,
-  Telescope,
 } from "lucide-react";
 import { useDemo } from "@/components/demo-provider";
-import { PageHeader, SectionTitle, Confidence, ScoreRing, ScoreBreakdown } from "@/components/shared";
+import { PageHeader, SectionTitle, Confidence, ScoreRing, ScoreBreakdown, EmptyState } from "@/components/shared";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { OpportunityCard } from "@/components/opportunity-card";
@@ -36,52 +37,6 @@ export const liveDimensionLabels = [
   "Delivery feasibility",
   "Founder advantage",
 ];
-
-export function WorkspaceEmpty({
-  title,
-  description,
-  actionHref = "/research/new",
-  actionLabel = "Create research brief",
-  onAction,
-}: {
-  title: string;
-  description: string;
-  actionHref?: string;
-  actionLabel?: string;
-  onAction?: () => void;
-}) {
-  const copy = useCopy();
-  return (
-    <section className="surface flex flex-col items-start gap-4 p-6 md:p-8">
-      <span className="flex size-11 items-center justify-center rounded-xl bg-secondary text-primary">
-        <Telescope className="size-5" />
-      </span>
-      <h2 className="text-xl font-semibold">{copy(title)}</h2>
-      <p className="max-w-2xl leading-relaxed text-muted-foreground">
-        {copy(description)}
-      </p>
-      {onAction ? (
-        <Button variant="outline" onClick={onAction}>
-          {copy(actionLabel)}
-        </Button>
-      ) : (
-        <Button asChild>
-          <Link href={actionHref}>
-            {copy(actionLabel)}
-            <ArrowRight />
-          </Link>
-        </Button>
-      )}
-      <Link
-        href="/demo/research/results"
-        className="text-sm font-medium text-primary"
-      >
-        {copy("See an example report in the separate demo")}
-        <ArrowRight className="ml-1 inline size-4" />
-      </Link>
-    </section>
-  );
-}
 
 export function ResearchAccessCard({ compact = false }: { compact?: boolean }) {
   const copy = useCopy();
@@ -403,35 +358,39 @@ export function LiveResearchResults({
           ))}
         </div>
       ) : (
-        <WorkspaceEmpty
-          actionHref={savedOnly ? "/research/results" : "/research"}
-          actionLabel={
-            query
-              ? "Clear search"
-              : savedOnly
-                ? "Browse research results"
-                : "Open research history"
-          }
-          onAction={query ? () => setQuery("") : undefined}
-          title={
-            query
-              ? copy("No matching opportunities")
-              : savedOnly
-                ? copy("Your shortlist starts here.")
-                : copy("No research results yet.")
-          }
-          description={
-            query
-              ? copy("Try another search term.")
-              : savedOnly
-                ? copy(
-                    "Save an opportunity from your completed research to add it here. Demonstration opportunities remain in the demo and are never copied into your account.",
-                  )
-                : copy(
-                    "尚无通过证据核验的报告。可从研究历史查看任务进度或失败原因；检索不可用或证据不足时不会生成虚构结果。",
-                  )
-          }
-        />
+        query ? (
+          <EmptyState
+            icon={SearchX}
+            title={copy("No matching opportunities")}
+            description={copy("Try another search term.")}
+            action={{ label: copy("Clear search"), onClick: () => setQuery("") }}
+          />
+        ) : savedOnly ? (
+          <EmptyState
+            icon={Bookmark}
+            title={copy("Your shortlist starts here.")}
+            description={copy(
+              "Save an opportunity from your completed research to add it here. Demonstration opportunities remain in the demo and are never copied into your account.",
+            )}
+            action={{
+              label: copy("Browse research results"),
+              href: "/research/results",
+            }}
+          />
+        ) : (
+          <EmptyState
+            icon={FileSearch}
+            title={copy("No research results yet.")}
+            description={copy(
+              "No report has passed the evidence checks yet. Research history shows each run's progress or why it stopped. When retrieval fails or evidence is thin, no results are invented.",
+            )}
+            action={{ label: copy("Open research history"), href: "/research" }}
+            secondary={{
+              label: copy("See an example report in the separate demo"),
+              href: "/demo/research/results",
+            }}
+          />
+        )
       )}
     </>
   );

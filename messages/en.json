@@ -1047,7 +1047,11 @@
     "mauc2lf": "Searching…",
     "m1jufdxk": "Waiting",
     "mvpgi27": "Not searched",
-    "m8fsw8u": "Technical details"
+    "m8fsw8u": "Technical details",
+    "m1mwg83d": "No research yet",
+    "mc3fqve": "Describe a market or idea to explore. Each run searches the web for evidence and reports only the hypotheses that pass the evidence checks.",
+    "mnxpfkq": "No matching research",
+    "m1yr0v72": "No report has passed the evidence checks yet. Research history shows each run's progress or why it stopped. When retrieval fails or evidence is thin, no results are invented."
   },
   "language": {
     "label": "Interface language",

@@ -11,6 +11,7 @@ import {
   ChartNoAxesCombined,
   Workflow,
   ArrowRight,
+  type LucideIcon,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -282,5 +283,65 @@ export function ScoreBreakdown({
         </div>
       ))}
     </dl>
+  );
+}
+/**
+ * The one empty-state pattern: an icon for the context, what is missing and
+ * why, and a single next step. Titles and descriptions are already-translated
+ * strings. The text is a status region, so a filter that leaves nothing is
+ * announced to screen readers.
+ */
+export function EmptyState({
+  icon: Icon,
+  title,
+  description,
+  action,
+  secondary,
+  plain = false,
+}: {
+  icon: LucideIcon;
+  title: string;
+  description: string;
+  action: { label: string; href?: string; onClick?: () => void };
+  secondary?: { label: string; href: string };
+  /** Drop the card frame when the state sits inside an existing surface. */
+  plain?: boolean;
+}) {
+  return (
+    <section
+      className={cn(
+        "flex flex-col items-center gap-5 px-6 py-12 text-center",
+        !plain && "surface",
+      )}
+    >
+      <span className="flex size-12 items-center justify-center rounded-xl bg-secondary text-primary">
+        <Icon className="size-6" aria-hidden="true" />
+      </span>
+      <div role="status" className="flex max-w-md flex-col gap-2">
+        <h2 className="text-lg font-semibold">{title}</h2>
+        <p className="leading-relaxed text-muted-foreground">{description}</p>
+      </div>
+      {action.onClick ? (
+        <Button variant="outline" onClick={action.onClick}>
+          {action.label}
+        </Button>
+      ) : (
+        <Button asChild>
+          <Link href={action.href ?? "/research/new"}>
+            {action.label}
+            <ArrowRight />
+          </Link>
+        </Button>
+      )}
+      {secondary && (
+        <Link
+          href={secondary.href}
+          className="inline-flex min-h-11 items-center gap-1 text-sm font-medium text-primary hover:underline"
+        >
+          {secondary.label}
+          <ArrowUpRight className="size-4" aria-hidden="true" />
+        </Link>
+      )}
+    </section>
   );
 }

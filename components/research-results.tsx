@@ -11,9 +11,10 @@ import {
   Columns3,
   Bookmark,
   Plus,
+  SearchX,
 } from "lucide-react";
 import { OpportunityCard } from "@/components/opportunity-card";
-import { PageHeader, DemoNote } from "@/components/shared";
+import { PageHeader, DemoNote, EmptyState } from "@/components/shared";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
@@ -245,39 +246,34 @@ export function ResearchResults({
           </Field>
         </FieldGroup>
         {list.length === 0 ? (
-          <div className="surface flex flex-col items-center gap-4 p-12 text-center">
-            <Bookmark className="size-8 text-muted-foreground" />
-            <h3 className="text-lg font-semibold">
-              {query || confidence !== "All confidence levels"
-                ? copy("No matching opportunities")
-                : copy("No saved opportunities yet")}
-            </h3>
-            <p className="text-muted-foreground">
-              {query || confidence !== "All confidence levels"
-                ? copy("Try a broader search or a different confidence filter.")
-                : copy(
-                    "Save an opportunity from your research results to build your shortlist.",
-                  )}
-            </p>
-            {query || confidence !== "All confidence levels" ? (
-              <Button
-                variant="outline"
-                onClick={() => {
+          query || confidence !== "All confidence levels" ? (
+            <EmptyState
+              icon={SearchX}
+              title={copy("No matching opportunities")}
+              description={copy(
+                "Try a broader search or a different confidence filter.",
+              )}
+              action={{
+                label: copy("Clear filters"),
+                onClick: () => {
                   setQuery("");
                   setConfidence("All confidence levels");
-                }}
-              >
-                {copy("Clear filters")}
-              </Button>
-            ) : (
-              <Button asChild variant="outline">
-                <Link href="/research/results">
-                  {copy("Explore opportunities")}
-                  <ArrowRight data-icon="inline-end" />
-                </Link>
-              </Button>
-            )}
-          </div>
+                },
+              }}
+            />
+          ) : (
+            <EmptyState
+              icon={Bookmark}
+              title={copy("Your shortlist starts here.")}
+              description={copy(
+                "Save an opportunity from your research results to build your shortlist.",
+              )}
+              action={{
+                label: copy("Explore opportunities"),
+                href: "/research/results",
+              }}
+            />
+          )
         ) : view === "cards" ? (
           <div className="grid gap-5 md:grid-cols-2">
             {list.map((o) => (
