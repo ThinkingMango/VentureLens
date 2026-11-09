@@ -176,6 +176,7 @@ export function AdminProviders({ initialData }: { initialData: ProviderSettingsR
             <p className="break-all font-mono text-xs text-muted-foreground">app_metadata.role = &quot;admin&quot;</p>
           </section>
           <p className="text-sm text-muted-foreground">{t("scope")}</p>
+          <p className="text-sm text-muted-foreground">{t("disclosure")}</p>
         </aside>
       </div>
     </>
