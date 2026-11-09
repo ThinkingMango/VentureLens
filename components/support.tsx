@@ -50,7 +50,7 @@ function buildTopics(disclosure: ProviderDisclosure): { title: string; questions
         },
         {
           q: "My research run failed.",
-          a: ["If retrieval fails, the model output is rejected, or the evidence is too thin, the run stops and your run is returned automatically. Check its status in My research before starting again."],
+          a: ["If retrieval fails, the model output is rejected, or the evidence is too thin, the run stops and your run is returned automatically, up to a limit per account that prevents abuse. Failures on our side are always returned. Check its status in My research before starting again."],
         },
         {
           q: "Which AI model runs my research?",

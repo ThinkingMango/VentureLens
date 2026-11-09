@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { scoringWeights, weightedScore, safeSourceUrl, groundedClassifications, eligibleEvidence, requireExactIds, errorCode } from '../lib/research-core.ts';
+import { scoringWeights, weightedScore, safeSourceUrl, groundedClassifications, eligibleEvidence, evidenceGate, confidenceLevel as gateConfidence, requireExactIds, errorCode } from '../lib/research-core.ts';
 import { projectSchema, emptyBrief } from '../lib/workspace-schema.ts';
 import { reportEvidenceCount, reportShortlist } from '../lib/report-presentation.ts';
 
@@ -60,6 +60,32 @@ test('inclusion requires two independent domains and non-vendor demand evidence'
   assert.equal(eligibleEvidence('c1',evidence,classes.map(c=>({...c,stance:'contradicts'}))).length,0);
   assert.equal(eligibleEvidence('c2',evidence,classes).length,0);
   assert.equal(eligibleEvidence('c1',[evidence[0],{...evidence[1],url:'https://www.buyers.org/another'}],classes).length,0);
+});
+test('contradicting and neutral sources never pass the gate or raise confidence and the score cap',()=>{
+  const all = {pain:100,demand:100,economics:100,feasibility:100,advantage:100};
+  const critic = { source_key:'c1-s3',candidate_id:'c1',url:'https://critics.net/review',excerpt:'Critics argue that proposal software rarely changes agency win rates.' };
+  const criticClass = { source_key:'c1-s3',relevant:true,kind:'pain',reliability:'secondary',stance:'contradicts',quote:critic.excerpt,claim:'Counter-evidence' };
+  // Regression: one supporting source plus two contradicting ones used to pass with "moderate" confidence and an 85 cap.
+  const oneSupport = [classes[0],{...classes[1],stance:'contradicts'},criticClass];
+  assert.deepEqual(evidenceGate('c1',[...evidence,critic],oneSupport),{sources:[],supportingDomains:0});
+  // Neutral sources are context, not corroboration.
+  assert.equal(evidenceGate('c1',evidence,[classes[0],{...classes[1],stance:'neutral'}]).supportingDomains,0);
+  // Two supporting domains pass; the contradicting source stays visible and labelled but is not counted.
+  const gate = evidenceGate('c1',[...evidence,critic],[...classes,criticClass]);
+  assert.equal(gate.supportingDomains,2);
+  assert.deepEqual(gate.sources.map(s=>[s.source_key,s.stance]),[['c1-s1','supports'],['c1-s2','supports'],['c1-s3','contradicts']]);
+  assert.equal(gateConfidence(gate.supportingDomains),'limited');
+  assert.equal(weightedScore(all,'combined',gate.supportingDomains),70);
+  // A third independent supporting domain is what earns moderate confidence and the 85 cap.
+  const three = evidenceGate('c1',[...evidence,critic],[...classes,{...criticClass,stance:'supports'}]);
+  assert.equal(three.supportingDomains,3);
+  assert.equal(gateConfidence(three.supportingDomains),'moderate');
+  assert.equal(weightedScore(all,'combined',three.supportingDomains),85);
+  // Two supporting pages from one publisher count as one independent domain.
+  const sister = {...critic,source_key:'c1-s4',url:'https://research.survey.org/more'};
+  assert.equal(evidenceGate('c1',[...evidence,sister],[...classes,{...criticClass,source_key:'c1-s4',stance:'supports'}]).supportingDomains,2);
+  // The non-vendor demand requirement must be met by a supporting source, not a contradicting one.
+  assert.equal(evidenceGate('c1',[...evidence,critic],[...classes.map(c=>({...c,reliability:'vendor'})),criticClass]).sources.length,0);
 });
 test('subdomains and trailing dots do not create independent sources',()=>{
   for (const urls of [

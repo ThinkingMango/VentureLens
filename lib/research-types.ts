@@ -27,6 +27,8 @@ export type ResearchDetail = {
   error_code: string | null;
   budget_block?: { model: string; required_usd: number; remaining_usd: number; kind: "reservation" | "estimate" };
   retry_count: number;
+  /** Whether a failed run handed its slot back. False once the account's failed-run refund allowance is used up. */
+  quota_released?: boolean;
   configuration: { brief: ResearchBrief };
   report: ResearchReport | null;
   created_at: string;

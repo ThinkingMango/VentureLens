@@ -31,6 +31,12 @@ export function OpportunityEvidence({
               key={source.source_key}
               className="flex flex-col gap-3 rounded-xl bg-background/70 p-4 sm:p-5"
             >
+              {source.stance === "contradicts" && (
+                // Counter-evidence is kept visible but must never read as support for the opportunity.
+                <p className="w-fit rounded-md bg-warm-soft px-2 py-1 text-xs font-semibold text-foreground">
+                  {copy("Counter-evidence: this source contradicts the opportunity")}
+                </p>
+              )}
               {url ? (
                 <a
                   href={url}
