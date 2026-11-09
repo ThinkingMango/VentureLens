@@ -72,7 +72,7 @@ The Next.js `(workspace)` route group **does not add a URL segment**. Do **not**
 
 | Priority | Observed issue | Consequence | Required verification/remediation |
 | --- | --- | --- | --- |
-| **P0** | `20261104000000_venturelens_workspace.sql` and `202611040001_venturelens_workspace.sql` overlap in initial schema creation | Fresh migrations may collide; deployed history could differ | Check actual migration history, reproduce clean setup, reconcile safely without rewriting applied migrations |
+| **P0** | `20261104000000_venturelens_workspace.sql` and `202611040001_venturelens_workspace.sql` overlap in initial schema creation | Fresh migrations may collide; deployed history could differ | Check actual migration history, reproduce clean setup, reconcile safely without rewriting applied migrations. **Resolved 2026-11-05:** files renamed to their applied versions and the unapplied duplicate removed; see `docs/DATABASE_MIGRATIONS.md`. |
 | **P0** | Real end-to-end research success not established by this review | Customers could pay for incomplete research | Execute existing `test:research:e2e` in a development environment; inspect failures, completion, source persistence, retries |
 | **P0** | Per-run development budget defaults to **$0.25**; retrieval reservations can be conservative (allowance for up to 32 searches) | Budget exhaustion, uncertain charges, or incomplete jobs possible | Instrument reservation-versus-actual usage; test full 8-candidate workflow and interruption scenarios |
 | **P1** | Research system instructions force human-readable conclusions to Chinese | English UI users may receive Chinese reports | Persist selected report language; preserve original quotes; localize output and error messages |
@@ -335,6 +335,8 @@ Initially measure:
 Do not invent benchmark pass rates. Establish launch thresholds from observed staging performance and a handful of real user trials. Commercial confidence rises with real payment and renewal behavior, not model confidence scores.
 
 ## 9. Immediate next action (the first v0/Codex task)
+
+> **Status (2026-11-09):** the migration overlap this task names was reconciled on 2026-11-05, and the two file names below no longer exist. See `docs/DATABASE_MIGRATIONS.md` for the current history.
 
 **Start with M0 only**. In the **existing** v0 project/repository, request:
 

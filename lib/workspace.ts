@@ -8,8 +8,48 @@ import {
   opportunitySchema,
   type ResearchAccess,
   type WorkspaceData,
+  type WorkspaceOpportunity,
   type Profile,
 } from "@/lib/workspace-schema";
+
+/**
+ * The workspace list is sent to the browser on every workspace page, so it leaves out what only the opportunity page
+ * renders: source excerpts and the long review text. Cards keep the title, scores, economics, the first validation
+ * step and the source links they count. The opportunity page reads the full record with readOpportunity().
+ */
+export function workspaceOpportunity(item: WorkspaceOpportunity): WorkspaceOpportunity {
+  const { rationale: _rationale, critique: _critique, falsification: _falsification, assumptions: _assumptions, ...summary } = item;
+  return {
+    ...summary,
+    evidence: item.evidence?.map(({ excerpt: _excerpt, ...source }) => source),
+  };
+}
+
+function parseOpportunity(row: { id: string; title: string; score: number; payload: unknown }) {
+  const parsed = opportunitySchema.safeParse({
+    ...(row.payload as Record<string, unknown>),
+    id: row.id,
+    title: row.title,
+    score: row.score,
+  });
+  return parsed.success ? parsed.data : null;
+}
+
+/** One opportunity with every field, for the opportunity page. Row-level security limits it to the owner. */
+export async function readOpportunity(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  id: string,
+): Promise<WorkspaceOpportunity | null> {
+  const { data, error } = await supabase
+    .from("opportunities")
+    .select("id,title,score,payload")
+    .eq("id", id)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) throw new Error("We could not load this opportunity. Please try again.");
+  return data ? parseOpportunity(data) : null;
+}
 
 export const requireUser = cache(async () => {
   const supabase = await createClient();
@@ -88,13 +128,8 @@ export async function readWorkspace(
       }
     : { ...emptyProfile };
   const opportunities = (opportunitiesResult.data ?? []).flatMap((item) => {
-    const parsed = opportunitySchema.safeParse({
-      ...item.payload,
-      id: item.id,
-      title: item.title,
-      score: item.score,
-    });
-    return parsed.success ? [parsed.data] : [];
+    const parsed = parseOpportunity(item);
+    return parsed ? [workspaceOpportunity(parsed)] : [];
   });
   const grant = accessResult.data;
   const active =

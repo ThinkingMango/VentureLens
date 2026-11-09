@@ -30,26 +30,26 @@ export async function POST(request: NextRequest) {
     const host =
       request.headers.get("x-forwarded-host") ?? request.headers.get("host");
     if (!origin || new URL(origin).host !== host)
-      return json({ code: "INVALID_ORIGIN", error: "请求来源不允许。" }, 403);
+      return json({ code: "INVALID_ORIGIN", error: "Request origin is not allowed." }, 403);
     if (!request.headers.get("content-type")?.startsWith("application/json"))
-      return json({ code: "JSON_REQUIRED", error: "需要 JSON 请求。" }, 415);
+      return json({ code: "JSON_REQUIRED", error: "JSON is required." }, 415);
     if (Number(request.headers.get("content-length") ?? 0) > 10000)
-      return json({ code: "REQUEST_TOO_LARGE", error: "请求过大。" }, 413);
+      return json({ code: "REQUEST_TOO_LARGE", error: "Request is too large." }, 413);
     const raw = await request.text();
     if (Buffer.byteLength(raw) > 10000)
-      return json({ code: "REQUEST_TOO_LARGE", error: "请求过大。" }, 413);
+      return json({ code: "REQUEST_TOO_LARGE", error: "Request is too large." }, 413);
     const parsed = inputSchema.safeParse(JSON.parse(raw));
     if (!parsed.success)
-      return json({ code: "INVALID_INPUT", error: "请检查研究配置。" }, 400);
+      return json({ code: "INVALID_INPUT", error: "Check the research settings." }, 400);
     const supabase = await createClient();
     const {
       data: { user },
       error: authError,
     } = await supabase.auth.getUser();
     if (authError || !user)
-      return json({ code: "AUTH_REQUIRED", error: "请先登录。" }, 401);
+      return json({ code: "AUTH_REQUIRED", error: "Please log in first." }, 401);
     if (!user.email_confirmed_at)
-      return json({ code: "EMAIL_UNVERIFIED", error: "请先验证邮箱。" }, 403);
+      return json({ code: "EMAIL_UNVERIFIED", error: "Please confirm your email first." }, 403);
     const admin = createAdminClient();
     let id: string;
     if (parsed.data.action === "start") {
@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
       const validatedProfile = profileSchema.safeParse(profile.data);
       if (!profile.data?.onboarding_completed || !validatedProfile.success)
         return json(
-          { code: "PROFILE_REQUIRED", error: "请先完成创始人画像。" },
+          { code: "PROFILE_REQUIRED", error: "Complete your founder profile first." },
           409,
         );
       const result = await admin.rpc("enqueue_research", {
@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
       id = parsed.data.id;
       const owned = await researchDetail(supabase, user.id, id);
       if (!owned)
-        return json({ code: "NOT_FOUND", error: "找不到研究任务。" }, 404);
+        return json({ code: "NOT_FOUND", error: "Research task not found." }, 404);
       const result = await admin.rpc("retry_research", {
         p_run: id,
         p_user: user.id,
@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
       if (result.error) throw new Error(result.error.message);
       if (!result.data)
         return json(
-          { code: "RETRY_UNAVAILABLE", error: "此任务当前不允许重试。" },
+          { code: "RETRY_UNAVAILABLE", error: "This task cannot be retried now." },
           409,
         );
     }
@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
     return json({ id }, 202);
   } catch (error) {
     if (error instanceof SyntaxError || error instanceof TypeError)
-      return json({ code: "INVALID_INPUT", error: "请求格式不正确。" }, 400);
+      return json({ code: "INVALID_INPUT", error: "The request is malformed." }, 400);
     const code = errorCode(error);
     return json(
       { code, error: researchErrors[code] },

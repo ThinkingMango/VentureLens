@@ -51,7 +51,7 @@ After this change `supabase migration list` shows local and remote in sync, and 
 
 - Creates `public.app_settings (key, value jsonb, updated_by, updated_at)`; RLS enabled and forced, no grants to `anon`/`authenticated`, full access for `service_role`.
 - Seeds the `research` row from the legacy `app_metadata.research_provider_settings` on the owner account (then removes that legacy key), adds `budgetUsd` (0.25) if missing.
-- Grants `app_metadata.role = "admin"` to the account that held the hard-coded administrator email; `isAdministrator` now checks only that claim.
+- Grants `app_metadata.role = "admin"` to the account that held the hard-coded administrator email; `isAdministrator` checks that claim (and still accepts the legacy server-managed `app_metadata.is_admin = true`; both require a confirmed email). Email addresses no longer grant access.
 - `public.research_budget_usd()` returns the configured cap; `enqueue_research` writes it to `research_runs.budget_usd`; the check constraint is loosened to `<= 5`.
 
 ## Notes on `20261105155412_signup_free_run_and_quota_release`

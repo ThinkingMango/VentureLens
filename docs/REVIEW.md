@@ -1,5 +1,7 @@
 # VentureLens AI — Holistic Review (November 2026)
 
+> **Historical snapshot.** This review describes `main` at `6719102`. Many of its findings have since been fixed (see the status column in §8), and the migration files it names were renamed or removed on 2026-11-05; `docs/DATABASE_MIGRATIONS.md` has the current history. Read it as a record of that review, not as the current state.
+
 > **Scope:** codebase, architecture, delivery plan (`plan.md`), business model, and UI/UX, reviewed at `main` `6719102` (merge of PR #11).
 > **Method:** full source read of `app/`, `components/`, `lib/`, `workflows/`, `supabase/`, `tests/`, `i18n/`, `messages/`; local execution of `pnpm typecheck`, `pnpm test` (81/81 pass), `pnpm build` (pass); Playwright screenshots of every public and demo route at desktop and mobile widths.
 > **Not executed:** Supabase integration test, research E2E test, any live provider call. Findings about runtime behaviour of the research engine are therefore code-reviewed, not observed.

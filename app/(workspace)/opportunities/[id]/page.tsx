@@ -1,7 +1,7 @@
 import { getCopy } from "@/i18n/server";
 import { notFound } from "next/navigation";
 import { z } from "zod";
-import { loadWorkspace } from "@/lib/workspace";
+import { readOpportunity, requireUser } from "@/lib/workspace";
 import { LiveOpportunityDetail } from "@/components/live-workspace";
 export async function generateMetadata() {
   const copy = await getCopy();
@@ -17,8 +17,9 @@ export default async function Page({
 }) {
   const { id } = await params;
   if (!z.uuid().safeParse(id).success) notFound();
-  const data = await loadWorkspace();
-  const opportunity = data.opportunities.find((item) => item.id === id);
+  // The workspace list omits excerpts and review text, so this page reads its own full record.
+  const { supabase, user } = await requireUser();
+  const opportunity = await readOpportunity(supabase, user.id, id);
   if (!opportunity) notFound();
   return <LiveOpportunityDetail opportunity={opportunity} />;
 }

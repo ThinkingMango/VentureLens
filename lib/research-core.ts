@@ -71,9 +71,9 @@ export function reportNarrative(language: ReportLanguage, counts: { candidates: 
   };
 }
 export const stageLabels: Record<string, string> = {
-  queued: "等待处理", discovery: "发现候选机会", retrieval: "检索外部证据",
-  classification: "分类与核验证据", evaluation: "商业评估", scoring: "加权评分",
-  review: "反向审查", finalizing: "保存报告", completed: "研究完成", failed: "研究中止",
+  queued: "Queued", discovery: "Discovering candidates", retrieval: "Retrieving external evidence",
+  classification: "Classifying and verifying evidence", evaluation: "Business evaluation", scoring: "Weighted scoring",
+  review: "Adversarial review", finalizing: "Saving report", completed: "Research complete", failed: "Research stopped",
 };
 const short = z.string().min(1).max(800);
 const long = z.string().min(1).max(2000);
@@ -309,19 +309,19 @@ export function requireExactIds(expected: string[], actual: string[]) {
   if (new Set(actual).size !== actual.length || actual.length !== expected.length || actual.some(id => !expected.includes(id))) throw new Error('INVALID_OUTPUT');
 }
 export const researchErrors: Record<string, string> = {
-  DEV_ACCESS_REQUIRED: "此账号没有有效的开发研究权限。尚未启用付费研究。",
-  DEV_QUOTA_EXCEEDED: "开发研究额度已用完。",
-  RUN_ALREADY_ACTIVE: "已有研究任务正在处理，请先查看该任务。",
-  BUDGET_EXCEEDED: "已达到本次研究的估算预算上限，任务已停止。",
+  DEV_ACCESS_REQUIRED: "This account does not have development research access. Paid research is not enabled.",
+  DEV_QUOTA_EXCEEDED: "Your development research allowance has been used.",
+  RUN_ALREADY_ACTIVE: "A research task is already active. Open it to check progress.",
+  BUDGET_EXCEEDED: "Research stopped because the next request could not fit within the remaining estimated budget, or a provider exceeded its reserved allowance.",
   RESEARCH_INPUT_TOO_LARGE: "The research input exceeds the safe processing limit. No further model request was sent.",
-  RETRIEVAL_UNAVAILABLE: "外部检索未返回可验证的内容。本次没有生成研究报告。",
-  INSUFFICIENT_EVIDENCE: "证据不足以支持任何机会，本次没有生成报告。",
-  INVALID_OUTPUT: "模型输出未通过结构或证据核验，本次没有生成报告。",
-  TRANSIENT_PROVIDER: "服务暂时不可用。可在剩余预算内手动重试一次。",
+  RETRIEVAL_UNAVAILABLE: "External retrieval returned no verifiable content. No report was generated.",
+  INSUFFICIENT_EVIDENCE: "Evidence was insufficient to support an opportunity. No report was generated.",
+  INVALID_OUTPUT: "Model output failed structural or evidence checks. No report was generated.",
+  TRANSIENT_PROVIDER: "The service is temporarily unavailable. You can retry once within the remaining budget.",
   PROVIDER_CREDITS_REQUIRED: "Research requires an available model-provider balance. Ask the project owner to check billing before starting another run.",
-  PROVIDER_CONFIGURATION: "研究服务暂不可用，请检查部署配置。",
-  WORKFLOW_INTERRUPTED: "工作流执行中断。可在剩余预算内手动重试一次。",
-  DISPATCH_FAILED: "任务未能启动，可手动重试一次。",
+  PROVIDER_CONFIGURATION: "Research is unavailable. The deployment configuration needs attention.",
+  WORKFLOW_INTERRUPTED: "The workflow was interrupted. You can retry once within the remaining budget.",
+  DISPATCH_FAILED: "The task could not start. You can retry once.",
 };
 export function errorCode(error: unknown): string {
   const seen = new Set<unknown>();

@@ -47,11 +47,11 @@ export function ResearchLibrary() {
               (item) => item.project_id === project.id,
             );
             return !latest
-              ? "简报已保存"
+              ? "Brief saved"
               : latest.status === "failed"
-                ? "研究中止"
+                ? "Research stopped"
                 : latest.status === "pending"
-                  ? "等待处理"
+                  ? "Queued"
                   : (stageLabels[latest.stage] ?? latest.status);
           })(),
           title: project.name,

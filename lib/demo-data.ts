@@ -300,5 +300,5 @@ export const researchReports: Record<string, DemoReport> = {
     ],
   },
 };
-export const demoNotice =
-  "Synthetic demonstration data. Scores, sources, and financial scenarios are illustrative—not verified research or forecasts.";
+// Re-exported for existing imports; live UI imports it from ./demo-notice so it does not pull in the fixtures.
+export { demoNotice } from "./demo-notice.ts";

@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PricingCards } from "@/components/pricing";
 import { useDemo } from "@/components/demo-provider";
+import { ResearchAccessCard } from "@/components/live-workspace";
 export function Billing() {
   const copy = useCopy();
   const { isDemo } = useDemo();
@@ -17,17 +18,20 @@ export function Billing() {
       <>
         <PageHeader
           title={copy("Credits & billing")}
-          description={copy(
-            "Payments and research credits are not enabled yet.",
-          )}
+          description={copy("Paid research credits are not available yet.")}
         />
+        <section className="surface flex flex-col gap-4 p-6">
+          <h2 className="text-xl font-semibold">{copy("Your research runs")}</h2>
+          {/* The same allowance the sidebar and New research page show, so billing never contradicts them. */}
+          <ResearchAccessCard />
+        </section>
         <section className="surface flex flex-col gap-4 p-6">
           <h2 className="text-xl font-semibold">
             {copy("No billing service connected")}
           </h2>
           <p className="leading-relaxed text-muted-foreground">
             {copy(
-              "No credits, charges, subscriptions, or payment methods have been provisioned for this account. You can save research briefs without making a payment.",
+              "Paid credits, charges, subscriptions, and payment methods are not connected yet, so nothing on this page can charge you. You can save research briefs without making a payment.",
             )}
           </p>
           <Button asChild variant="outline" className="w-fit">

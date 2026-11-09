@@ -8,7 +8,7 @@ A founder describes their experience, constraints and goals; VentureLens discove
 - **Contact:** product help at `support@smartmango.ai`, privacy and data requests at `privacy@smartmango.ai` (`lib/contact.ts`). The Privacy Policy (`components/privacy.tsx`) describes the real data flows; update it and `privacyUpdatedAt` whenever a provider, cookie, or stored field changes.
 - **Synthetic demo:** everything under `/demo/*` runs on fixed fixtures with no account and no AI calls.
 - **Languages:** English, Simplified Chinese, Traditional Chinese (interface). Source excerpts are kept in their original language.
-- **Status:** beta. Every confirmed account receives one free research run (`research_dev_access`, granted by a database trigger); failed runs are returned automatically; payments are not connected. See [`plan.md`](./plan.md) for the roadmap and [`docs/REVIEW.md`](./docs/REVIEW.md) for the current holistic review.
+- **Status:** beta. Every confirmed account receives one free research run (`research_dev_access`, granted by a database trigger); failed runs are returned automatically; payments are not connected. See [`plan.md`](./plan.md) for the roadmap and [`docs/REVIEW.md`](./docs/REVIEW.md) for the November 2026 holistic review (a historical snapshot; §8 there records what has since been fixed).
 
 ## Stack
 
@@ -62,7 +62,7 @@ where user_id = '<auth.users.id>';
 
 ## Administrators and settings
 
-Administrator access is granted only by a server-managed claim, `app_metadata.role = "admin"`, set with the service role or in the Supabase dashboard; no email address is special. Administrators manage the research policy (primary provider, fallback, models, per-run budget cap) at `/admin`, which is stored in the service-role-only `public.app_settings` table under the key `research`. The page shows what a complete run is expected to cost and refuses a primary model that the per-run budget cannot pay for. At the $0.25 default only Qwen 3.8 Flash can finish a run; Gemini Flash-Lite needs about $0.40 because Google Search grounding is billed per query. See [`docs/GENERATION_PIPELINE_REVIEW.md`](./docs/GENERATION_PIPELINE_REVIEW.md).
+Administrator access is granted only by a server-managed claim in `app_metadata`, set with the service role or in the Supabase dashboard: `app_metadata.role = "admin"` (use this one), or the legacy `app_metadata.is_admin = true`, which `lib/admin-access.ts` still accepts. Either also requires a confirmed email; no email address is special, and `user_metadata` never grants access. Administrators manage the research policy (primary provider, fallback, models, per-run budget cap) at `/admin`, which is stored in the service-role-only `public.app_settings` table under the key `research`. The page shows what a complete run is expected to cost and refuses a primary model that the per-run budget cannot pay for. At the $0.25 default only Qwen 3.8 Flash can finish a run; Gemini Flash-Lite needs about $0.40 because Google Search grounding is billed per query. See [`docs/GENERATION_PIPELINE_REVIEW.md`](./docs/GENERATION_PIPELINE_REVIEW.md).
 
 ```sql
 update auth.users set raw_app_meta_data = coalesce(raw_app_meta_data, '{}'::jsonb) || '{"role": "admin"}'

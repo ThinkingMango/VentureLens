@@ -219,7 +219,7 @@ export function ResearchConfig() {
                 </h2>
               <Field>
                 <FieldLabel htmlFor="discovery-mode">
-                  {copy("发现模式")}
+                  {copy("Discovery mode")}
                 </FieldLabel>
                 <select
                   id="discovery-mode"
@@ -234,18 +234,18 @@ export function ResearchConfig() {
                   }
                 >
                   <option value="combined">
-                    {copy("综合发现 · Combined Discovery")}
+                    {copy("Combined discovery")}
                   </option>
                   <option value="founder">
-                    {copy("创始人优势 · Founder Advantage")}
+                    {copy("Founder advantage")}
                   </option>
                   <option value="market">
-                    {copy("市场优先 · Market-First")}
+                    {copy("Market-first")}
                   </option>
                 </select>
                 <FieldDescription>
                   {copy(
-                    "市场优先不使用个人背景进行机会发现或评分；其余模式结合你的技能和资源。",
+                    "Market-first excludes personal context from discovery and scoring. Other modes consider your skills and resources.",
                   )}
                 </FieldDescription>
               </Field>
