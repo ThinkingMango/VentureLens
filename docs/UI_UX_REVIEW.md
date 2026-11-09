@@ -72,6 +72,8 @@ The product reads as competent and trustworthy, but it all looks the same. In th
 
 ### Contrast table (WCAG 2.1)
 
+> These are the first pass's blue-palette values. The merged teal palette is in §4.1; its text pairs are at least 4.84:1 in light mode and 6.4:1 in dark mode.
+
 | Pair | Light | Dark |
 | --- | --- | --- |
 | Body text on background | 14.93 : 1 | 15.48 : 1 |
@@ -94,16 +96,72 @@ Text inside a card cannot be selected with the mouse, because the stretched link
 
 ---
 
-## 4. Still recommended (prioritised)
+## 4. Follow-ups completed (second pass)
+
+The top three items of the original backlog, done on the same branch after merging `codex/ui-ux-redesign` (teal direction, see [`UI_DESIGN.md`](./UI_DESIGN.md)).
+
+### 4.1 Merge and palette reconciliation
+
+The codex branch replaced the blue palette with teal. Its light values were kept, with two contrast corrections, and given a dark counterpart:
+
+| Token / surface | Change | Why |
+| --- | --- | --- |
+| `--primary` (light) | `#087e83` → `#07787d` | Primary text on the `#f3f6f7` canvas was 4.47:1; now 4.84:1 |
+| `.brand-gradient` end | `#40a7a5` → `#23807f` | White CTA text over the light end was 2.88:1; now 4.70:1 |
+| Dark palette | Teal-tinted canvas `#0b171c`, card `#11232b`, primary `#4fc4c4` | Every text pair is at least 6.4:1 |
+| `.hero-bg` | Fixed `#f0f6f5` → derived from tokens | Would have shown a light hero behind light text in dark mode |
+| `.workspace-sidebar` | Defines its own `--primary-foreground` | Its mint "New research" button would otherwise get white text (now 9.76:1) |
+| Header | Codex sticky translucent header + single-row mobile sizing | Both changes kept |
+| Dark band accent | `#9fb7ff` (old blue) → `#8bdfd6` (mint) | One accent colour per page |
+
+### 4.2 Landing preview (was item 1)
+
+The codex `EvidencePreview` already replaced the `<div>`-built mockup with real demo data and a link into the demo. It now uses the workspace's own `ScoreRing`, `Confidence`, key-risk callout and a new shared `ScoreBreakdown`. It shows the opportunity's real key risk and price unit, and it cannot drift from the product.
+
+This is better than the screenshot originally proposed: a static image goes stale and cannot follow the interface language or colour scheme.
+
+### 4.3 Accessibility audit (was item 2)
+
+**Method:**
+- axe-core 4.10 (WCAG 2.0/2.1/2.2 A and AA, plus best practice) on 16 routes, including every report tab and the compare view, in light and dark at 1440px and 390px. That is 64 page contexts.
+- Scripted keyboard checks of dialogs, the mobile drawer, report tabs and the skip link.
+- Form-error checks.
+- Reflow at 320px and at 640px (200% zoom).
+
+| # | Finding | WCAG | Severity | Fix |
+| --- | --- | --- | --- | --- |
+| A4 | Submitting the new-research and onboarding forms empty showed the browser's untranslated tooltip. The app's inline error (`aria-invalid`, linked message) never ran, because native `required` validation blocked the submit first. | 3.3.1, 3.3.2 | 🔴 | `noValidate` on both forms. `required` is kept for semantics; the inline error now appears, is announced and receives focus. |
+| A5 | Checkboxes were 16–20px. | 2.5.8 | 🟡 | 24×24px everywhere (validation lists, report filter, admin). |
+| A6 | The desktop sidebar `<aside>` had no name, so pages with their own `<aside>` had two indistinguishable complementary landmarks. | 1.3.1 (best practice) | 🟢 | `aria-label="Workspace"`. |
+| A7 | Dimension score lists put a `<div>` bar beside `<dt>`/`<dd>`, which is invalid `<dl>` content. | 1.3.1 | 🟢 | Shared `ScoreBreakdown` puts the bar inside `<dd>`. |
+| A8 | Comparison-table rows had no row header. | 1.3.1 | 🟢 | The opportunity cell is `<th scope="row">`. |
+
+**Result:** axe reports **0 violations in all 64 contexts**.
+
+**Behaviour that passed as-is:**
+- The help dialog and mobile drawer move focus in, trap Tab, close on Escape and return focus to their trigger.
+- Report tabs follow the ARIA tabs pattern: roving `tabIndex`, arrow keys, Home and End.
+- A skip link is the first Tab stop on both shells, and every Tab stop shows a visible focus indicator.
+- There is no horizontal scroll at 320px or 640px.
+
+**Not covered:** a real screen reader (VoiceOver or NVDA) and the signed-in live screens. The run-progress live region in particular needs a real account and a running job.
+
+### 4.4 Demo disclaimers (was item 3)
+
+| Page | Before | After |
+| --- | --- | --- |
+| Results | Header badge, "Demonstration report" badge, notice sentence, "How to interpret" details, "Demo confidence" filter, "Demo score" column | Header badge, notice sentence, "How to interpret" details; the filter and column read "Confidence" and "Score" |
+| Report | Header badge, notice sentence, "Demo assessment" fact, "Demo" badge on the score panel | Header badge and notice sentence; the fact reads "Score" |
+
+The notes that mark individual sources and buyer hypotheses as synthetic were kept on purpose. On an evidence product, they say exactly which claims are invented. Accessible names still say "Demo score".
+
+## 5. Still recommended (prioritised)
 
 | # | Recommendation | Why | Effort | Skill |
 | --- | --- | --- | --- | --- |
-| 1 | **Replace the landing hero's hand-built product mockup with a real screenshot** of the demo report (light and dark `<picture>` sources). | The `<div>`-built mockup drifts from the real UI: it still shows the old "87 / 100" text score. A real capture is more credible and stays honest. | S | `run`, `design-taste-frontend` |
-| 2 | **Run a full accessibility audit** on the signed-in workspace (forms, run-progress live region, tab order on the report tabs). | Only the colour tokens and the card were audited here. | M | `design:accessibility-review` |
-| 3 | **Reduce disclaimers on the results and detail pages:** keep the header badge plus a single collapsible "About this demo" line; drop "Demonstration report" and "Demo confidence" (rename to "Confidence"). | Still four demo signals per screen (U4). | S | `design:ux-copy` |
 | 4 | **Run page:** move token counts and USD costs under "Technical details"; show per-candidate retrieval progress. | Carried over from REVIEW §6.3 item 6. | M | `design:ux-copy` |
 | 5 | **Empty states** for Saved and My research, with a single action each. | A blank list should invite the next step. | S | `design:ux-copy` |
-| 6 | **Landing-page template tells:** a centered hero with a gradient accent on one phrase ("Then prove it."), an eyebrow label above five sections, a decorative dot in the hero pill, and the "Big ideas"-style taglines elsewhere. Reduce eyebrows to at most two and make the hero left-aligned with the real screenshot from item 1. | These are the patterns the design skills identify as signs of a generated page. They weaken the "checkable, not convincing" brand. | M | `frontend-design`, `design-taste-frontend` |
+| 6 | **Landing-page template tells (remaining):** the codex redesign already left-aligned the hero and dropped the gradient accent; still left are an all-caps eyebrow label above five sections and a decorative dot in the hero pill. Reduce eyebrows to at most two. | These are patterns the design skills identify as signs of a generated page, and they weaken the "checkable, not convincing" brand. | S | `frontend-design`, `design-taste-frontend` |
 | 7 | **Stat tiles on mobile** take a full screen. Use a compact 2×2 without detail lines below `sm`, or a horizontal strip. | Pushes opportunities below the fold on phones. | S | `dataviz` |
 | 8 | **Manual theme toggle** (system / light / dark) in the header menu, stored per viewer. | Dark mode follows the OS only. Some users want to override it. | S | n/a |
 | 9 | **Em and en dashes in copy** (7 in `messages/en.json`, more in Chinese where they are idiomatic). | Optional. Some style guides now treat em dashes as a sign of AI-written text; plain punctuation reads more direct. Do not change the Chinese catalogues. | S | `design:ux-copy` |
@@ -111,7 +169,7 @@ Text inside a card cannot be selected with the mouse, because the stretched link
 
 ---
 
-## 5. How to keep the UI from regressing
+## 6. How to keep the UI from regressing
 
 1. **Use tokens, never hex values, in components.** `grep -rnE "#[0-9a-f]{3,6}|bg-white|text-black" components` should return only the fixed-brand surfaces documented in `app/globals.css`.
 2. **Check both schemes.** In Chrome DevTools → Rendering → "Emulate CSS prefers-color-scheme", or with Playwright: `browser.newContext({ colorScheme: "dark" })`.
