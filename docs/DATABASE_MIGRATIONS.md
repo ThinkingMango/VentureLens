@@ -2,7 +2,7 @@
 
 Supabase project: **VentureLens** (`ndrxywlouwigawhgrtrj`, ap-southeast-1).
 
-## Applied history (as of 2026-11-06)
+## Applied history (as of 2026-11-09)
 
 Read from `supabase_migrations.schema_migrations` on the live project:
 
@@ -15,16 +15,12 @@ Read from `supabase_migrations.schema_migrations` on the live project:
 | `20261105155412` | `signup_free_run_and_quota_release` | `supabase/migrations/20261105155412_signup_free_run_and_quota_release.sql` | identical (applied with `apply_migration`, file renamed to the assigned version) |
 | `20261105161832` | `app_settings_and_role_admin` | `supabase/migrations/20261105161832_app_settings_and_role_admin.sql` | identical (applied with `apply_migration`, file renamed to the assigned version) |
 | `20261106141806` | `research_dev_access_max_runs_limit` | `supabase/migrations/20261106141806_research_dev_access_max_runs_limit.sql` | identical (applied with `apply_migration`, file renamed to the assigned version) |
+| `20261109150000` | `cap_failed_run_refunds` | `supabase/migrations/20261109150000_cap_failed_run_refunds.sql` | identical (applied from the repository file after #28 merged, under the file's own version; stored one statement per element, see below) |
+| `20261109160000` | `normalize_gmail_signup_grants` | `supabase/migrations/20261109160000_normalize_gmail_signup_grants.sql` | identical (applied from the repository file after #29 merged, under the file's own version; stored one statement per element, see below) |
 
 "Identical" means the MD5 of the SQL with all whitespace removed matches between the repository file and the `statements` column of the applied migration.
 
-## Pending (in the repository, not yet applied to the live project)
-
-| Version | Name | Notes |
-| --- | --- | --- |
-| `20261109150000` | `cap_failed_run_refunds` | Adds `research_dev_access.runs_refunded` and `max_refunds` (default 3, bounded 0–100) and replaces `release_failed_research_run()`. Failures on our side (`DISPATCH_FAILED`, `WORKFLOW_INTERRUPTED`, `TRANSIENT_PROVIDER`, `PROVIDER_CONFIGURATION`, `PROVIDER_CREDITS_REQUIRED`) and runs with no recorded spend are always returned; other failed runs are returned only while `runs_refunded < max_refunds`. Existing accounts start at `runs_refunded = 0`. Tested on PostgreSQL 16 with `pnpm test:sql` on top of the full migration history. |
-
-Apply it with `supabase db push`, or with `apply_migration` using the name `cap_failed_run_refunds` and then rename the file to the version it assigns (rule 1 below). Move the row into the applied table once done.
+Migrations applied with `apply_migration` store the whole file as one element of `statements`. Migrations applied by the Supabase CLI (as `20261109150000` and `20261109160000` were, under their file versions) store one element per statement without its terminating semicolon, so compare those with the statements rejoined: `md5(regexp_replace(array_to_string(statements, ';') || ';', '\s+', '', 'g'))`.
 
 ## Reconciliation performed on 2026-11-05
 
@@ -46,7 +42,7 @@ After this change `supabase migration list` shows local and remote in sync, and 
 
 1. **One source of truth.** Write the SQL file in `supabase/migrations/` first, then apply it with the Supabase CLI (`supabase db push`) or with `apply_migration` using the *same* `name`. If `apply_migration` is used, copy the version it assigned into the file name before committing.
 2. **Never edit an applied file.** Write a new migration instead. If a file must be renamed to match history, keep its content byte-identical.
-3. **Verify before merging.** Compare `md5(regexp_replace(array_to_string(statements, E'\n'), '\s+', '', 'g'))` on the project against the local file.
+3. **Verify before merging.** Compare `md5(regexp_replace(array_to_string(statements, E'\n'), '\s+', '', 'g'))` on the project against the local file, or the rejoined form above for a migration the CLI applied.
 4. **Keep RLS invariants.** New tables use `enable` + `force row level security`, composite `(id, user_id)` foreign keys, `revoke all … from anon, authenticated`, and explicit `grant` statements, as in the existing files.
 5. **Business parameters live in `public.app_settings`, not in check constraints.** The per-run budget is read by `public.research_budget_usd()` from the `research` row (bounded 0.05–5 USD). `research_dev_access.max_runs` is bounded 1–100 by a check constraint (raised from 3 on 2026-11-06); the grant size itself is set per account by an operator until the entitlement ledger exists.
 
