@@ -54,7 +54,8 @@
     "costEstimate": "Estimated cost of a complete run: about {expected}. Every reservation fits only with a per-run budget of at least {required}.",
     "budgetTooLow": "{model} cannot finish a run within this budget: it needs at least {required}. Raise the budget or choose a less expensive model; otherwise every run stops before its report.",
     "fallbackOverBudget": "{model} needs at least {required} to finish a run, so it will not be used as a fallback at this budget.",
-    "budgetTooLowSaved": "This budget is too low for the selected primary model. Raise the budget or choose a less expensive model."
+    "budgetTooLowSaved": "This budget is too low for the selected primary model. Raise the budget or choose a less expensive model.",
+    "disclosure": "Saving updates the AI-provider sections of the Privacy Policy and Support page immediately. A provider change can change where research data is processed, including mainland China; tell users before a change that materially affects them."
   },
   "ui": {
     "m1pbhrck": "Admin",
@@ -1216,7 +1217,26 @@
     "m12ek4is": "Saved",
     "m1kwlci6": "Profile",
     "mz1c41v": "Discovery preferences",
-    "mpa7q9s": "Review and start"
+    "mpa7q9s": "Review and start",
+    "m6arnwa": "Research runs currently use {model} through Alibaba Cloud Model Studio, which processes requests in mainland China (Beijing region).",
+    "mcs4rdk": "Research runs currently use {model} through the Google Gemini API.",
+    "m1xvj7om": "If it is unavailable, a run may fall back to {model} through Alibaba Cloud Model Studio, which processes requests in mainland China (Beijing region).",
+    "ma0r7mk": "If it is unavailable, a run may fall back to {model} through the Google Gemini API.",
+    "m8grfs5": "Automatic fallback to another provider is turned off, so no other AI provider receives your data.",
+    "m1p9pol5": "An administrator chooses the provider for all new runs, and this section always shows the current choice. A run that has already started keeps the settings it started with.",
+    "mmiy7ll": "Research runs use Qwen through Alibaba Cloud Model Studio, which processes requests in mainland China (Beijing region), or the Google Gemini API, as chosen by an administrator.",
+    "mshppa9": "An administrator chooses the provider for all new runs. A run that has already started keeps the settings it started with.",
+    "m10jkc2t": "Primary AI model (Gemini) and web search for research runs.",
+    "m1z3687": "Fallback AI model (Qwen) and web search for research runs.",
+    "mvfzy5f": "AI model (Qwen) and web search for research runs.",
+    "mcvmc8z": "AI model (Gemini) and web search for research runs.",
+    "m9my4ui": "Our providers may process your information in countries other than the one you live in, including the United States. Where the law requires it, we rely on appropriate safeguards for these transfers.",
+    "m8ghvzp": "AI provider settings last changed {date}.",
+    "msoqu6j": "Which AI model runs my research?",
+    "mbywobu": "New research runs use {model} through Alibaba Cloud Model Studio, which processes requests in mainland China (Beijing region).",
+    "m1p721t4": "New research runs use {model} through the Google Gemini API.",
+    "m1yxgamc": "Automatic fallback to another provider is turned off.",
+    "m1cwbrqt": "Each research run shows the model it used on its progress page. The Privacy Policy explains how research data is processed."
   },
   "language": {
     "label": "Interface language",

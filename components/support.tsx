@@ -14,6 +14,9 @@ import { PublicShell } from "@/components/public-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { mailto, privacyEmail, supportEmail } from "@/lib/contact";
+import type { DisclosedProvider, ProviderDisclosure } from "@/lib/provider-disclosure";
+
+type Answer = string | { source: string; values: Record<string, string> };
 
 const include = [
   "The email address on your account",
@@ -23,58 +26,93 @@ const include = [
   "Your browser, device, and interface language",
 ];
 
-const topics = [
-  {
-    title: "Signing in",
-    questions: [
-      {
-        q: "I didn’t receive a sign-in email.",
-        a: "Check your spam or promotions folder and confirm the address is spelled correctly. Emails usually arrive within a minute. You can request a new code once the countdown on the sign-in screen ends.",
-      },
-      {
-        q: "My code or sign-in link doesn’t work.",
-        a: "Codes and links expire and can be used only once, and using the button in an email also uses up its code. Request a new code and use the most recent email only.",
-      },
-    ],
-  },
-  {
-    title: "Research",
-    questions: [
-      {
-        q: "My free research run is missing.",
-        a: "Every confirmed account receives one free research run. If yours does not appear on the New research page, log out and back in. If it is still missing, email support from the address on your account.",
-      },
-      {
-        q: "My research run failed.",
-        a: "If retrieval fails, the model output is rejected, or the evidence is too thin, the run stops and your run is returned automatically. Check its status in My research before starting again.",
-      },
-      {
-        q: "Why did I get fewer opportunities than expected?",
-        a: "An opportunity only enters the report when it is backed by independent evidence. When the evidence supports fewer candidates, the list is not padded.",
-      },
-    ],
-  },
-  {
-    title: "Account and data",
-    questions: [
-      {
-        q: "How do I change the interface language?",
-        a: "Use the language menu at the top of any page. Source excerpts in reports stay in their original language.",
-      },
-      {
-        q: "How do I export or delete my data?",
-        a: "Email our privacy team from the address on your account and tell us what you need. We may confirm your identity first and aim to respond within 30 days.",
-      },
-      {
-        q: "Will I be charged?",
-        a: "No. Payments are not connected during the beta, and no purchase, subscription, or charge can be created.",
-      },
-    ],
-  },
-];
+function buildTopics(disclosure: ProviderDisclosure): { title: string; questions: { q: string; a: Answer[] }[] }[] {
+  return [
+    {
+      title: "Signing in",
+      questions: [
+        {
+          q: "I didn’t receive a sign-in email.",
+          a: ["Check your spam or promotions folder and confirm the address is spelled correctly. Emails usually arrive within a minute. You can request a new code once the countdown on the sign-in screen ends."],
+        },
+        {
+          q: "My code or sign-in link doesn’t work.",
+          a: ["Codes and links expire and can be used only once, and using the button in an email also uses up its code. Request a new code and use the most recent email only."],
+        },
+      ],
+    },
+    {
+      title: "Research",
+      questions: [
+        {
+          q: "My free research run is missing.",
+          a: ["Every confirmed account receives one free research run. If yours does not appear on the New research page, log out and back in. If it is still missing, email support from the address on your account."],
+        },
+        {
+          q: "My research run failed.",
+          a: ["If retrieval fails, the model output is rejected, or the evidence is too thin, the run stops and your run is returned automatically. Check its status in My research before starting again."],
+        },
+        {
+          q: "Which AI model runs my research?",
+          a: modelAnswer(disclosure),
+        },
+        {
+          q: "Why did I get fewer opportunities than expected?",
+          a: ["An opportunity only enters the report when it is backed by independent evidence. When the evidence supports fewer candidates, the list is not padded."],
+        },
+      ],
+    },
+    {
+      title: "Account and data",
+      questions: [
+        {
+          q: "How do I change the interface language?",
+          a: ["Use the language menu at the top of any page. Source excerpts in reports stay in their original language."],
+        },
+        {
+          q: "How do I export or delete my data?",
+          a: ["Email our privacy team from the address on your account and tell us what you need. We may confirm your identity first and aim to respond within 30 days."],
+        },
+        {
+          q: "Will I be charged?",
+          a: ["No. Payments are not connected during the beta, and no purchase, subscription, or charge can be created."],
+        },
+      ],
+    },
+  ];
+}
 
-export function Support() {
+const usesModel: Record<DisclosedProvider["provider"], string> = {
+  qwen: "New research runs use {model} through Alibaba Cloud Model Studio, which processes requests in mainland China (Beijing region).",
+  gemini: "New research runs use {model} through the Google Gemini API.",
+};
+const fallsBackTo: Record<DisclosedProvider["provider"], string> = {
+  qwen: "If it is unavailable, a run may fall back to {model} through Alibaba Cloud Model Studio, which processes requests in mainland China (Beijing region).",
+  gemini: "If it is unavailable, a run may fall back to {model} through the Google Gemini API.",
+};
+
+/** The answer to "Which AI model runs my research?", following the saved research policy. */
+export function modelAnswer(disclosure: ProviderDisclosure): Answer[] {
+  const closing = "Each research run shows the model it used on its progress page. The Privacy Policy explains how research data is processed.";
+  if (!disclosure.known)
+    return [
+      "Research runs use Qwen through Alibaba Cloud Model Studio, which processes requests in mainland China (Beijing region), or the Google Gemini API, as chosen by an administrator.",
+      closing,
+    ];
+  return [
+    { source: usesModel[disclosure.primary.provider], values: { model: disclosure.primary.modelName } },
+    disclosure.fallback
+      ? { source: fallsBackTo[disclosure.fallback.provider], values: { model: disclosure.fallback.modelName } }
+      : "Automatic fallback to another provider is turned off.",
+    closing,
+  ];
+}
+
+export function Support({ disclosure }: { disclosure: ProviderDisclosure }) {
   const copy = useCopy();
+  const topics = buildTopics(disclosure);
+  const say = (text: Answer) =>
+    typeof text === "string" ? copy(text) : copy(text.source, text.values);
   return (
     <PublicShell>
       <main id="main-content">
@@ -183,9 +221,14 @@ export function Support() {
                       {copy(item.q)}
                       <ArrowRight className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-90" />
                     </summary>
-                    <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-                      {copy(item.a)}
-                    </p>
+                    {item.a.map((text) => (
+                      <p
+                        key={typeof text === "string" ? text : text.source}
+                        className="mt-3 text-sm leading-relaxed text-muted-foreground"
+                      >
+                        {say(text)}
+                      </p>
+                    ))}
                   </details>
                 ))}
               </div>
