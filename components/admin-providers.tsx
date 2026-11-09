@@ -15,6 +15,7 @@ import { providerPlan, runCostEstimates, parseBudgetInput, settleBudgetInput, MI
 import { useFormats } from "@/i18n/use-copy";
 import { ProviderModelField } from "@/components/provider-model-field";
 import { selectedModel, researchModels, qwenModelSchema, geminiModelSchema } from "@/lib/research-models";
+import { candidatesForBudget, MIN_CANDIDATES, MAX_CANDIDATES } from "@/lib/research-budget";
 
 const endpoint = "/api/admin/providers";
 const names = { qwen: "Qwen", gemini: "Gemini" };
@@ -38,9 +39,13 @@ export function AdminProviders({ initialData }: { initialData: ProviderSettingsR
   const changed = settings.primary !== data.settings.primary || settings.autoFallback !== data.settings.autoFallback || settings.qwenModel !== data.settings.qwenModel || settings.geminiModel !== data.settings.geminiModel || settings.budgetUsd !== data.settings.budgetUsd;
   const plan = providerPlan(settings);
   const configured = data.providers[plan.primary].configured && (!plan.fallback || data.providers[plan.fallback].configured);
+  // The same plan the engine makes at run start: providers that can finish, and how many hypotheses they all afford.
   const estimates = runCostEstimates(settings);
-  const primaryFits = estimates.primary.requiredUsd <= settings.budgetUsd;
-  const fallbackFits = !estimates.fallback || estimates.fallback.requiredUsd <= settings.budgetUsd;
+  const primaryFits = estimates.plan?.providers[0] === plan.primary;
+  const fallbackFits = !plan.fallback || estimates.plan?.providers.length === 2;
+  // Keeping the fallback sizes the run for the dearer model; say so when that costs hypotheses.
+  const primaryAlone = candidatesForBudget([selectedModel(plan.primary, settings)], settings.budgetUsd) ?? 0;
+  const limitedByFallback = !!plan.fallback && fallbackFits && primaryFits && primaryAlone > estimates.candidates;
 
   function change(patch: Partial<ProviderSettings>) {
     setDraft({ primary: settings.primary, autoFallback: settings.autoFallback, qwenModel: settings.qwenModel, geminiModel: settings.geminiModel, budgetUsd: settings.budgetUsd, ...patch });
@@ -133,8 +138,10 @@ export function AdminProviders({ initialData }: { initialData: ProviderSettingsR
                     {researchModels[selectedModel(plan.primary, settings)].name}
                     {plan.fallback ? <><ArrowRight className="size-4 text-muted-foreground" aria-hidden="true" />{researchModels[selectedModel(plan.fallback, settings)].name}</> : <span className="text-sm font-normal text-muted-foreground">· {t("noFallback")}</span>}
                   </p>
+                  {primaryFits && <p className="text-sm font-medium">{t("candidates", { count: estimates.candidates, min: MIN_CANDIDATES, max: MAX_CANDIDATES })}</p>}
+                  {limitedByFallback && estimates.fallback && <p className="text-sm text-muted-foreground">{t("candidatesFallbackLimit", { model: researchModels[estimates.fallback.model].name, count: primaryAlone })}</p>}
                   <p className="text-sm text-muted-foreground">{t("costEstimate", { expected: formats.usd(estimates.primary.expectedUsd, 2), required: formats.usd(estimates.primary.requiredUsd, 2) })}</p>
-                  {!primaryFits && <p className="text-sm font-medium text-destructive">{t("budgetTooLow", { model: researchModels[estimates.primary.model].name, required: formats.usd(estimates.primary.requiredUsd, 2) })}</p>}
+                  {!primaryFits && <p className="text-sm font-medium text-destructive">{t("budgetTooLow", { model: researchModels[estimates.primary.model].name, required: formats.usd(estimates.primary.requiredUsd, 2), min: MIN_CANDIDATES })}</p>}
                   {primaryFits && !fallbackFits && estimates.fallback && <p className="text-sm text-muted-foreground">{t("fallbackOverBudget", { model: researchModels[estimates.fallback.model].name, required: formats.usd(estimates.fallback.requiredUsd, 2) })}</p>}
                   <p className="text-sm text-muted-foreground">{t("fallbackLimit")}</p>
                 </div>

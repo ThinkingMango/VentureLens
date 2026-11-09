@@ -29,7 +29,7 @@ const reportParts = [
   {
     icon: Lightbulb,
     title: "Ranked opportunity hypotheses",
-    text: "Up to eight concrete, narrow business ideas matched to your profile, each stated as a hypothesis to test rather than a promise.",
+    text: "Up to twelve concrete, narrow business ideas matched to your profile, each stated as a hypothesis to test rather than a promise. Only those with independent evidence make the report.",
   },
   {
     icon: Target,
@@ -133,7 +133,7 @@ const faqs = [
   },
   {
     q: "What does a research run actually produce?",
-    a: "A saved report with up to eight scored opportunity hypotheses, the original source excerpts behind each one, the weights used, a critique, a falsification test, and next validation steps. Reports stay in your private workspace and can be reopened any time.",
+    a: "A saved report with the scored opportunity hypotheses that passed the evidence check (up to twelve, depending on the research budget), a recommendation of which to test first, the original source excerpts behind each one, the weights used, a critique, a falsification test, and next validation steps. Reports stay in your private workspace and can be reopened any time.",
   },
   {
     q: "Which languages are supported?",

@@ -76,3 +76,31 @@ export const scoreBands: ScoreBand[] = [
 export function scoreBand(score: number): ScoreBand {
   return scoreBands.find((band) => score >= band.min) ?? scoreBands[scoreBands.length - 1];
 }
+
+/** Points the top opportunity must lead the runner-up by to be recommended on its own. */
+export const CLEAR_LEAD_POINTS = 5;
+
+/**
+ * Which opportunity to validate first, and how sure the ranking is.
+ * - `single`: one opportunity survived the evidence gate and review.
+ * - `leader`: the top score leads the runner-up by at least CLEAR_LEAD_POINTS.
+ * - `close`: the top two are within CLEAR_LEAD_POINTS. Scores are model judgements with evidence caps at 70 and 85,
+ *   so a gap that small (often a tie at a cap) does not separate them; both are worth a first test.
+ */
+export type Recommendation =
+  | { kind: "none" }
+  | { kind: "single"; lead: WorkspaceOpportunity }
+  | { kind: "leader"; lead: WorkspaceOpportunity; runnerUp: WorkspaceOpportunity; gap: number }
+  | { kind: "close"; lead: WorkspaceOpportunity; runnerUp: WorkspaceOpportunity; gap: number };
+
+export function recommendation(opportunities: WorkspaceOpportunity[]): Recommendation {
+  // Highest score first; on a tie the better-supported opportunity (more linked pages) leads.
+  const ranked = [...opportunities].sort(
+    (a, b) => b.score - a.score || reportEvidenceCount([b]) - reportEvidenceCount([a]),
+  );
+  const [lead, runnerUp] = ranked;
+  if (!lead) return { kind: "none" };
+  if (!runnerUp) return { kind: "single", lead };
+  const gap = lead.score - runnerUp.score;
+  return { kind: gap >= CLEAR_LEAD_POINTS ? "leader" : "close", lead, runnerUp, gap };
+}

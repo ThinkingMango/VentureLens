@@ -38,7 +38,7 @@ import {
   FieldError,
 } from "@/components/ui/field";
 const pipeline = [
-  ["Discover", "Up to eight narrow hypotheses from your brief and profile."],
+  ["Discover", "Five to twelve narrow hypotheses from your brief and profile. The research budget sets how many."],
   [
     "Retrieve",
     "Live web search for buyer pain, spending, competitors, and counter-evidence.",

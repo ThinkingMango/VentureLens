@@ -159,8 +159,10 @@ test("admin updates enforce origin, JSON validation, request limits, and the ses
 test("server persistence revalidates identity and writes only the app_settings row", async () => {
   const writes = [];
   const service = storage({ writes, admin: { getUserById: async id => { assert.equal(id, verified.id); return { data: { user: verified }, error: null }; } } });
-  // Gemini Flash-Lite cannot finish a run on the $0.25 default (production run 11436d76 stopped at the 8th search).
-  await assert.rejects(service.saveProviderSettings(verified.id, { primary: "gemini", autoFallback: false }), /BUDGET_TOO_LOW/);
+  // Gemini Flash-Lite needs about $0.24 for the smallest run (5 hypotheses), so $0.20 cannot finish any run. (Before
+  // the budget set the hypothesis count, the $0.25 default was rejected too: production run 11436d76 stopped at the
+  // 8th search. At $0.25 it now runs 5 hypotheses.)
+  await assert.rejects(service.saveProviderSettings(verified.id, { primary: "gemini", autoFallback: false, budgetUsd: 0.2 }), /BUDGET_TOO_LOW/);
   assert.equal(writes.length, 0, "an unfinishable policy is never written");
   const saved = await service.saveProviderSettings(verified.id, { primary: "gemini", autoFallback: false, budgetUsd: 0.5 });
   assert.equal(writes.length, 1);

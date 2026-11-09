@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { getDomain } from "tldts";
 import { reportLanguageSchema, type ReportLanguage } from "./workspace-schema.ts";
+import { MIN_CANDIDATES, MAX_CANDIDATES, DEFAULT_CANDIDATES, SOURCES_PER_CANDIDATE } from "./research-budget.ts";
 
 export const RESEARCH_MODEL = "qwen3.8-flash";
 // v2: the adversarial review deducts at most 15 points and no longer deducts again for evidence gaps the evaluation
@@ -33,7 +34,7 @@ const narratives: Record<ReportLanguage, {
 }> = {
   en: {
     summary: ({ candidates, evidence, opportunities }) => `Searched ${candidates} candidates, saved ${evidence} web evidence excerpts, and kept ${opportunities} ${opportunities === 1 ? "opportunity" : "opportunities"} after the independent-source gate and adversarial review.`,
-    short: " Evidence did not support 5–8 opportunities; the list was not padded.",
+    short: " Fewer than five hypotheses had enough independent evidence; the list was not padded.",
     limitations: [
       "Web excerpts are not full due diligence, and search indexes can lag.",
       "An opportunity is included only when supporting evidence comes from at least two independent domains, including non-vendor pain or demand signals. Contradicting sources are shown but never raise confidence.",
@@ -43,7 +44,7 @@ const narratives: Record<ReportLanguage, {
   },
   "zh-Hans": {
     summary: ({ candidates, evidence, opportunities }) => `检索 ${candidates} 个候选，保存 ${evidence} 条网页证据，经独立来源门槛及反向审查后保留 ${opportunities} 个机会。`,
-    short: "证据不足以支持 5–8 个机会，没有凑数。",
+    short: "有足够独立证据支持的假设少于 5 个，没有凑数。",
     limitations: [
       "网页摘录并非完整尽调，检索索引可能滞后。",
       "至少两个独立域名的支持性证据（含非供应商的痛点/需求证据）才纳入报告；相反证据会列出，但不会提高可信度。",
@@ -53,7 +54,7 @@ const narratives: Record<ReportLanguage, {
   },
   "zh-Hant": {
     summary: ({ candidates, evidence, opportunities }) => `檢索 ${candidates} 個候選，儲存 ${evidence} 條網頁證據，經獨立來源門檻及反向審查後保留 ${opportunities} 個機會。`,
-    short: "證據不足以支持 5–8 個機會，沒有湊數。",
+    short: "有足夠獨立證據支持的假設少於 5 個，沒有湊數。",
     limitations: [
       "網頁摘錄並非完整盡職調查，檢索索引可能滯後。",
       "至少兩個獨立網域的支持性證據（含非供應商的痛點/需求證據）才納入報告；相反證據會列出，但不會提高可信度。",
@@ -81,12 +82,14 @@ export const stageLabels: Record<string, string> = {
 };
 const short = z.string().min(1).max(800);
 const long = z.string().min(1).max(2000);
+/** A hypothesis key: c1 … c12. Keys are positional labels assigned by `normalizeDiscovery`. */
+const candidateKey = z.string().regex(/^c[1-9]\d?$/).refine(key => Number(key.slice(1)) <= MAX_CANDIDATES);
 export const candidateSchema = z.object({
-  key: z.string().regex(/^c[1-8]$/), title: z.string().min(1).max(180),
+  key: candidateKey, title: z.string().min(1).max(180),
   buyer: short, pain: short, solution: short, advantage: short,
   query: z.string().min(10).max(300),
 });
-export const discoverySchema = z.object({ candidates: z.array(candidateSchema).min(5).max(8) });
+export const discoverySchema = z.object({ candidates: z.array(candidateSchema).min(MIN_CANDIDATES).max(MAX_CANDIDATES) });
 export type Candidate = z.infer<typeof candidateSchema>;
 export const evidenceSchema = z.object({
   source_key: z.string(), candidate_id: z.string(), url: z.string().url(),
@@ -100,7 +103,8 @@ const classificationItemSchema = z.object({
   stance: z.enum(["supports", "contradicts", "neutral"]),
   quote: z.string().max(500), claim: short,
 });
-export const classificationSchema = z.object({ items: z.array(classificationItemSchema).max(32) });
+// Also parses the run-wide classification checkpoint, so the bound is every source of the largest run (12 × 4 = 48).
+export const classificationSchema = z.object({ items: z.array(classificationItemSchema).max(MAX_CANDIDATES * SOURCES_PER_CANDIDATE) });
 export type Classification = z.infer<typeof classificationSchema>["items"][number];
 const dimensionsSchema = z.object({ pain: z.number().int().min(0).max(100), demand: z.number().int().min(0).max(100), economics: z.number().int().min(0).max(100), feasibility: z.number().int().min(0).max(100), advantage: z.number().int().min(0).max(100) });
 const evaluationItemSchema = z.object({
@@ -110,14 +114,15 @@ const evaluationItemSchema = z.object({
   dimensions: dimensionsSchema,
   rationale: long,
 });
-export const evaluationSchema = z.object({ items: z.array(evaluationItemSchema).min(1).max(8) });
+// Also parses the run-wide evaluation checkpoint, so the bound is every hypothesis of the largest run.
+export const evaluationSchema = z.object({ items: z.array(evaluationItemSchema).min(1).max(MAX_CANDIDATES) });
 export type Evaluation = z.infer<typeof evaluationSchema>["items"][number];
 const reviewItemSchema = z.object({
   candidate_id: z.string(), reject: z.boolean(), critique: short,
   // Stored reviews from methodology v1 could deduct up to 30; new reviews are clamped to REVIEW_MAX_PENALTY.
   penalty: z.number().int().min(0).max(30), falsification: short,
 });
-export const reviewSchema = z.object({ items: z.array(reviewItemSchema).min(1).max(8) });
+export const reviewSchema = z.object({ items: z.array(reviewItemSchema).min(1).max(MAX_CANDIDATES) });
 export type Review = z.infer<typeof reviewSchema>["items"][number];
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -132,7 +137,7 @@ export const discoveryDraftSchema = z.object({ candidates: z.array(z.object({
   key: z.string().describe("c1, c2, … in order."), title: prose(180),
   buyer: prose(800), pain: prose(800), solution: prose(800), advantage: prose(800),
   query: z.string().min(1).describe("Web-search string in the language the prompt names, 10–300 characters."),
-})).min(1).describe("Exactly 8 candidates.") });
+})).min(1).describe("Exactly as many candidates as the prompt asks for.") });
 export const classificationDraftSchema = z.object({ items: z.array(classificationItemSchema.extend({
   quote: z.string().describe("Copied verbatim from the excerpt, 12–500 characters."), claim: prose(800),
 })) });
@@ -171,9 +176,10 @@ function matchIds<T>(expected: string[], items: T[], id: (item: T) => string): T
   });
 }
 
-export function normalizeDiscovery(draft: z.infer<typeof discoveryDraftSchema>): z.infer<typeof discoverySchema> {
+/** Keeps the first `limit` hypotheses (the count the run asked for). Fewer than MIN_CANDIDATES fails the run. */
+export function normalizeDiscovery(draft: z.infer<typeof discoveryDraftSchema>, limit = DEFAULT_CANDIDATES): z.infer<typeof discoverySchema> {
   // Keys are positional labels, so they are assigned here rather than trusted from the model.
-  const candidates = draft.candidates.slice(0, 8).map((candidate, index) => {
+  const candidates = draft.candidates.slice(0, Math.min(limit, MAX_CANDIDATES)).map((candidate, index) => {
     const query = clipText(candidate.query, 300);
     return {
       key: `c${index + 1}`, title: clipText(candidate.title, 180),
@@ -181,7 +187,7 @@ export function normalizeDiscovery(draft: z.infer<typeof discoveryDraftSchema>):
       query: query.length >= 10 ? query : clipText(`${candidate.title} ${candidate.buyer}`, 300),
     };
   });
-  if (candidates.length < 5) throw new Error("INVALID_OUTPUT");
+  if (candidates.length < MIN_CANDIDATES) throw new Error("INVALID_OUTPUT");
   return discoverySchema.parse({ candidates });
 }
 export function normalizeClassification(draft: z.infer<typeof classificationDraftSchema>, sourceKeys: string[]): z.infer<typeof classificationSchema> {

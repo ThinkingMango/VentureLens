@@ -16,7 +16,7 @@ import { feedbackSource } from "@/i18n/errors";
 import { getJson, postJson, ApiNetworkError } from "@/lib/api-client";
 const stageHints: Record<string, string> = {
   queued: "Waiting for a worker to pick up the job.",
-  discovery: "Generating up to eight narrow hypotheses from your brief and profile.",
+  discovery: "Generating five to twelve narrow hypotheses from your brief and profile. The research budget sets how many.",
   retrieval: "Searching the web for buyer pain, spending signals, competitors, and counter-evidence. This is the longest stage.",
   classification: "Tagging every excerpt by kind, reliability, and whether it supports or contradicts the idea.",
   evaluation: "Estimating buyer, pricing, cost, and risk for each candidate with enough evidence.",

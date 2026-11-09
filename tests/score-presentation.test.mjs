@@ -115,3 +115,52 @@ test("cards and the opportunity page show the rating and every step of the score
   assert.match(capped, /The evidence cap set this score\./);
   assert.deepEqual(missing.filter(s => !/^Clinic|^Healthcare$/.test(s)), []);
 });
+
+const ranked = (score, extra = {}) => ({ id: `o${score}-${extra.id ?? ""}`, title: `Opportunity ${score}`, category: "c", description: "d", buyer: "b", pain: "p", score, confidence: "limited", revenue: "r", cost: "c", risk: "k", scores: [1, 1, 1, 1, 1], icon: "workflow", evidence: [], validation: [`Interview buyers for ${score}`], falsification: `Ten buyers decline ${score}`, ...extra });
+
+test("the report recommends one opportunity only when the ranking separates it", () => {
+  const { recommendation, CLEAR_LEAD_POINTS } = presentation;
+  assert.equal(CLEAR_LEAD_POINTS, 5);
+  assert.deepEqual(recommendation([]), { kind: "none" });
+  assert.equal(recommendation([ranked(41)]).kind, "single");
+  // Order of the input does not matter; a 5-point lead is clear, 4 points is not.
+  const leader = recommendation([ranked(55), ranked(62), ranked(48)]);
+  assert.deepEqual([leader.kind, leader.lead.score, leader.runnerUp.score, leader.gap], ["leader", 62, 55, 7]);
+  assert.equal(recommendation([ranked(60), ranked(65)]).kind, "leader");
+  const close = recommendation([ranked(64), ranked(60), ranked(30)]);
+  assert.deepEqual([close.kind, close.gap], ["close", 4]);
+  // A tie at the evidence cap is the common close call; the better-supported opportunity is listed first.
+  const source = n => ({ source_key: `s${n}`, url: `https://example.org/${n}`, title: "t", retrieved_at: "", published_at: null });
+  const tie = recommendation([ranked(70, { id: "a", evidence: [source(1)] }), ranked(70, { id: "b", evidence: [source(2), source(3)] })]);
+  assert.deepEqual([tie.kind, tie.gap, tie.lead.id], ["close", 0, "b"]);
+});
+
+test("the Start here section explains its pick in every language", () => {
+  for (const locale of locales) {
+    const { copy, missing } = copyFor(locale);
+    const view = loadModule("../components/report-recommendation.tsx", {
+      "@/components/workspace-link": { default: ({ children, ...props }) => createElement("a", props, children) },
+      "@/components/shared": { Confidence: ({ level }) => createElement("span", null, level) },
+      "@/lib/report-presentation": presentation, "@/i18n/use-copy": { useCopy: () => copy },
+    });
+    const render = opportunities => text(renderToStaticMarkup(createElement(view.ReportRecommendation, { opportunities })));
+    assert.equal(render([]), "");
+    const leader = render([ranked(55), ranked(62)]);
+    const close = render([ranked(64), ranked(61)]);
+    const single = render([ranked(41)]);
+    if (locale === "en") {
+      assert.match(leader, /Start here .*Leads the next hypothesis by 7 points\. Run its first test/);
+      assert.match(leader, /Opportunity 62 First validation step Interview buyers for 62 Test that could disprove it Ten buyers decline 62 Read report/);
+      assert.doesNotMatch(leader, /Opportunity 55/);
+      assert.match(renderToStaticMarkup(createElement(view.ReportRecommendation, { opportunities: [ranked(62)] })), /aria-label="Read report: Opportunity 62"/);
+      assert.match(close, /Two close candidates .*Their scores are 3 points apart, .*a clear lead is 5 points or more/);
+      assert.match(close, /Opportunity 64.*Opportunity 61/);
+      assert.match(single, /only hypothesis that passed the evidence check/);
+      assert.match(render([ranked(60), ranked(59)]), /Their scores are 1 point apart,/);
+    } else {
+      assert.match(leader, /7/);
+      assert.match(close, /3.*5/);
+    }
+    assert.deepEqual(missing, [], locale);
+  }
+});

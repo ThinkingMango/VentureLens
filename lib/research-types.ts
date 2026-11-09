@@ -7,6 +7,8 @@ export type ResearchReport = {
   provider?: string;
   mode: Mode;
   generated_at: string;
+  /** Hypotheses discovery generated for this run (5–12, set by the budget). Absent on reports before it was recorded. */
+  candidates?: number;
   summary: string;
   limitations: string[];
   weights: Record<string, number>;

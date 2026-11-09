@@ -16,6 +16,7 @@ import { localeNames } from "@/i18n/config";
 import { REVIEW_MAX_PENALTY, reportLanguage } from "@/lib/research-core";
 import { ModelTag } from "@/components/model-tag";
 import { ScoreScale } from "@/components/score-scale";
+import { ReportRecommendation } from "@/components/report-recommendation";
 const dimensions: Record<string, string> = {
   pain: "Buyer pain",
   demand: "Demand",
@@ -68,6 +69,14 @@ export function ResearchReportView({ report }: { report: ResearchReport }) {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2 border-t pt-4 text-sm">
+          {report.candidates !== undefined && (
+            <span>
+              {copy(
+                "{count, plural, one {# hypothesis explored} other {# hypotheses explored}}",
+                { count: report.candidates },
+              )}
+            </span>
+          )}
           <span>
             {copy(
               "{count, plural, one {# opportunity hypothesis} other {# opportunity hypotheses}}",
@@ -136,6 +145,7 @@ export function ResearchReportView({ report }: { report: ResearchReport }) {
           </div>
         </details>
       </section>
+      <ReportRecommendation opportunities={report.opportunities} />
       <section
         aria-labelledby="report-opportunities"
         className="flex flex-col gap-5"

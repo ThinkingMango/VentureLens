@@ -8,9 +8,9 @@ import { fetchResearchSource } from "@/lib/research-source";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { researchProviderSettings } from "@/lib/provider-settings";
-import { defaultProviderSettings, providerPlan, providerSettingsSchema, type ProviderSettings } from "@/lib/provider-settings-core";
+import { defaultProviderSettings, providerPlan, providerSettingsSchema, runPlan, type ProviderSettings } from "@/lib/provider-settings-core";
 import { selectedModel, researchModelPricing, geminiThinkingOptions, qwenModelSchema, geminiModelSchema, type ResearchModelId } from "@/lib/research-models";
-import { reservationFor, estimateRunCost } from "@/lib/research-budget";
+import { reservationFor, estimateRunCost, DEFAULT_CANDIDATES, MIN_CANDIDATES, SOURCES_PER_CANDIDATE } from "@/lib/research-budget";
 import { searchLanguage } from "@/lib/research-options";
 import { researchRequestSchema, profileSchema, opportunitySchema } from "@/lib/workspace-schema";
 import {
@@ -77,18 +77,20 @@ export async function initializeResearch(ctx: Context) {
     const providerSettings = providerSettingsSchema.parse({ primary: saved.primary, autoFallback: saved.autoFallback, qwenModel: saved.qwenModel, geminiModel: saved.geminiModel });
     const plan = providerPlan(providerSettings);
     // A run whose models cannot finish within its budget would spend money and then stop with no report. Check before
-    // the first request: skip a provider that cannot finish, and stop early (uncharged) when none can.
+    // the first request: size the run to what every usable provider can finish, drop a fallback that cannot finish even
+    // the smallest run, and stop early (uncharged) when no provider can.
     const budget = Number(row.budget_usd);
-    const estimate = (provider: ProviderSettings["primary"]) => estimateRunCost(selectedModel(provider, providerSettings));
-    const feasible = (provider: ProviderSettings["primary"]) => estimate(provider).requiredUsd <= budget;
-    const order = [plan.primary, ...(plan.fallback ? [plan.fallback] : [])].filter(feasible);
-    if (!order.length) {
+    const estimate = (provider: ProviderSettings["primary"], candidates = MIN_CANDIDATES) => estimateRunCost(selectedModel(provider, providerSettings), new Date(), candidates);
+    const sized = runPlan(providerSettings, budget);
+    const order = sized?.providers ?? [];
+    if (!sized || !order.length) {
       const needed = estimate(plan.primary);
       log("error", "run cannot finish within its budget", ctx, { budget, primary: needed, fallback: plan.fallback ? estimate(plan.fallback) : undefined });
       await checkpoint(ctx, "budget_block", { stage: "setup", kind: "estimate", provider: plan.primary, model: needed.model, required_usd: needed.requiredUsd });
       throw new Error("BUDGET_EXCEEDED");
     }
     if (order[0] !== plan.primary) log("warn", "primary provider cannot finish within the budget; using the fallback", ctx, { budget, primary: estimate(plan.primary) });
+    else if (plan.fallback && order.length === 1) log("warn", "fallback provider cannot finish within the budget; running without it", ctx, { budget, fallback: estimate(plan.fallback) });
     const verify = async (provider: ProviderSettings["primary"]) => {
       if (provider === "gemini") { await verifyGeminiModel(providerSettings.geminiModel); return GEMINI_PROVIDER; }
       await verifyQwenModel(providerSettings.qwenModel); return QWEN_PROVIDER;
@@ -106,6 +108,8 @@ export async function initializeResearch(ctx: Context) {
       ...configuration, pricing, fallback_pricing: fallbackPricing, active_provider: activeProvider, provider_settings: providerSettings,
       // The fallback stays available mid-run only when it, too, can finish within the budget.
       fallback_allowed: order.length > 1 && !verifyFailure,
+      // How many hypotheses discovery generates: the most every provider above can finish within the budget.
+      candidates: sized.candidates,
       model: selectedModel(active, providerSettings), provider: activeProvider, methodology,
     });
   } else if (![QWEN_PROVIDER, GEMINI_PROVIDER].includes((cached.output as { provider?: string }).provider ?? "")) {
@@ -232,12 +236,12 @@ async function retrieve(ctx: Context, candidate: Candidate, pricing: Pricing) {
   }).slice(0, 10);
   seen.clear();
   let unreadable = 0;
-  for (let index = 0; index < sources.length && evidence.length < 4; index += 2) {
+  for (let index = 0; index < sources.length && evidence.length < SOURCES_PER_CANDIDATE; index += 2) {
     const pages = await Promise.all(sources.slice(index, index + 2).map(async item => {
       try { return await fetchResearchSource(item.url); } catch { unreadable++; return null; }
     }));
     for (const page of pages) {
-      if (!page || seen.has(page.url) || evidence.length >= 4) continue;
+      if (!page || seen.has(page.url) || evidence.length >= SOURCES_PER_CANDIDATE) continue;
       seen.add(page.url);
       evidence.push({ source_key: `${candidate.key}-s${evidence.length + 1}`, candidate_id: candidate.key, ...page, title: page.title || new URL(page.url).hostname, retrieved_at: new Date().toISOString(), published_at: null });
     }
@@ -257,13 +261,15 @@ export async function executeResearchStage(ctx: Context, key: string): Promise<s
   if (cached) return key === "discovery" ? discoverySchema.parse(cached.output).candidates.map(c => c.key) : [];
   const stage = key.split(":")[0];
   checked(await client.from("research_runs").update({ stage }).eq("id", ctx.runId).eq("user_id", ctx.userId).eq("workflow_id", ctx.workflowId).eq("status", "running"));
-  const setup = await previous<{ brief: z.infer<typeof researchRequestSchema>; profile: z.infer<typeof profileSchema>; pricing: Pricing }>(ctx, "setup");
+  const setup = await previous<{ brief: z.infer<typeof researchRequestSchema>; profile: z.infer<typeof profileSchema>; pricing: Pricing; candidates?: number }>(ctx, "setup");
   const { brief, pricing } = setup;
+  // Runs started before the budget set the count have none recorded; they were planned for the old fixed count.
+  const candidateCount = setup.candidates ?? DEFAULT_CANDIDATES;
   const mode: Mode = brief.discovery_mode ?? "combined";
   const language = reportLanguage(brief.language);
   const profile = mode === "market" ? null : { industry: setup.profile.industry, skills: setup.profile.skills, hours: setup.profile.hours, budget: setup.profile.budget, goal: setup.profile.goal };
   if (key === "discovery") {
-    const output = await structured(ctx, key, discoveryDraftSchema, normalizeDiscovery, `Generate 8 specific, mutually distinct GenAI business opportunity hypotheses that a small team could validate. No retrieval happens in this stage, so never claim anything is verified. Keys must be c1 through c8. Keep each title under 180 characters and each other field under 800 characters. Write "query" as a web-search string in ${searchLanguage(brief.geography)} that would find independent evidence of the buyer's problem and what they already spend on it (surveys, industry reports, forum discussions, news), naming the buyer, the problem and the target geography. Do not name products or ask for tools or software. Mode=${mode}: founder starts from the founder's skills, channels, and resource advantages; market starts only from market pain and existing spending and does not infer founder fit; combined considers both. Brief=${JSON.stringify(brief)}; available founder context=${JSON.stringify(profile)}.`, pricing);
+    const output = await structured(ctx, key, discoveryDraftSchema, draft => normalizeDiscovery(draft, candidateCount), `Generate ${candidateCount} specific, mutually distinct GenAI business opportunity hypotheses that a small team could validate. Each must name a different buyer or a different pain; never restate an earlier hypothesis in other words. No retrieval happens in this stage, so never claim anything is verified. Keys must be c1 through c${candidateCount}. Keep each title under 180 characters and each other field under 800 characters. Write "query" as a web-search string in ${searchLanguage(brief.geography)} that would find independent evidence of the buyer's problem and what they already spend on it (surveys, industry reports, forum discussions, news), naming the buyer, the problem and the target geography. Do not name products or ask for tools or software. Mode=${mode}: founder starts from the founder's skills, channels, and resource advantages; market starts only from market pain and existing spending and does not infer founder fit; combined considers both. Brief=${JSON.stringify(brief)}; available founder context=${JSON.stringify(profile)}.`, pricing);
     await checkpoint(ctx, key, output);
     return output.candidates.map(c => c.key);
   }
@@ -351,7 +357,7 @@ export async function executeResearchStage(ctx: Context, key: string): Promise<s
     const models = [...new Set((attempts ?? []).map(attempt => attempt.model))];
     const providers = [...new Set((attempts ?? []).map(attempt => attempt.provider))];
     const narrative = reportNarrative(language, { candidates: discovery.candidates.length, evidence: evidence.length, opportunities: opportunities.length });
-    const report = { methodology, language, model: models.length === 1 ? models[0] : "mixed", provider: providers.length === 1 ? providers[0] : "mixed", models, providers, mode, generated_at: new Date().toISOString(), summary: narrative.summary, limitations: narrative.limitations, weights: scoringWeights[mode], opportunities };
+    const report = { methodology, language, model: models.length === 1 ? models[0] : "mixed", provider: providers.length === 1 ? providers[0] : "mixed", models, providers, mode, generated_at: new Date().toISOString(), candidates: discovery.candidates.length, summary: narrative.summary, limitations: narrative.limitations, weights: scoringWeights[mode], opportunities };
     checked(await client.rpc("finish_research", { p_run: ctx.runId, p_user: ctx.userId, p_workflow: ctx.workflowId, p_report: report }));
   } else throw new Error("INVALID_OUTPUT");
   return [];
