@@ -1,5 +1,9 @@
 import { getCopy } from "@/i18n/server";
 import { Support } from "@/components/support";
+import { loadProviderDisclosure } from "@/lib/provider-disclosure-server";
+
+// Rendered per request: the answer about which AI model runs research follows the current policy in app_settings.
+export const dynamic = "force-dynamic";
 export async function generateMetadata() {
   const copy = await getCopy();
   return {
@@ -9,6 +13,6 @@ export async function generateMetadata() {
     ),
   };
 }
-export default function Page() {
-  return <Support />;
+export default async function Page() {
+  return <Support disclosure={await loadProviderDisclosure()} />;
 }
