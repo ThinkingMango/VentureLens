@@ -11,6 +11,7 @@ import * as settingsCore from "../lib/provider-settings-core.ts";
 import { withResearchFallback } from "../lib/research-fallback-core.ts";
 import { z } from "zod";
 import * as models from "../lib/research-models.ts";
+import * as researchOptions from "../lib/research-options.ts";
 const modelDefaults = { qwenModel: models.DEFAULT_QWEN_MODEL, geminiModel: models.DEFAULT_GEMINI_MODEL, budgetUsd: 0.25 };
 import { errorCode } from "../lib/research-core.ts";
 import * as researchCore from "../lib/research-core.ts";
@@ -288,7 +289,7 @@ test("research dispatches saved models, reasoning controls, usage IDs, and fallb
       "@/lib/provider-settings": {},
       "@/lib/provider-settings-core": settingsCore,
       "@/lib/research-models": models,
-      "@/lib/research-budget": budget,
+      "@/lib/research-budget": budget, "@/lib/research-options": researchOptions,
       "@/lib/workspace-schema": {},
       "@/lib/research-core": { errorCode, researchErrors: {}, researchPolicy: researchCore.researchPolicy, reportLanguage: researchCore.reportLanguage },
     }, {}, "\nexport { structured };\n");
@@ -343,7 +344,7 @@ function researchFixture({ settings = { primary: "gemini", autoFallback: true, q
     "@/lib/gemini-provider": { geminiModel: model => ({ modelId: model }), searchGemini: search.gemini, verifyGeminiModel: verify.gemini },
     "@/lib/qwen-core": { QWEN_PROVIDER: "dashscope-beijing" }, "@/lib/research-fallback-core": fallbackCore,
     "@/lib/research-source": { fetchResearchSource: fetchSource }, "@/lib/provider-settings": { researchProviderSettings: async () => providerSettings }, "@/lib/provider-settings-core": settingsCore,
-    "@/lib/research-models": models, "@/lib/research-budget": budget, "@/lib/workspace-schema": workspaceSchema, "@/lib/research-core": researchCore,
+    "@/lib/research-models": models, "@/lib/research-budget": budget, "@/lib/research-options": researchOptions, "@/lib/workspace-schema": workspaceSchema, "@/lib/research-core": researchCore,
     "@/lib/supabase/admin": { createAdminClient: () => ({ from, rpc: async (_name, input) => {
       reservations.push(input);
       const committed = spent + records.reduce((sum, record) => sum + (record.status === "completed" ? record.estimated_usd : record.reserved_usd), 0);
@@ -742,7 +743,7 @@ test("account-level failures move the whole run, empty searches move nothing", a
   const { providerSwitch } = loadModule("../lib/research-engine.ts", {
     "server-only": {}, "ai": {}, "@/lib/qwen-provider": {}, "@/lib/gemini-provider": {}, "@/lib/qwen-core": { QWEN_PROVIDER: "dashscope-beijing" },
     "@/lib/research-fallback-core": fallbackCore, "@/lib/research-source": {}, "@/lib/supabase/admin": {}, "@/lib/provider-settings": {}, "@/lib/provider-settings-core": settingsCore,
-    "@/lib/research-models": models, "@/lib/research-budget": budget, "@/lib/workspace-schema": workspaceSchema, "@/lib/research-core": researchCore,
+    "@/lib/research-models": models, "@/lib/research-budget": budget, "@/lib/research-options": researchOptions, "@/lib/workspace-schema": workspaceSchema, "@/lib/research-core": researchCore,
   });
   const g = "google-gemini";
   assert.equal(providerSwitch(true, "RETRIEVAL_UNAVAILABLE", g), null);
@@ -750,6 +751,18 @@ test("account-level failures move the whole run, empty searches move nothing", a
   assert.deepEqual(providerSwitch(true, "BUDGET_EXCEEDED", g), { search_provider: g });
   for (const code of ["PROVIDER_CONFIGURATION", "PROVIDER_CREDITS_REQUIRED"]) assert.deepEqual(providerSwitch(true, code, g), { active_provider: g, search_provider: g });
   assert.deepEqual(providerSwitch(false, "TRANSIENT_PROVIDER", g), { active_provider: g, search_provider: g });
+});
+
+test("discovery asks for evidence searches in the target market's own language", async () => {
+  const candidates = Array.from({ length: 5 }, (_, i) => ({ key: `c${i + 1}`, title: "Candidate", buyer: "Clinic owners", pain: "Billing takes hours", solution: "Assistant", advantage: "Network", query: "clinic billing time survey report" }));
+  for (const [geography, language] of [["Mainland China", "Simplified Chinese"], ["Japan", "Japanese"], ["United States", "English"]]) {
+    const fixture = researchFixture({ spent: 0, settings: { primary: "qwen", autoFallback: false, qwenModel: "qwen3.8-flash", geminiModel: "gemini-3.5-flash-lite" }, generate: async () => ({ output: { candidates }, totalUsage: { inputTokens: 100, outputTokens: 50 } }) });
+    fixture.checkpoints.get("setup").brief = { ...fixture.setup.brief, geography };
+    await fixture.engine.executeResearchStage(fixture.context, "discovery");
+    const prompt = fixture.calls[0].prompt;
+    assert.match(prompt, new RegExp(`Write "query" as a web-search string in ${language} that would find independent evidence`), geography);
+    assert.match(prompt, new RegExp(`"geography":"${geography}"`), "the brief itself still names the market");
+  }
 });
 
 test("discovery queries look for evidence of the problem, not for products", () => {

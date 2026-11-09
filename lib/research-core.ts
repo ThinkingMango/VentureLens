@@ -126,7 +126,7 @@ const score = (max: number) => z.number().describe(`Integer from 0 to ${max}.`);
 export const discoveryDraftSchema = z.object({ candidates: z.array(z.object({
   key: z.string().describe("c1, c2, … in order."), title: prose(180),
   buyer: prose(800), pain: prose(800), solution: prose(800), advantage: prose(800),
-  query: z.string().min(1).describe("English web-search string, 10–300 characters."),
+  query: z.string().min(1).describe("Web-search string in the language the prompt names, 10–300 characters."),
 })).min(1).describe("Exactly 8 candidates.") });
 export const classificationDraftSchema = z.object({ items: z.array(classificationItemSchema.extend({
   quote: z.string().describe("Copied verbatim from the excerpt, 12–500 characters."), claim: prose(800),

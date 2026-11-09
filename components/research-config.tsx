@@ -19,6 +19,13 @@ import {
   Lock,
 } from "lucide-react";
 import { useDemo } from "@/components/demo-provider";
+import {
+  businessModelGroups,
+  businessModelLead,
+  researchSectors,
+  targetMarketGroups,
+  targetMarketLead,
+} from "@/lib/research-options";
 import { PageHeader, DemoNote } from "@/components/shared";
 import { ResearchAccessCard } from "@/components/research-access-card";
 import { Button } from "@/components/ui/button";
@@ -46,7 +53,12 @@ const pipeline = [
 export function ResearchConfig() {
   const copy = useCopy();
   const { run, setRun, profile, isDemo, href, busy, refresh, data } = useDemo();
-  const [draft, setDraft] = useState(run);
+  // A first brief starts from the founder's own industry when it is one of the research industries.
+  const [draft, setDraft] = useState(() =>
+    !isDemo && !data?.projects.length && (researchSectors as readonly string[]).includes(profile.industry)
+      ? { ...run, sector: profile.industry as typeof run.sector }
+      : run,
+  );
   const [submitting, setSubmitting] = useState(false);
   const requestKey = useRef<string | null>(null);
   const [nameError, setNameError] = useState("");
@@ -264,13 +276,7 @@ export function ResearchConfig() {
                     })
                   }
                 >
-                  {[
-                    "Professional services",
-                    "B2B SaaS",
-                    "Finance & operations",
-                    "Education",
-                    "Healthcare",
-                  ].map((v) => (
+                  {researchSectors.map((v) => (
                     <option key={v} value={v}>
                       {copy(v)}
                     </option>
@@ -292,15 +298,15 @@ export function ResearchConfig() {
                     })
                   }
                 >
-                  {[
-                    "B2B subscription",
-                    "Productized service",
-                    "Usage-based software",
-                    "Open to possibilities",
-                  ].map((v) => (
-                    <option key={v} value={v}>
-                      {copy(v)}
-                    </option>
+                  <option value={businessModelLead}>{copy(businessModelLead)}</option>
+                  {businessModelGroups.map((group) => (
+                    <optgroup key={group.label} label={copy(group.label)}>
+                      {group.options.map((v) => (
+                        <option key={v} value={v}>
+                          {copy(v)}
+                        </option>
+                      ))}
+                    </optgroup>
                   ))}
                 </select>
               </Field>
@@ -319,15 +325,15 @@ export function ResearchConfig() {
                     })
                   }
                 >
-                  {[
-                    "United States",
-                    "United Kingdom",
-                    "European Union",
-                    "Global / English-speaking",
-                  ].map((v) => (
-                    <option key={v} value={v}>
-                      {copy(v)}
-                    </option>
+                  <option value={targetMarketLead}>{copy(targetMarketLead)}</option>
+                  {targetMarketGroups.map((group) => (
+                    <optgroup key={group.label} label={copy(group.label)}>
+                      {group.options.map((v) => (
+                        <option key={v} value={v}>
+                          {copy(v)}
+                        </option>
+                      ))}
+                    </optgroup>
                   ))}
                 </select>
               </Field>
@@ -356,7 +362,7 @@ export function ResearchConfig() {
                   maxLength={1000}
                   className="field-select min-h-24"
                   placeholder={copy(
-                    "A buyer group, a problem you’ve noticed, or a niche you know well…",
+                    "A buyer group, a problem you’ve noticed, a city or region, or a niche you know well…",
                   )}
                 />
                 <FieldDescription id="context-help">
@@ -393,7 +399,7 @@ export function ResearchConfig() {
                   <>
                     <Clock3 className="size-4" />
                     {copy(
-                      "Usually 5–10 minutes · Uses one research run, returned if the run fails",
+                      "Usually 5–10 minutes · Uses one research run, returned if the run fails (within a per-account limit)",
                     )}
                     {" · "}
                     {copy("Report in {language}", {

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { businessModels, researchSectors, targetMarkets } from "./research-options.ts";
 
 export const profileSchema = z.object({
   name: z.string().trim().min(1, "Enter your name.").max(80),
@@ -22,25 +23,10 @@ export const hoursOptions = profileSchema.shape.hours.options;
 export const budgetOptions = profileSchema.shape.budget.options;
 export const projectSchema = z.object({
   name: z.string().trim().min(1).max(100),
-  sector: z.enum([
-    "Professional services",
-    "B2B SaaS",
-    "Finance & operations",
-    "Education",
-    "Healthcare",
-  ]),
-  model: z.enum([
-    "B2B subscription",
-    "Productized service",
-    "Usage-based software",
-    "Open to possibilities",
-  ]),
-  geography: z.enum([
-    "United States",
-    "United Kingdom",
-    "European Union",
-    "Global / English-speaking",
-  ]),
+  // Canonical English values from lib/research-options.ts; translated only for display.
+  sector: z.enum(researchSectors),
+  model: z.enum(businessModels),
+  geography: z.enum(targetMarkets),
   context: z.string().trim().max(1000).default(""),
   discovery_mode: z.enum(["founder", "market", "combined"]).optional(),
 });
