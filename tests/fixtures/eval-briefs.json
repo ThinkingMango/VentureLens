@@ -1,0 +1,403 @@
+{
+  "version": 1,
+  "notes": "Fixed briefs for scripts/research-eval.mjs (spec WP-01 §3). Covers every discovery mode, all three report languages and 16 target markets. Five 'verify my idea' briefs are added after WP-05. Changing a brief changes what the evaluation measures: add new briefs rather than editing old ones, so results stay comparable.",
+  "profile": {
+    "name": "Evaluation founder",
+    "role": "Independent professional",
+    "industry": "Professional services",
+    "skills": "Ten years in operations consulting for small businesses; comfortable with no-code tools and spreadsheets; can sell to owners directly.",
+    "hours": "10–20 hours",
+    "budget": "$1,000–5,000",
+    "goal": "Build a sustainable side business"
+  },
+  "briefs": [
+    {
+      "id": "b01",
+      "brief": {
+        "name": "Back-office help for small accounting firms",
+        "sectors": [
+          "Professional services"
+        ],
+        "models": [
+          "B2B subscription"
+        ],
+        "geography": "United States",
+        "context": "Firms with 2–20 staff; look at month-end close and client document chasing.",
+        "discovery_mode": "combined",
+        "language": "en"
+      }
+    },
+    {
+      "id": "b02",
+      "brief": {
+        "name": "Admin burden in UK dental practices",
+        "sectors": [
+          "Healthcare"
+        ],
+        "models": [
+          "Productized service"
+        ],
+        "geography": "United Kingdom",
+        "context": "Independent practices, not corporate groups.",
+        "discovery_mode": "market",
+        "language": "en"
+      }
+    },
+    {
+      "id": "b03",
+      "brief": {
+        "name": "Developer tooling a solo engineer can sell",
+        "sectors": [
+          "B2B SaaS"
+        ],
+        "models": [
+          "Usage-based software",
+          "API or data product"
+        ],
+        "geography": "Global / English-speaking",
+        "context": "Prefer problems where buyers already pay for a workaround.",
+        "discovery_mode": "founder",
+        "language": "en"
+      }
+    },
+    {
+      "id": "b04",
+      "brief": {
+        "name": "Property managers handling maintenance requests",
+        "sectors": [
+          "Real estate & property"
+        ],
+        "models": [
+          "B2B subscription"
+        ],
+        "geography": "Australia & New Zealand",
+        "context": "",
+        "discovery_mode": "combined",
+        "language": "en"
+      }
+    },
+    {
+      "id": "b05",
+      "brief": {
+        "name": "Exam preparation for working adults",
+        "sectors": [
+          "Education"
+        ],
+        "models": [
+          "B2C subscription",
+          "Freemium with paid upgrades"
+        ],
+        "geography": "India",
+        "context": "Adults studying for professional certification exams while employed.",
+        "discovery_mode": "market",
+        "language": "en"
+      }
+    },
+    {
+      "id": "b06",
+      "brief": {
+        "name": "Compliance chores for small cross-border sellers",
+        "sectors": [
+          "Legal & compliance"
+        ],
+        "models": [
+          "Managed service or retainer"
+        ],
+        "geography": "Canada",
+        "context": "",
+        "discovery_mode": "founder",
+        "language": "en"
+      }
+    },
+    {
+      "id": "b07",
+      "brief": {
+        "name": "Last-mile delivery coordination for small shops",
+        "sectors": [
+          "Logistics & transportation",
+          "Retail & e-commerce"
+        ],
+        "models": [
+          "Marketplace or platform fees"
+        ],
+        "geography": "Latin America",
+        "context": "",
+        "discovery_mode": "combined",
+        "language": "en"
+      }
+    },
+    {
+      "id": "b08",
+      "brief": {
+        "name": "Guest communication for boutique hotels",
+        "sectors": [
+          "Travel & hospitality"
+        ],
+        "models": [
+          "B2B subscription"
+        ],
+        "geography": "Middle East (GCC)",
+        "context": "",
+        "discovery_mode": "market",
+        "language": "en"
+      }
+    },
+    {
+      "id": "b09",
+      "brief": {
+        "name": "中小制造企业的质检记录",
+        "sectors": [
+          "Manufacturing & engineering"
+        ],
+        "models": [
+          "B2B subscription"
+        ],
+        "geography": "Mainland China",
+        "context": "关注 50–300 人规模的工厂，质检记录仍靠纸质或 Excel。",
+        "discovery_mode": "combined",
+        "language": "zh-Hans"
+      }
+    },
+    {
+      "id": "b10",
+      "brief": {
+        "name": "社区团购团长的运营负担",
+        "sectors": [
+          "Retail & e-commerce"
+        ],
+        "models": [
+          "Productized service"
+        ],
+        "geography": "Mainland China",
+        "context": "",
+        "discovery_mode": "market",
+        "language": "zh-Hans"
+      }
+    },
+    {
+      "id": "b11",
+      "brief": {
+        "name": "东南亚中小企业的跨境收款对账",
+        "sectors": [
+          "Finance & operations"
+        ],
+        "models": [
+          "B2B subscription"
+        ],
+        "geography": "Singapore",
+        "context": "创始人有财务背景，熟悉多币种结算。",
+        "discovery_mode": "founder",
+        "language": "zh-Hans"
+      }
+    },
+    {
+      "id": "b12",
+      "brief": {
+        "name": "小型农场的产量与价格信息",
+        "sectors": [
+          "Food & agriculture"
+        ],
+        "models": [
+          "API or data product"
+        ],
+        "geography": "Southeast Asia",
+        "context": "",
+        "discovery_mode": "combined",
+        "language": "zh-Hans"
+      }
+    },
+    {
+      "id": "b13",
+      "brief": {
+        "name": "日本护理机构的排班与交接",
+        "sectors": [
+          "Healthcare"
+        ],
+        "models": [
+          "Managed service or retainer"
+        ],
+        "geography": "Japan",
+        "context": "面向中小型护理机构。",
+        "discovery_mode": "market",
+        "language": "zh-Hans"
+      }
+    },
+    {
+      "id": "b14",
+      "brief": {
+        "name": "中小企业的碳排放报告",
+        "sectors": [
+          "Energy & sustainability"
+        ],
+        "models": [
+          "Licensing or white-label"
+        ],
+        "geography": "Germany",
+        "context": "面向需要向大客户提交供应链碳数据的供应商。",
+        "discovery_mode": "founder",
+        "language": "zh-Hans"
+      }
+    },
+    {
+      "id": "b15",
+      "brief": {
+        "name": "独立内容创作者的变现工具",
+        "sectors": [
+          "Marketing & media"
+        ],
+        "models": [
+          "Paid community or membership"
+        ],
+        "geography": "Global / English-speaking",
+        "context": "",
+        "discovery_mode": "combined",
+        "language": "zh-Hans"
+      }
+    },
+    {
+      "id": "b16",
+      "brief": {
+        "name": "北欧中小企业的招聘筛选",
+        "sectors": [
+          "HR & recruitment"
+        ],
+        "models": [
+          "B2B subscription"
+        ],
+        "geography": "Nordics",
+        "context": "",
+        "discovery_mode": "market",
+        "language": "zh-Hans"
+      }
+    },
+    {
+      "id": "b17",
+      "brief": {
+        "name": "香港中小律師行的文件處理",
+        "sectors": [
+          "Professional services"
+        ],
+        "models": [
+          "Productized service"
+        ],
+        "geography": "Hong Kong",
+        "context": "專注於 1–10 名律師的事務所。",
+        "discovery_mode": "combined",
+        "language": "zh-Hant"
+      }
+    },
+    {
+      "id": "b18",
+      "brief": {
+        "name": "台灣補習班的家長溝通",
+        "sectors": [
+          "Education"
+        ],
+        "models": [
+          "B2C subscription"
+        ],
+        "geography": "Taiwan",
+        "context": "",
+        "discovery_mode": "market",
+        "language": "zh-Hant"
+      }
+    },
+    {
+      "id": "b19",
+      "brief": {
+        "name": "傳統製造業的設備保養排程",
+        "sectors": [
+          "Manufacturing & engineering"
+        ],
+        "models": [
+          "Managed service or retainer"
+        ],
+        "geography": "Taiwan",
+        "context": "創業者曾在工廠擔任維修主管。",
+        "discovery_mode": "founder",
+        "language": "zh-Hant"
+      }
+    },
+    {
+      "id": "b20",
+      "brief": {
+        "name": "大廈管理處的維修與住戶通知",
+        "sectors": [
+          "Real estate & property"
+        ],
+        "models": [
+          "B2B subscription"
+        ],
+        "geography": "Hong Kong",
+        "context": "",
+        "discovery_mode": "combined",
+        "language": "zh-Hant"
+      }
+    },
+    {
+      "id": "b21",
+      "brief": {
+        "name": "小型旅行社的行程報價",
+        "sectors": [
+          "Travel & hospitality"
+        ],
+        "models": [
+          "Marketplace or platform fees"
+        ],
+        "geography": "Singapore",
+        "context": "",
+        "discovery_mode": "market",
+        "language": "zh-Hant"
+      }
+    },
+    {
+      "id": "b22",
+      "brief": {
+        "name": "北美華人家庭的長輩照護協調",
+        "sectors": [
+          "Consumer products & services"
+        ],
+        "models": [
+          "B2C subscription"
+        ],
+        "geography": "United States",
+        "context": "創業者熟悉中英雙語社群。",
+        "discovery_mode": "founder",
+        "language": "zh-Hant"
+      }
+    },
+    {
+      "id": "b23",
+      "brief": {
+        "name": "韓國小型網店的商品內容製作",
+        "sectors": [
+          "Retail & e-commerce",
+          "Marketing & media"
+        ],
+        "models": [
+          "Freemium with paid upgrades"
+        ],
+        "geography": "South Korea",
+        "context": "",
+        "discovery_mode": "combined",
+        "language": "zh-Hant"
+      }
+    },
+    {
+      "id": "b24",
+      "brief": {
+        "name": "小型非營利組織的資助申請",
+        "sectors": [
+          "Nonprofits & social impact"
+        ],
+        "models": [
+          "Productized service"
+        ],
+        "geography": "European Union",
+        "context": "創業者曾為非營利組織撰寫資助申請。",
+        "discovery_mode": "founder",
+        "language": "zh-Hant"
+      }
+    }
+  ]
+}

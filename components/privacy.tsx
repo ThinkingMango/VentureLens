@@ -49,6 +49,7 @@ function buildSections(disclosure: ProviderDisclosure): Section[] {
         ["Research results", "Run status, generated opportunities and scores, and excerpts, titles, and links from public web pages used as evidence, with their retrieval dates."],
         ["Saved items", "Opportunities you save, your notes, and the validation tasks you mark as complete."],
         ["Usage and cost records", "For each research stage: the AI provider and model used, token and web-search counts, and the estimated cost. These records enforce the per-run budget and free-run limits."],
+        ["Product usage events", "Which actions you take in the workspace, such as starting a research run and how it ended, recorded as event names, codes, and counts. They never contain the text of your profile, briefs, reports, or notes."],
         ["Technical data", "Essential cookies (described below) and standard server logs kept by our hosting provider, such as IP address, browser type, and request times."],
         ["Support messages", "Anything you include when you email us."],
       ],
@@ -65,6 +66,7 @@ function buildSections(disclosure: ProviderDisclosure): Section[] {
         ["Run research", "To generate opportunity hypotheses, search the web for evidence, score candidates, and save the report to your account."],
         ["Protect accounts and costs", "To verify sign-ins, grant free research runs, enforce run limits and budgets, and prevent abuse."],
         ["Support and reliability", "To answer your messages and to diagnose failed runs and errors."],
+        ["Improve the product", "To measure, in aggregate, how research runs perform and which features are used."],
         ["Service messages", "To send sign-in codes and essential notices about your account or this policy. We do not send marketing email."],
       ],
       after: [
@@ -120,6 +122,7 @@ function buildSections(disclosure: ProviderDisclosure): Section[] {
       body: [
         "We keep your account, profile, briefs, research, and saved items while your account is active, so you can return to your research history.",
         "When your account is deleted, your profile, briefs, research runs, evidence, usage records, and saved items are deleted with it. Copies in provider backups and logs expire on those providers' schedules.",
+        "Product usage events are kept to measure the product over time. When your account is deleted, they are kept without any link to you.",
         "We keep support emails only as long as needed to resolve your request and keep a reasonable record of it.",
       ],
     },

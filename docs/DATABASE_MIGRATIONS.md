@@ -38,6 +38,14 @@ Root cause: the migrations were applied through the Supabase MCP `apply_migratio
 
 After this change `supabase migration list` shows local and remote in sync, and a fresh database can be built with `supabase db reset`.
 
+## Written but not yet applied
+
+These files are in the repository but have **not** been applied to the production project. Apply them only with the owner's approval. If `apply_migration` assigns a different version, rename the file to that version before merging.
+
+| File | Work package | Notes |
+| --- | --- | --- |
+| `20261110120000_product_events.sql` | WP-01 | New table `public.product_events`, readable and writable by the service role only. Adds a trigger on `research_runs` that records `run_started` and `run_finished`. Tested on a disposable PostgreSQL 16 (`tests/product-events.sql.test.mjs`) |
+
 ## Rules going forward
 
 1. **One source of truth.** Write the SQL file in `supabase/migrations/` first, then apply it with the Supabase CLI (`supabase db push`) or with `apply_migration` using the *same* `name`. If `apply_migration` is used, copy the version it assigned into the file name before committing.

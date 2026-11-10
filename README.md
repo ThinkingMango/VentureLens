@@ -71,6 +71,56 @@ update auth.users set raw_app_meta_data = coalesce(raw_app_meta_data, '{}'::json
 where id = '<auth.users.id>';
 ```
 
+### Operator pages
+
+Administrators also get two read-only pages next to the provider settings:
+
+- **`/admin/runs`**: every research run with its status, stage reached, error code, mode, report language, duration, committed cost and opportunity count, filtered by status, error code and creation date. Each run opens at `/admin/runs/<id>`, which shows:
+  - the stage timeline with checkpoint sizes;
+  - the saved failure and budget checkpoints;
+  - each provider call (reserved and committed cost) and any provider switch;
+  - per candidate: sources, domains, vendor share and the evidence gate's verdict.
+- **`/admin/quality`**: completion rate, insufficient-evidence rate, opportunities per completed run, independent supporting domains, vendor share, median and p95 duration, and cost per completed run and per surviving opportunity, over 7, 30 or 90 days. The definitions are in `lib/quality-metrics.ts` and are unit-tested.
+
+Both pages show **structural data only**: no brief, profile, candidate, source or report text (owner decision D5 in `docs/PRODUCT_SPEC_V1.md`). Non-administrators get a 404.
+
+### Product events
+
+`public.product_events` records what founders do, for funnels and the quality dashboard. It holds no personal data: only codes, counts and fixed choices, checked against a strict schema per event in `lib/events-core.ts`.
+
+- Founders cannot read or write the table.
+- Server code records events with `track()` from `lib/events.ts`, which never throws.
+- `run_started` and `run_finished` are written by a database trigger on `research_runs`, so each is recorded exactly once on every path that starts or ends a run.
+
+### Quality evaluation (costs money)
+
+`scripts/research-eval.mjs` runs the 24 fixed briefs in `tests/fixtures/eval-briefs.json` through a deployment's research API. It writes the quality metrics per brief and overall to `docs/eval/<date>-<git sha>.json` and `.md`.
+
+**It spends real provider money.** Run it only:
+- against a deployment connected to a **development** Supabase project, never production;
+- within the spend the owner has approved (default: at most $5 per session).
+
+1. Sign in on that deployment with a dedicated evaluation account and give it enough run slots:
+
+   ```sql
+   update public.research_dev_access set max_runs = 30, expires_at = now() + interval '7 days' where user_id = '<id>';
+   ```
+
+2. Save that session's `Cookie` request header (from the browser's developer tools) to a file outside the repository.
+
+3. Run:
+
+   ```bash
+   pnpm eval:research --confirm-cost --max-usd 5 --base-url https://<development deployment> --cookie-file ~/.venturelens-eval-cookie
+   ```
+
+How the script controls cost and scope:
+- It refuses to start without `--confirm-cost` and `--max-usd`.
+- It saves the fixture's founder profile to the account first, so every evaluation uses the same profile.
+- It runs one brief at a time, and starts a run only while the spend so far plus a whole run budget still fits under `--max-usd`.
+- `--brief <id>` (repeatable) and `--limit <n>` run a subset.
+- Vendor share is not exposed by the research API; read it on `/admin/quality` for the same window.
+
 ## Scripts
 
 ```bash
@@ -80,11 +130,13 @@ pnpm test                # unit tests (no network)
 pnpm build               # production build
 pnpm test:integration    # Supabase RLS/integration test — needs credentials and a test project
 pnpm test:research:e2e   # runs a real research job — incurs provider cost
+pnpm eval:research --confirm-cost --max-usd 5 --base-url … --cookie-file …
+                         # quality evaluation over the fixed briefs — incurs provider cost; see above
 TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:5432/postgres pnpm test:sql
                          # runs every migration on a throwaway database and tests the run-quota SQL
 ```
 
-CI (`.github/workflows/ci.yml`) runs `pnpm typecheck`, `pnpm test` (including the SQL tests, against a PostgreSQL 16 service) and `pnpm build` on every pull request and every push to `main`. It needs no secrets; `test:integration` and `test:research:e2e` stay manual because they need credentials and incur provider cost.
+CI (`.github/workflows/ci.yml`) runs `pnpm typecheck`, `pnpm test` (including the SQL tests, against a PostgreSQL 16 service) and `pnpm build` on every pull request and every push to `main`. It needs no secrets; `test:integration`, `test:research:e2e` and `eval:research` stay manual because they need credentials and incur provider cost.
 
 ## Repository layout
 
