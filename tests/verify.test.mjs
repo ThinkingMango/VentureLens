@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { projectSchema, researchRequestSchema, emptyBrief } from "../lib/workspace-schema.ts";
-import { normalizeVerifyDiscovery, mergeSearchSources, verifyDiscoverySchema, discoveryCheckpointSchema, discoverySchema, scoringWeights, outcomeSchema } from "../lib/research-core.ts";
+import { normalizeVerifyDiscovery, mergeSearchSources, verifyDiscoverySchema, discoveryCheckpointSchema, discoverySchema, storedDiscoverySchema, scoringWeights, outcomeSchema } from "../lib/research-core.ts";
 import { estimateRunCost } from "../lib/research-budget.ts";
 import { researchModels } from "../lib/research-models.ts";
 import { eventProps } from "../lib/events-core.ts";
@@ -52,8 +52,9 @@ test("the verify candidate keeps the founder's text exactly; only the queries co
 test("a stored discovery checkpoint is read with the schema for its mode", () => {
   const verifyCheckpoint = normalizeVerifyDiscovery({ query: "physio clinic missed appointment cost", query_alt: "physio clinic reminder alternatives" }, idea);
   assert.ok(discoveryCheckpointSchema("verify").safeParse(verifyCheckpoint).success);
-  assert.equal(discoveryCheckpointSchema("combined").safeParse(verifyCheckpoint).success, false, "discovery still needs 5–8 candidates");
-  assert.equal(discoveryCheckpointSchema("combined"), discoverySchema);
+  assert.equal(discoveryCheckpointSchema("combined").safeParse(verifyCheckpoint).success, false, "a verify candidate is not a discovery candidate");
+  // WP-04: stored discovery checkpoints hold 1–8 candidates (idea memory may drop repeats); the model's draft still needs 5–8.
+  assert.equal(discoveryCheckpointSchema("combined"), storedDiscoverySchema);
   assert.equal(verifyDiscoverySchema.safeParse({ candidates: [...verifyCheckpoint.candidates, verifyCheckpoint.candidates[0]] }).success, false, "verify holds exactly one candidate");
 });
 

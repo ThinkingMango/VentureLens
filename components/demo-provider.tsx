@@ -22,6 +22,8 @@ type WorkspaceState = {
   setProfile: (p: Profile, starter?: string) => Promise<void>;
   run: ResearchBrief;
   setRun: (r: ResearchBrief) => Promise<void>;
+  /** "Clear idea memory": later research no longer avoids ideas from earlier runs. Not available in the demo. */
+  clearMemory: () => Promise<void>;
   completed: string[];
   toggleTask: (id: string) => void;
   href: (path: string) => string;
@@ -79,6 +81,7 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
           setProfileEdited(true);
           setProfile(p);
         },
+        clearMemory: async () => undefined,
         setRun: async (r) => {
           setRunEdited(true);
           setRun(r);
@@ -171,6 +174,7 @@ export function WorkspaceProvider({
         href: (path) => path,
         setProfile: (profile, starter) => persist({ action: "profile", profile, ...(starter ? { starter } : {}) }),
         setRun: (project) => persist({ action: "project", project }),
+        clearMemory: () => persist({ action: "clear_memory" }),
         toggleSave: (id) =>
           handleMutation({
             action: "save",

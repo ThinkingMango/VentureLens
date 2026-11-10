@@ -68,6 +68,7 @@ export async function readWorkspace(
   user: { id: string; email?: string },
 ): Promise<WorkspaceData> {
   const [
+    memoryResult,
     profileResult,
     projectsResult,
     runsResult,
@@ -75,6 +76,12 @@ export async function readWorkspace(
     savesResult,
     accessResult,
   ] = await Promise.all([
+    // Read on its own, so a database without the WP-04 column only loses the "cleared on" date, never the workspace.
+    supabase
+      .from("founder_profiles")
+      .select("history_reset_at")
+      .eq("user_id", user.id)
+      .maybeSingle(),
     supabase
       .from("founder_profiles")
       .select(profileColumns)
@@ -148,6 +155,7 @@ export async function readWorkspace(
     email: user.email ?? "",
     profile,
     onboarded: row?.onboarding_completed ?? false,
+    memoryResetAt: memoryResult.error ? null : (memoryResult.data?.history_reset_at ?? null),
     access,
     projects: projectsResult.data ?? [],
     runs: runsResult.data ?? [],

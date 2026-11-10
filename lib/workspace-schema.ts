@@ -193,6 +193,8 @@ export type WorkspaceData = {
   email: string;
   profile: Profile;
   onboarded: boolean;
+  /** When the founder last cleared their idea memory (WP-04); null if never. */
+  memoryResetAt?: string | null;
   access: ResearchAccess;
   projects: Project[];
   runs: ResearchRun[];
