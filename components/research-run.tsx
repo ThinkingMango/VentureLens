@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/shared";
 import { useDemo } from "@/components/demo-provider";
 import { ResearchReportView } from "@/components/research-report";
+import { ResearchOutcomeView } from "@/components/research-outcome";
 import { ModelTag } from "@/components/model-tag";
 import { researchErrors, stageLabels } from "@/lib/research-core";
 import type { ResearchDetail } from "@/lib/research-types";
@@ -153,6 +154,10 @@ export function ResearchRunView({
         </p>
       )}
       {completed && data.report && <ResearchReportView report={data.report} />}
+      {completed && data.outcome && <ResearchOutcomeView outcome={data.outcome} variant="completed" runId={data.id} />}
+      {data.status === "failed" && data.error_code === "INSUFFICIENT_EVIDENCE" && data.outcome && (
+        <ResearchOutcomeView outcome={data.outcome} variant="failed" runId={data.id} />
+      )}
       <ExecutionContainer
         id="execution-details"
         open={completed ? executionOpen : undefined}

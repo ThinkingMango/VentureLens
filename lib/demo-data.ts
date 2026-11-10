@@ -1,3 +1,4 @@
+import type { ResearchOutcome } from "@/lib/research-core";
 export type Opportunity = {
   id: string;
   title: string;
@@ -302,3 +303,45 @@ export const researchReports: Record<string, DemoReport> = {
 };
 // Re-exported for existing imports; live UI imports it from ./demo-notice so it does not pull in the fixtures.
 export { demoNotice } from "./demo-notice.ts";
+
+/**
+ * A fixed "nothing passed" run for the demo (spec WP-06). The same component renders live outcomes; demo text is
+ * fixed English translated through the catalogues, and its sources use reserved .example domains with no links.
+ */
+export const demoOutcome: ResearchOutcome = {
+  version: 1,
+  mode: "founder",
+  counts: { candidates: 4, sources: 7, passed: 0 },
+  candidates: [
+    {
+      key: "c1", title: "Appointment reminders for independent physiotherapy clinics", buyer: "Owners of one- or two-room physiotherapy clinics", query: "physiotherapy clinic missed appointments cost survey",
+      sources: [
+        { url: "https://reminder-vendor.example/blog", title: "Sample vendor blog", domain: "reminder-vendor.example", reliability: "vendor", stance: "supports", relevant: true },
+        { url: "https://clinic-software.example/stats", title: "Sample vendor statistics", domain: "clinic-software.example", reliability: "vendor", stance: "supports", relevant: true },
+      ],
+      supportingDomains: 2, nonVendorSupport: false, contradicting: 0, reason: "VENDOR_ONLY",
+    },
+    {
+      key: "c2", title: "Intake forms that pre-fill insurer paperwork", buyer: "Front-desk staff at small allied-health practices", query: "allied health practice insurance paperwork time",
+      sources: [
+        { url: "https://forms-vendor.example/guide", title: "Sample vendor guide", domain: "forms-vendor.example", reliability: "vendor", stance: "supports", relevant: true },
+        { url: "https://practice-tools.example/case-study", title: "Sample case study", domain: "practice-tools.example", reliability: "vendor", stance: "supports", relevant: true },
+        { url: "https://health-news.example/report", title: "Sample news report", domain: "health-news.example", reliability: "secondary", stance: "contradicts", relevant: true },
+      ],
+      supportingDomains: 2, nonVendorSupport: false, contradicting: 1, reason: "VENDOR_ONLY",
+    },
+    {
+      key: "c3", title: "Home-exercise video plans for discharged patients", buyer: "Physiotherapists running solo practices", query: "physiotherapy home exercise adherence problem",
+      sources: [
+        { url: "https://physio-forum.example/thread", title: "Sample forum thread", domain: "physio-forum.example", reliability: "primary", stance: "supports", relevant: true },
+        { url: "https://physio-forum.example/another-thread", title: "Another thread on the same forum", domain: "physio-forum.example", reliability: "primary", stance: "supports", relevant: true },
+      ],
+      supportingDomains: 1, nonVendorSupport: true, contradicting: 0, reason: "SINGLE_DOMAIN",
+    },
+    {
+      key: "c4", title: "Referral tracking between GPs and physiotherapists", buyer: "Practice managers at small physiotherapy clinics", query: "GP physiotherapy referral tracking problem", sources: [],
+      supportingDomains: 0, nonVendorSupport: false, contradicting: 0, reason: "SEARCH_FAILED",
+    },
+  ],
+  suggestions: ["TRY_MARKET_MODE", "VERIFY_SPECIFIC_IDEA"],
+};

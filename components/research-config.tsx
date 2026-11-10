@@ -19,6 +19,7 @@ import {
   Lock,
 } from "lucide-react";
 import { useDemo } from "@/components/demo-provider";
+import type { ResearchBrief } from "@/lib/workspace-schema";
 import { scoringWeights } from "@/lib/research-core";
 import {
   anySector,
@@ -108,12 +109,14 @@ function ChoiceChip({
     </label>
   );
 }
-export function ResearchConfig() {
+export function ResearchConfig({ initialBrief }: { initialBrief?: ResearchBrief } = {}) {
   const copy = useCopy();
   const { run, setRun, profile, isDemo, href, busy, refresh, data } = useDemo();
-  // A first brief starts from the founder's own industry when it is one of the research industries.
+  // A brief passed in (from an earlier run) wins; a first brief starts from the founder's own industry when it is one
+  // of the research industries.
   const [draft, setDraft] = useState(() =>
-    !isDemo && !data?.projects.length && (researchSectors as readonly string[]).includes(profile.industry)
+    initialBrief ? initialBrief
+    : !isDemo && !data?.projects.length && (researchSectors as readonly string[]).includes(profile.industry)
       ? { ...run, sectors: [profile.industry as (typeof run.sectors)[number]] }
       : run,
   );

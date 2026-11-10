@@ -19,7 +19,7 @@ import {
   normalizeDiscovery, normalizeClassification, normalizeEvaluation, normalizeReview,
   groundedClassifications, eligibleEvidence, evidenceGate, weightedScore, safeSourceUrl,
   scoringWeights, scoreParts, REVIEW_MAX_PENALTY, researchErrors, errorCode, researchPolicy, reportLanguage, reportNarrative, confidenceLevel,
-  type Candidate, type Evidence, type Mode,
+  researchOutcome, type Candidate, type Classification, type Evidence, type Mode, type ResearchOutcome, type Review,
 } from "@/lib/research-core";
 
 const pricingSchema = z.object({ input: z.number().positive().max(0.00001), output: z.number().positive().max(0.00003), search: z.number().positive().max(0.05), checked_at: z.string() });
@@ -58,6 +58,23 @@ async function previous<T>(ctx: Context, key: string): Promise<T> {
   const row = checked(await db().from("research_stages").select("output").eq("run_id", ctx.runId).eq("user_id", ctx.userId).eq("stage_key", key).single());
   if (!row) throw new Error("WORKFLOW_INTERRUPTED");
   return row.output as T;
+}
+/** Candidate keys whose search found nothing readable: their retrieval checkpoint was saved as skipped. */
+async function retrievalFailures(ctx: Context, keys: string[]) {
+  const rows = await Promise.all(keys.map(async key => checked(await db().from("research_stages").select("output").eq("run_id", ctx.runId).eq("user_id", ctx.userId).eq("stage_key", `retrieval:${key}`).maybeSingle()) as { output?: { skipped?: unknown } } | null));
+  return keys.filter((_, index) => !!rows[index]?.output?.skipped);
+}
+/**
+ * Saves the run's outcome (what was searched and why each candidate passed or not). The first outcome written is kept:
+ * a stage that runs again after a platform retry must not replace an explanation the founder may already have read.
+ */
+export async function saveOutcome(ctx: Context, outcome: ResearchOutcome) {
+  checked(await db().from("research_stages").upsert({ run_id: ctx.runId, user_id: ctx.userId, stage_key: "outcome", output: outcome }, { onConflict: "run_id,stage_key", ignoreDuplicates: true }));
+}
+async function recordOutcome(ctx: Context, input: { candidates: Candidate[]; evidence: Evidence[]; classifications: Classification[]; reviews?: Review[]; mode: Mode }) {
+  const outcome = researchOutcome({ ...input, retrievalFailures: await retrievalFailures(ctx, input.candidates.map(candidate => candidate.key)) });
+  await saveOutcome(ctx, outcome);
+  return outcome;
 }
 export async function initializeResearch(ctx: Context) {
   const client = db();
@@ -302,7 +319,11 @@ export async function executeResearchStage(ctx: Context, key: string): Promise<s
   }
   const classes = classificationSchema.parse(await previous(ctx, "classification")).items;
   const eligible = discovery.candidates.filter(c => eligibleEvidence(c.key, evidence, classes).length > 0);
-  if (!eligible.length) throw new Error("INSUFFICIENT_EVIDENCE");
+  if (!eligible.length) {
+    // Nothing passed the evidence gate: explain why for each candidate before the run is marked failed.
+    await recordOutcome(ctx, { candidates: discovery.candidates, evidence, classifications: classes, mode });
+    throw new Error("INSUFFICIENT_EVIDENCE");
+  }
   if (key === "evaluation") {
     const items: z.infer<typeof evaluationSchema>["items"] = [];
     for (let offset = 0; offset < eligible.length; offset += 2) {
@@ -346,6 +367,8 @@ export async function executeResearchStage(ctx: Context, key: string): Promise<s
       const { score, beforeReview, cap } = scoreParts(e.dimensions, mode, supportingDomains, review.penalty);
       return [opportunitySchema.parse({ id: crypto.randomUUID(), candidate_id: candidate.key, title: candidate.title, category: e.category, description: e.description, buyer: candidate.buyer, pain: candidate.pain, score, confidence: confidenceLevel(supportingDomains), revenue: e.revenue, cost: e.cost, risk: e.risk, scores: Object.values(e.dimensions), icon: "workflow", evidence: sources, assumptions: e.assumptions, validation: e.validation, rationale: e.rationale, critique: review.critique, falsification: review.falsification, penalty: review.penalty, score_before_review: beforeReview, score_cap: cap })];
     }).sort((a, b) => b.score - a.score);
+    // Saved for completed runs too, so the report can list the candidates that did not pass and why.
+    await recordOutcome(ctx, { candidates: discovery.candidates, evidence, classifications: classes, reviews, mode });
     if (!opportunities.length) throw new Error("INSUFFICIENT_EVIDENCE");
     const attempts = checked(await client.from("research_usage").select("model,provider").eq("run_id", ctx.runId).eq("user_id", ctx.userId));
     const models = [...new Set((attempts ?? []).map(attempt => attempt.model))];

@@ -306,9 +306,22 @@ export type GatedEvidence = Evidence & { stance: Classification["stance"] };
  * the confidence level and the score cap.
  */
 export function evidenceGate(candidate: string, evidence: Evidence[], classifications: Classification[]): { sources: GatedEvidence[]; supportingDomains: number } {
+  const { relevant, supportingDomains, demand } = gateInputs(candidate, evidence, classifications);
+  return supportingDomains >= 2 && demand
+    ? { sources: relevant.map(({ source }) => source), supportingDomains }
+    : { sources: [], supportingDomains: 0 };
+}
+/**
+ * What the evidence gate measures for one candidate, before it decides. Shared by evidenceGate and diagnoseCandidates
+ * so the explanation of a failed candidate can never drift from the rule that failed it. In the gate's order:
+ * 1. `relevant`: grounded sources the classifier marked relevant, one per URL, each with a registrable domain;
+ * 2. `supportingDomains`: independent domains among the relevant sources that support the candidate;
+ * 3. `demand`: whether a supporting source is first-hand or independent (non-vendor) evidence of pain or demand.
+ */
+export function gateInputs(candidate: string, evidence: Evidence[], classifications: Classification[]) {
   const byKey = new Map(groundedClassifications(evidence, classifications).map(c => [c.source_key, c]));
   const urls = new Set<string>();
-  const relevant: { source: GatedEvidence; domain: string }[] = [];
+  const relevant: { source: GatedEvidence; domain: string; classification: Classification }[] = [];
   for (const e of evidence) {
     const classification = byKey.get(e.source_key);
     if (e.candidate_id !== candidate || !classification?.relevant) continue;
@@ -317,22 +330,122 @@ export function evidenceGate(candidate: string, evidence: Evidence[], classifica
     const domain = registrableDomain(url);
     if (!domain) continue;
     urls.add(url);
-    relevant.push({ source: { ...e, stance: classification.stance }, domain });
+    relevant.push({ source: { ...e, stance: classification.stance }, domain, classification });
   }
   const supporting = relevant.filter(({ source }) => source.stance === 'supports');
   const supportingDomains = new Set(supporting.map(({ domain }) => domain)).size;
-  const demand = supporting.some(({ source }) => {
-    const c = byKey.get(source.source_key)!;
-    return ['pain', 'demand'].includes(c.kind) && ['primary', 'secondary'].includes(c.reliability);
-  });
-  return supportingDomains >= 2 && demand
-    ? { sources: relevant.map(({ source }) => source), supportingDomains }
-    : { sources: [], supportingDomains: 0 };
+  const demand = supporting.some(({ classification: c }) => ['pain', 'demand'].includes(c.kind) && ['primary', 'secondary'].includes(c.reliability));
+  return { relevant, supportingDomains, demand, grounded: byKey };
 }
 /** The sources shown for a candidate that passes the gate (supporting first-class, counter-evidence kept), else none. */
 export function eligibleEvidence(candidate: string, evidence: Evidence[], classifications: Classification[]) {
   return evidenceGate(candidate, evidence, classifications).sources;
 }
+// ---------------------------------------------------------------------------------------------------------------
+// Outcome diagnostics (WP-06): why each candidate did or did not become an opportunity, for "nothing passed" runs and
+// for the candidates a completed report left out. Reasons and suggestions are fixed codes, translated in the interface
+// and never written by a model.
+
+/**
+ * Why a candidate did not become an opportunity, as the first rule it failed, in the order the pipeline applies them:
+ * its search (SEARCH_FAILED), then the evidence gate's own checks from gateInputs (NO_SOURCES or CONTRADICTED when no
+ * relevant source supports it, SINGLE_DOMAIN when support comes from one domain, VENDOR_ONLY when no supporting source
+ * is non-vendor pain or demand evidence), then the adversarial review (REVIEW_REJECTED, or NOT_EVALUATED when a
+ * candidate that passed the gate has no evaluation or review). PASSED means it became an opportunity.
+ */
+export const gateReasons = ["SEARCH_FAILED", "NO_SOURCES", "CONTRADICTED", "SINGLE_DOMAIN", "VENDOR_ONLY", "REVIEW_REJECTED", "NOT_EVALUATED", "PASSED"] as const;
+export type GateReason = (typeof gateReasons)[number];
+export const suggestionKeys = ["TRY_MARKET_MODE", "NARROW_BUYER", "CHANGE_GEOGRAPHY", "VERIFY_SPECIFIC_IDEA"] as const;
+export type SuggestionKey = (typeof suggestionKeys)[number];
+export const OUTCOME_VERSION = 1;
+
+const diagnosisSourceSchema = z.object({
+  url: z.string(), title: z.string().max(300), domain: z.string().nullable(),
+  reliability: z.enum(["primary", "secondary", "vendor", "unknown"]).nullable(),
+  stance: z.enum(["supports", "contradicts", "neutral"]).nullable(),
+  /** Whether the classifier judged the page relevant to this candidate; the gate counts relevant sources only. */
+  relevant: z.boolean().nullable(),
+});
+export const candidateDiagnosisSchema = z.object({
+  key: z.string(), title: z.string(), buyer: z.string(), query: z.string(),
+  sources: z.array(diagnosisSourceSchema).max(10),
+  supportingDomains: z.number().int().min(0), nonVendorSupport: z.boolean(), contradicting: z.number().int().min(0),
+  reason: z.enum(gateReasons),
+});
+export type CandidateDiagnosis = z.infer<typeof candidateDiagnosisSchema>;
+/** The `outcome` checkpoint: what was searched, what was found, why each candidate passed or not, and what to try next. */
+export const outcomeSchema = z.object({
+  version: z.literal(OUTCOME_VERSION),
+  mode: z.enum(["founder", "market", "combined"]),
+  counts: z.object({ candidates: z.number().int().min(0), sources: z.number().int().min(0), passed: z.number().int().min(0) }),
+  candidates: z.array(candidateDiagnosisSchema).max(8),
+  suggestions: z.array(z.enum(suggestionKeys)),
+});
+export type ResearchOutcome = z.infer<typeof outcomeSchema>;
+
+/** One diagnosis per candidate, in discovery order. Uses gateInputs, so it always agrees with evidenceGate. */
+export function diagnoseCandidates(input: {
+  candidates: Pick<Candidate, "key" | "title" | "buyer" | "query">[];
+  evidence: Evidence[];
+  classifications: Classification[];
+  /** The review stage's items; omit before review has run. */
+  reviews?: Pick<Review, "candidate_id" | "reject">[];
+  /** Candidate keys whose search found nothing readable (retrieval checkpoint marked skipped). */
+  retrievalFailures?: string[];
+}): CandidateDiagnosis[] {
+  const grounded = new Map(groundedClassifications(input.evidence, input.classifications).map(c => [c.source_key, c]));
+  return input.candidates.map(candidate => {
+    const own = input.evidence.filter(source => source.candidate_id === candidate.key);
+    const { relevant, supportingDomains, demand } = gateInputs(candidate.key, input.evidence, input.classifications);
+    const contradicting = relevant.filter(({ source }) => source.stance === "contradicts").length;
+    const review = input.reviews?.find(item => item.candidate_id === candidate.key);
+    const reason: GateReason =
+      !own.length && input.retrievalFailures?.includes(candidate.key) ? "SEARCH_FAILED"
+      : supportingDomains === 0 ? (contradicting > 0 ? "CONTRADICTED" : "NO_SOURCES")
+      : supportingDomains < 2 ? "SINGLE_DOMAIN"
+      : !demand ? "VENDOR_ONLY"
+      : !review ? (input.reviews ? "NOT_EVALUATED" : "PASSED")
+      : review.reject ? "REVIEW_REJECTED"
+      : "PASSED";
+    return {
+      key: candidate.key, title: candidate.title, buyer: candidate.buyer, query: candidate.query,
+      sources: own.slice(0, 10).map(source => {
+        const classification = grounded.get(source.source_key);
+        const safe = safeSourceUrl(source.url);
+        return { url: safe ?? "", title: clipText(source.title, 300), domain: safe ? registrableDomain(safe) : null, reliability: classification?.reliability ?? null, stance: classification?.stance ?? null, relevant: classification ? classification.relevant : null };
+      }).filter(source => source.url),
+      supportingDomains, nonVendorSupport: demand, contradicting, reason,
+    };
+  });
+}
+
+/**
+ * What to try next, as fixed keys in a fixed order. A reason "dominates" when it accounts for at least half of the
+ * candidates that did not pass. VERIFY_SPECIFIC_IDEA is always offered.
+ */
+export function outcomeSuggestions(reasons: GateReason[], mode: Mode): SuggestionKey[] {
+  const failed = reasons.filter(reason => reason !== "PASSED");
+  const dominant = (...wanted: GateReason[]) => failed.length > 0 && failed.filter(reason => wanted.includes(reason)).length * 2 >= failed.length;
+  const keys: SuggestionKey[] = [];
+  if (mode === "founder" && dominant("VENDOR_ONLY")) keys.push("TRY_MARKET_MODE");
+  if (dominant("SINGLE_DOMAIN")) keys.push("NARROW_BUYER");
+  if (dominant("NO_SOURCES", "SEARCH_FAILED")) keys.push("CHANGE_GEOGRAPHY");
+  keys.push("VERIFY_SPECIFIC_IDEA");
+  return keys;
+}
+
+/** The complete outcome checkpoint for a run. */
+export function researchOutcome(input: Parameters<typeof diagnoseCandidates>[0] & { mode: Mode }): ResearchOutcome {
+  const candidates = diagnoseCandidates(input);
+  return outcomeSchema.parse({
+    version: OUTCOME_VERSION,
+    mode: input.mode,
+    counts: { candidates: candidates.length, sources: input.evidence.length, passed: candidates.filter(c => c.reason === "PASSED").length },
+    candidates,
+    suggestions: outcomeSuggestions(candidates.map(c => c.reason), input.mode),
+  });
+}
+
 /**
  * How an opportunity's score is reached: the weighted rating of its five dimensions, minus the adversarial review's
  * deduction, capped at 70 with fewer than three independent supporting sources and 85 otherwise.

@@ -7,7 +7,8 @@ import { ResearchResults } from "@/components/research-results";
 import { OpportunityDetail } from "@/components/opportunity-detail";
 import { Onboarding } from "@/components/onboarding";
 import { Billing } from "@/components/billing";
-import { opportunities } from "@/lib/demo-data";
+import { opportunities, demoOutcome } from "@/lib/demo-data";
+import { DemoOutcome } from "@/components/research-outcome";
 export default async function DemoPage({
   params,
   searchParams,
@@ -24,6 +25,7 @@ export default async function DemoPage({
     research: <ResearchLibrary />,
     "research/new": <ResearchConfig />,
     "research/results": <ResearchResults />,
+    "research/no-result": <DemoOutcome outcome={demoOutcome} />,
     saved: <ResearchResults savedOnly />,
     profile: <Onboarding editing />,
     billing: <Billing />,

@@ -10,6 +10,7 @@ import { providerPlan } from "@/lib/provider-settings-core";
 import { selectedModel } from "@/lib/research-models";
 import { QWEN_PROVIDER } from "@/lib/qwen-core";
 import { GEMINI_PROVIDER } from "@/lib/research-fallback-core";
+import { outcomeSchema } from "@/lib/research-core";
 
 export async function dispatchResearch(id: string, userId: string) {
   const client = createAdminClient();
@@ -75,13 +76,16 @@ export async function researchDetail(supabase: Awaited<ReturnType<typeof createC
       if (recovered?.length) { run.status = "failed"; run.error_code = interrupted; run.completed_at = completedAt; run.quota_released = recovered[0].quota_released; }
     }
   }
-  const [steps, usage, budgetBlock, setup] = await Promise.all([
+  const [steps, usage, budgetBlock, setup, outcomeRow] = await Promise.all([
     supabase.from("research_stages").select("stage_key,created_at").eq("run_id", id).eq("user_id", userId).order("created_at"),
     supabase.from("research_usage").select("status,input_tokens,output_tokens,search_requests,estimated_usd,reserved_usd,provider,model").eq("run_id", id).eq("user_id", userId),
     supabase.from("research_stages").select("output").eq("run_id", id).eq("user_id", userId).eq("stage_key", "budget_block").maybeSingle(),
     supabase.from("research_stages").select("output").eq("run_id", id).eq("user_id", userId).eq("stage_key", "setup").maybeSingle(),
+    supabase.from("research_stages").select("output").eq("run_id", id).eq("user_id", userId).eq("stage_key", "outcome").maybeSingle(),
   ]);
-  if (steps.error || usage.error || budgetBlock.error || setup.error) throw new Error("WORKFLOW_INTERRUPTED");
+  if (steps.error || usage.error || budgetBlock.error || setup.error || outcomeRow.error) throw new Error("WORKFLOW_INTERRUPTED");
+  // Runs from before outcomes were recorded have none; an outcome that does not match the schema is not shown.
+  const parsedOutcome = outcomeRow.data ? outcomeSchema.safeParse(outcomeRow.data.output) : null;
   const model = await describeModel(setup.data?.output, usage.data ?? []);
   const totals = (usage.data ?? []).reduce((sum, u) => ({
     estimated_usd: sum.estimated_usd + (u.status === "completed" ? Number(u.estimated_usd) : 0),
@@ -93,7 +97,7 @@ export async function researchDetail(supabase: Awaited<ReturnType<typeof createC
   const budget_block = run.status === "failed" && run.error_code === "BUDGET_EXCEEDED" && blocked && typeof blocked.model === "string" && Number.isFinite(blocked.required_usd)
     ? { model: blocked.model, required_usd: Number(blocked.required_usd), remaining_usd: Math.max(0, Number(run.budget_usd) - totals.committed_usd), kind: blocked.kind === "estimate" ? "estimate" as const : "reservation" as const }
     : undefined;
-  return { id: run.id, status: run.status, stage: run.stage, model, error_code: run.error_code, retry_count: run.retry_count, quota_released: run.quota_released, configuration: { brief: run.configuration.brief }, report: run.report, created_at: run.created_at, completed_at: run.completed_at, steps: steps.data ?? [], usage: { ...totals, budget_usd: Number(run.budget_usd) }, ...(budget_block ? { budget_block } : {}) };
+  return { id: run.id, status: run.status, stage: run.stage, model, error_code: run.error_code, retry_count: run.retry_count, quota_released: run.quota_released, configuration: { brief: run.configuration.brief }, report: run.report, outcome: parsedOutcome?.success ? parsedOutcome.data : null, created_at: run.created_at, completed_at: run.completed_at, steps: steps.data ?? [], usage: { ...totals, budget_usd: Number(run.budget_usd) }, ...(budget_block ? { budget_block } : {}) };
 }
 
 // Which model a run uses: the recorded choice once the run has initialized, otherwise the configured primary.

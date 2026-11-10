@@ -477,11 +477,79 @@ test("finalizing counts only supporting evidence and saves counter-evidence with
   assert.deepEqual(workspaceSchema.opportunitySchema.parse(c1).evidence.map(e => e.stance), ["supports", "supports", "contradicts"]);
 });
 
+test("finalizing saves an outcome that agrees with the report, listing the candidates that did not pass", async () => {
+  const checkpoints = new Map();
+  const candidates = Array.from({ length: 5 }, (_, i) => ({ key: `c${i + 1}`, title: `Candidate ${i + 1}`, buyer: "Agencies", pain: "Slow proposals", solution: "Assistant", advantage: "Network", query: "agency proposal preparation time survey" }));
+  checkpoints.set("discovery", { candidates });
+  checkpoints.set("retrieval:c3", { evidence: [], skipped: "RETRIEVAL_UNAVAILABLE" });
+  const page = (key, candidate, url, text) => ({ source_key: key, candidate_id: candidate, url, title: "Source", excerpt: text, retrieved_at: "2026-11-10T00:00:00.000Z", published_at: null });
+  const evidence = [
+    page("c1-s1", "c1", "https://buyers.org/pain", "Agencies report spending ten hours every week preparing proposals."),
+    page("c1-s2", "c1", "https://survey.org/analysis", "An independent survey confirms proposal preparation delays agency sales."),
+    page("c2-s1", "c2", "https://blog.vendor.io/a", "Agencies lose deals when proposals are late, says our product team."),
+    page("c2-s2", "c2", "https://www.vendor.io/b", "Our customers report faster proposals after switching to our tool."),
+  ];
+  checkpoints.set("classification", { items: evidence.map(e => ({ source_key: e.source_key, relevant: true, kind: "pain", reliability: e.candidate_id === "c2" ? "vendor" : "secondary", stance: "supports", quote: e.excerpt, claim: "Buyer pain" })) });
+  const dimensions = { pain: 60, demand: 60, economics: 60, feasibility: 60, advantage: 60 };
+  checkpoints.set("evaluation", { items: [{ candidate_id: "c1", description: "Assistant", category: "Services", revenue: "Assumed, unverified", cost: "Assumed, unverified", risk: "Unverified demand", assumptions: ["Unverified"], validation: ["Interview buyers"], dimensions, rationale: "Cites c1-s1" }] });
+  checkpoints.set("review", { items: [{ candidate_id: "c1", reject: false, critique: "Needs interviews", penalty: 5, falsification: "Run a paid pilot" }] });
+  const fixture = researchFixture({ spent: 0, evidence, checkpoints });
+  await fixture.engine.executeResearchStage(fixture.context, "finalizing");
+  const report = fixture.reservations.find(call => call.p_report)?.p_report;
+  const outcome = checkpoints.get("outcome");
+  assert.ok(outcome, "the outcome is saved for completed runs too");
+  assert.deepEqual(outcome.candidates.map(c => [c.key, c.reason]), [["c1", "PASSED"], ["c2", "SINGLE_DOMAIN"], ["c3", "SEARCH_FAILED"], ["c4", "NO_SOURCES"], ["c5", "NO_SOURCES"]]);
+  assert.equal(outcome.counts.passed, report.opportunities.length, "passed candidates are exactly the reported opportunities");
+  assert.deepEqual(outcome.counts, { candidates: 5, sources: 4, passed: 1 });
+  assert.ok(researchCore.outcomeSchema.safeParse(outcome).success);
+});
+
+test("a run where nothing passes the evidence gate saves why before it fails, without another provider request", async () => {
+  const checkpoints = new Map();
+  const candidates = Array.from({ length: 5 }, (_, i) => ({ key: `c${i + 1}`, title: `Idea ${i + 1}`, buyer: "Clinics", pain: "No-shows", solution: "Reminders", advantage: "Network", query: "clinic no-show cost survey" }));
+  checkpoints.set("discovery", { candidates });
+  for (const key of ["c4", "c5"]) checkpoints.set(`retrieval:${key}`, { evidence: [], skipped: "RETRIEVAL_UNAVAILABLE" });
+  const page = (key, candidate, url, text) => ({ source_key: key, candidate_id: candidate, url, title: "Vendor page", excerpt: text, retrieved_at: "2026-11-10T00:00:00.000Z", published_at: null });
+  const evidence = ["c1", "c2", "c3"].flatMap(candidate => [1, 2].map(i => page(`${candidate}-s${i}`, candidate, `https://vendor${i}-${candidate}.io/page`, `Clinics lose revenue to no-shows every week, says vendor ${i}.`)));
+  checkpoints.set("classification", { items: evidence.map(e => ({ source_key: e.source_key, relevant: true, kind: "pain", reliability: "vendor", stance: "supports", quote: e.excerpt, claim: "Vendor claim" })) });
+  const fixture = researchFixture({ spent: 0, evidence, checkpoints, settings: { primary: "qwen", autoFallback: false, qwenModel: "qwen3.8-flash", geminiModel: "gemini-3.5-flash-lite" } });
+  fixture.checkpoints.set("setup", { ...fixture.checkpoints.get("setup"), brief: { ...fixture.checkpoints.get("setup").brief, discovery_mode: "founder" } });
+  await assert.rejects(fixture.engine.executeResearchStage(fixture.context, "evaluation"), /INSUFFICIENT_EVIDENCE/);
+  assert.equal(fixture.calls.length, 0, "no model call is made for a run that cannot pass");
+  const outcome = checkpoints.get("outcome");
+  assert.deepEqual(outcome.candidates.map(c => c.reason), ["VENDOR_ONLY", "VENDOR_ONLY", "VENDOR_ONLY", "SEARCH_FAILED", "SEARCH_FAILED"]);
+  assert.deepEqual(outcome.suggestions, ["TRY_MARKET_MODE", "VERIFY_SPECIFIC_IDEA"], "founder mode with mostly vendor-only evidence suggests market mode");
+  assert.deepEqual(outcome.counts, { candidates: 5, sources: 6, passed: 0 });
+});
+
+test("the outcome checkpoint keeps the first version written", async () => {
+  const rows = new Map();
+  const options = [];
+  const engine = loadModule("../lib/research-engine.ts", {
+    "server-only": {}, "ai": {}, "@/lib/qwen-provider": {}, "@/lib/gemini-provider": {}, "@/lib/qwen-core": { QWEN_PROVIDER: "dashscope-beijing" },
+    "@/lib/research-fallback-core": fallbackCore, "@/lib/research-source": {}, "@/lib/provider-settings": {}, "@/lib/provider-settings-core": settingsCore,
+    "@/lib/research-models": models, "@/lib/research-budget": budget, "@/lib/research-options": researchOptions, "@/lib/workspace-schema": workspaceSchema, "@/lib/research-core": researchCore,
+    // A client that behaves like PostgREST: ignoreDuplicates turns the upsert into ON CONFLICT DO NOTHING.
+    "@/lib/supabase/admin": { createAdminClient: () => ({ from: () => ({ upsert: async (value, opts) => {
+      options.push(opts);
+      const key = `${value.run_id}/${value.stage_key}`;
+      if (!(opts?.ignoreDuplicates && rows.has(key))) rows.set(key, value.output);
+      return { data: null, error: null };
+    } }) }) },
+  });
+  const context = { runId: "run", userId: "user", workflowId: "workflow" };
+  const first = { version: 1, mode: "combined", counts: { candidates: 1, sources: 0, passed: 0 }, candidates: [], suggestions: ["VERIFY_SPECIFIC_IDEA"] };
+  await engine.saveOutcome(context, first);
+  await engine.saveOutcome(context, { ...first, counts: { candidates: 9, sources: 9, passed: 9 } });
+  assert.deepEqual(rows.get("run/outcome"), first);
+  assert.deepEqual(options, [{ onConflict: "run_id,stage_key", ignoreDuplicates: true }, { onConflict: "run_id,stage_key", ignoreDuplicates: true }]);
+});
+
 test("concurrent dispatches share a durable hook and manual retries get a new identity", async () => {
   const row = { status: "pending", workflow_id: null, retry_count: 0 };
   const hooks = new Map(), requests = [], updates = [];
   const service = loadModule("../lib/research-service.ts", {
-    "server-only": {},
+    "server-only": {}, "@/lib/research-core": researchCore,
     "@/lib/provider-settings": { researchProviderSettings: async () => ({ primary: "qwen", autoFallback: true }) }, "@/lib/provider-settings-core": settingsCore, "@/lib/research-models": models, "@/lib/qwen-core": { QWEN_PROVIDER: "dashscope-beijing" }, "@/lib/research-fallback-core": fallbackCore,
     "workflow/api": { start: async (_workflow, args, options) => {
       assert.deepEqual(args, ["run", "owner"]);
@@ -539,13 +607,34 @@ test("research detail explains blocked reservations without adding them to spent
     };
     return query;
   }
-  const service = loadModule("../lib/research-service.ts", { "server-only": {}, "workflow/api": {}, "workflow/errors": {}, "@/workflows/research": {}, "@/lib/provider-settings": { researchProviderSettings: async () => ({ primary: "qwen", autoFallback: true }) }, "@/lib/provider-settings-core": settingsCore, "@/lib/research-models": models, "@/lib/qwen-core": { QWEN_PROVIDER: "dashscope-beijing" }, "@/lib/research-fallback-core": fallbackCore, "@/lib/supabase/admin": {} });
+  const service = loadModule("../lib/research-service.ts", { "server-only": {}, "@/lib/research-core": researchCore, "workflow/api": {}, "workflow/errors": {}, "@/workflows/research": {}, "@/lib/provider-settings": { researchProviderSettings: async () => ({ primary: "qwen", autoFallback: true }) }, "@/lib/provider-settings-core": settingsCore, "@/lib/research-models": models, "@/lib/qwen-core": { QWEN_PROVIDER: "dashscope-beijing" }, "@/lib/research-fallback-core": fallbackCore, "@/lib/supabase/admin": {} });
   const detail = await service.researchDetail({ from }, "owner", "run");
   assert.equal(detail.usage.committed_usd, 0.051042);
   assert.equal(detail.usage.search_requests, 0);
   assert.equal(detail.budget_block.required_usd, 0.20448);
   assert.ok(Math.abs(detail.budget_block.remaining_usd - 0.198958) < 1e-9);
   assert.ok(scopes.every(filters => filters.user_id === "owner"));
+  assert.equal(detail.outcome, null, "a stored outcome that does not match its schema is not shown");
+});
+
+test("research detail returns the run's outcome, read with the owner's own client", async () => {
+  const outcome = researchCore.researchOutcome({ mode: "combined", candidates: [{ key: "c1", title: "Idea", buyer: "Clinics", query: "clinic survey" }], evidence: [], classifications: [], retrievalFailures: ["c1"] });
+  const run = { id: "run", status: "failed", stage: "evaluation", error_code: "INSUFFICIENT_EVIDENCE", retry_count: 0, budget_usd: 0.25, configuration: { brief: {} }, report: null };
+  const scopes = [];
+  function from(table) {
+    const filters = {};
+    const query = {
+      select: () => query, eq: (key, value) => { filters[key] = value; return query; }, order: () => query,
+      maybeSingle: async () => { scopes.push({ table, ...filters }); return { data: table === "research_runs" ? run : filters.stage_key === "outcome" ? { output: outcome } : null, error: null }; },
+      then: resolve => { scopes.push({ table, ...filters }); resolve({ data: [], error: null }); },
+    };
+    return query;
+  }
+  const service = loadModule("../lib/research-service.ts", { "server-only": {}, "@/lib/research-core": researchCore, "workflow/api": {}, "workflow/errors": {}, "@/workflows/research": {}, "@/lib/provider-settings": { researchProviderSettings: async () => ({ primary: "qwen", autoFallback: true }) }, "@/lib/provider-settings-core": settingsCore, "@/lib/research-models": models, "@/lib/qwen-core": { QWEN_PROVIDER: "dashscope-beijing" }, "@/lib/research-fallback-core": fallbackCore, "@/lib/supabase/admin": {} });
+  const detail = await service.researchDetail({ from }, "owner", "run");
+  assert.deepEqual(detail.outcome, outcome);
+  assert.equal(detail.outcome.candidates[0].reason, "SEARCH_FAILED");
+  assert.ok(scopes.filter(scope => scope.table === "research_stages").every(scope => scope.user_id === "owner" && scope.run_id === "run"));
 });
 
 test("the actual progress view renders blocked-request costs and a usable recovery link", () => {
@@ -557,6 +646,7 @@ test("the actual progress view renders blocked-request costs and a usable recove
     "@/components/shared": { PageHeader: ({ title, description }) => createElement("header", null, createElement("h1", null, title), createElement("p", null, description)) },
     "@/components/demo-provider": { useDemo: () => ({ refresh: async () => undefined }) },
     "@/components/research-report": { ResearchReportView: () => null },
+    "@/components/research-outcome": { ResearchOutcomeView: () => null },
     // The real model badge, so the rendered model and provider names are checked.
     "@/components/model-tag": loadModule("../components/model-tag.tsx", { "@/components/ui/badge": { Badge: ({ children, ...props }) => createElement("span", props, children) }, "@/lib/research-models": models, "@/i18n/use-copy": { useCopy: () => (text, values = {}) => text.replace(/\{(\w+)\}/g, (_match, key) => values[key] ?? key) } }),
     "@/lib/research-core": researchCore,
@@ -578,6 +668,86 @@ test("the actual progress view renders blocked-request costs and a usable recove
   assert.match(html, /Gemini via Google/);
 });
 
+// The real outcome component inside the real run view, with the same light mocks as the progress-view tests.
+function runViewWithOutcome(data) {
+  const copy = () => (text, values = {}) => text.replace(/\{count, plural, one \{# ([^}]*)\} other \{# ([^}]*)\}\}/, (_m, one, other) => `${values.count} ${values.count === 1 ? one : other}`).replace(/\{(\w+)\}/g, (_match, key) => values[key] ?? key);
+  const shared = {
+    "next/link": { default: ({ children, ...props }) => createElement("a", props, children) },
+    "@/components/workspace-link": { default: ({ children, ...props }) => createElement("a", props, children) },
+    "@/components/ui/button": { Button: ({ asChild, children, ...props }) => asChild ? cloneElement(children, props) : createElement("button", props, children) },
+    "@/components/ui/badge": { Badge: ({ children, ...props }) => createElement("span", props, children) },
+    "@/i18n/use-copy": { useCopy: copy, useFormats: () => ({ usd: (value, digits = 2) => `$${value.toFixed(digits)}`, number: value => String(value), date: value => value }) },
+  };
+  const outcomeModule = loadModule("../components/research-outcome.tsx", { ...shared, "lucide-react": { ExternalLink: () => null, SearchX: () => null } });
+  const { ResearchRunView } = loadModule("../components/research-run.tsx", {
+    ...shared,
+    "swr": { default: () => ({ data, mutate: async () => undefined }) },
+    "@/components/shared": { PageHeader: ({ title }) => createElement("h1", null, title) },
+    "@/components/demo-provider": { useDemo: () => ({ refresh: async () => undefined }) },
+    "@/components/research-report": { ResearchReportView: () => createElement("section", null, "REPORT") },
+    "@/components/research-outcome": outcomeModule,
+    "@/components/model-tag": { ModelTag: () => null },
+    "@/lib/research-core": researchCore, "@/lib/research-models": models,
+    "@/i18n/errors": { feedbackSource: (_code, fallback) => fallback }, "@/lib/api-client": apiClient,
+  });
+  return { html: renderToStaticMarkup(createElement(ResearchRunView, { initialData: data })), outcomeModule };
+}
+const outcomeFixture = () => researchCore.researchOutcome({
+  mode: "founder",
+  candidates: [{ key: "c1", title: "Reminders for physio clinics", buyer: "Clinic owners", query: "q" }, { key: "c2", title: "Intake forms", buyer: "Front desks", query: "q" }, { key: "c3", title: "Referral tracking", buyer: "Practice managers", query: "q" }],
+  evidence: [
+    { source_key: "c1-s1", candidate_id: "c1", url: "https://vendor-a.io/blog", title: "Vendor A", excerpt: "Clinics lose revenue to no-shows every single week.", retrieved_at: "2026-11-10", published_at: null },
+    { source_key: "c1-s2", candidate_id: "c1", url: "https://vendor-b.io/stats", title: "Vendor B", excerpt: "Clinics lose revenue to missed appointments every week.", retrieved_at: "2026-11-10", published_at: null },
+    { source_key: "c2-s1", candidate_id: "c2", url: "https://forum.example-health.org/t", title: "Forum", excerpt: "Front desks spend hours on insurer paperwork every day.", retrieved_at: "2026-11-10", published_at: null },
+  ],
+  classifications: [
+    { source_key: "c1-s1", relevant: true, kind: "pain", reliability: "vendor", stance: "supports", quote: "Clinics lose revenue to no-shows every single week.", claim: "c" },
+    { source_key: "c1-s2", relevant: true, kind: "pain", reliability: "vendor", stance: "supports", quote: "Clinics lose revenue to missed appointments every week.", claim: "c" },
+    { source_key: "c2-s1", relevant: true, kind: "pain", reliability: "primary", stance: "supports", quote: "Front desks spend hours on insurer paperwork every day.", claim: "c" },
+  ],
+  retrievalFailures: ["c3"],
+});
+const runData = overrides => ({ id: "run-1", status: "failed", stage: "evaluation", error_code: "INSUFFICIENT_EVIDENCE", retry_count: 0, quota_released: true, model: { provider: null, model: null, planned: false, used: [] }, configuration: { brief: { name: "Physio research" } }, report: null, steps: [], usage: { estimated_usd: 0.05, committed_usd: 0.05, budget_usd: 0.25, uncertain_calls: 0, input_tokens: 1, output_tokens: 1, search_requests: 3 }, outcome: outcomeFixture(), ...overrides });
+
+test("a run where nothing passed explains each idea, links its sources safely and offers a prefilled rerun", () => {
+  const { html } = runViewWithOutcome(runData());
+  assert.match(html, /What we looked for, and why nothing passed/);
+  assert.match(html, /3 ideas searched · 3 sources read · 0 passed/);
+  assert.match(html, /Reminders for physio clinics[\s\S]*Support came only from companies selling a solution/);
+  assert.match(html, /Intake forms[\s\S]*Support came from only one publisher/);
+  assert.match(html, /Referral tracking[\s\S]*The web search for this idea returned no page we could read/);
+  assert.match(html, /<a href="https:\/\/vendor-a\.io\/blog" target="_blank" rel="noopener noreferrer nofollow"/);
+  assert.match(html, /vendor-a\.io[\s\S]*Vendor[\s\S]*Supports/);
+  // One reason each out of three: none dominates, so no reason-specific suggestion (the engine test covers the dominant case).
+  assert.doesNotMatch(html, /Most ideas were backed only by vendor pages/);
+  assert.match(html, /href="\/research\/new\?from=run-1"/);
+  assert.doesNotMatch(html, /check that one idea directly/, "verifying one idea is not offered before it exists");
+  assert.match(html, /This run did not use up a research run/, "the slot-release message is unchanged");
+});
+
+test("other failures never show the explanation, and completed runs list the ideas that did not pass, collapsed", () => {
+  for (const error_code of ["INVALID_OUTPUT", "BUDGET_EXCEEDED", "RETRIEVAL_UNAVAILABLE"]) {
+    assert.doesNotMatch(runViewWithOutcome(runData({ error_code })).html, /why nothing passed/, error_code);
+  }
+  assert.doesNotMatch(runViewWithOutcome(runData({ outcome: null })).html, /why nothing passed/, "runs saved before outcomes existed render as before");
+  const report = { methodology: "evidence-driven-v2", model: "qwen3.8-flash", mode: "founder", generated_at: "2026-11-10", summary: "s", limitations: [], weights: {}, opportunities: [] };
+  const { html } = runViewWithOutcome(runData({ status: "completed", stage: "completed", error_code: null, report }));
+  assert.match(html, /REPORT[\s\S]*<details[^>]*>[\s\S]*Ideas that did not pass the evidence rules \(3\)/);
+  assert.doesNotMatch(html, /why nothing passed/);
+});
+
+test("the demo outcome is fixed sample data, rendered without outbound links", async () => {
+  const { demoOutcome } = await import("../lib/demo-data.ts");
+  assert.ok(researchCore.outcomeSchema.safeParse(demoOutcome).success, "the demo outcome is a valid outcome");
+  assert.deepEqual(demoOutcome.suggestions, researchCore.outcomeSuggestions(demoOutcome.candidates.map(c => c.reason), demoOutcome.mode), "its suggestions follow the live rules");
+  assert.ok(demoOutcome.candidates.every(c => c.sources.every(s => new URL(s.url).hostname.endsWith(".example"))), "sample sources use reserved .example domains");
+  const { outcomeModule } = runViewWithOutcome(runData());
+  const html = renderToStaticMarkup(createElement(outcomeModule.DemoOutcome, { outcome: demoOutcome }));
+  assert.doesNotMatch(html, /href="https?:/, "no outbound links in the demo");
+  assert.match(html, /href="\/research\/new"/, "the rerun link stays inside the workspace (WorkspaceLink adds /demo)");
+  assert.match(html, /Appointment reminders for independent physiotherapy clinics/);
+});
+
 test("a failed run says whether its slot was returned, from the server's refund decision", () => {
   const render = quota_released => {
     const data = { id: "run", status: "failed", stage: "classification", error_code: "INVALID_OUTPUT", retry_count: 0, quota_released, model: { provider: "dashscope-beijing", model: "qwen3.8-flash", planned: false, used: ["qwen3.8-flash"] }, configuration: { brief: { name: "Test" } }, report: null, steps: [{ stage_key: "discovery" }], usage: { estimated_usd: 0.04, committed_usd: 0.04, budget_usd: 0.25, uncertain_calls: 0, input_tokens: 1, output_tokens: 1, search_requests: 1 } };
@@ -588,6 +758,7 @@ test("a failed run says whether its slot was returned, from the server's refund 
       "@/components/shared": { PageHeader: ({ title }) => createElement("h1", null, title) },
       "@/components/demo-provider": { useDemo: () => ({ refresh: async () => undefined }) },
       "@/components/research-report": { ResearchReportView: () => null },
+    "@/components/research-outcome": { ResearchOutcomeView: () => null },
       // The real model badge, so the rendered model and provider names are checked.
       "@/components/model-tag": loadModule("../components/model-tag.tsx", { "@/components/ui/badge": { Badge: ({ children, ...props }) => createElement("span", props, children) }, "@/lib/research-models": models, "@/i18n/use-copy": { useCopy: () => (text, values = {}) => text.replace(/\{(\w+)\}/g, (_match, key) => values[key] ?? key) } }),
       "@/lib/research-core": researchCore, "@/lib/research-models": models,
@@ -688,7 +859,7 @@ test("dispatch falls back to a plain start when the deployment does not support 
   const row = { status: "pending", workflow_id: null, retry_count: 0 };
   const starts = [];
   const service = loadModule("../lib/research-service.ts", {
-    "server-only": {},
+    "server-only": {}, "@/lib/research-core": researchCore,
     "@/lib/provider-settings": {}, "@/lib/provider-settings-core": settingsCore, "@/lib/research-models": models, "@/lib/qwen-core": { QWEN_PROVIDER: "dashscope-beijing" }, "@/lib/research-fallback-core": fallbackCore,
     "workflow/api": { start: async (_workflow, _args, options) => {
       starts.push(options?.hook ? "hook" : "plain");
