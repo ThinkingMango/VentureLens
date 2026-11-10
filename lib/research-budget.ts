@@ -41,6 +41,19 @@ export const typicalRun = {
   schemaBytes: 2_000,
 } as const;
 
+/**
+ * Typical shape of a "Verify my idea" run (WP-05): one small structured call that only writes two search queries, two
+ * searches for the single candidate, and one batch each of classification (up to 8 sources), evaluation and review for
+ * one candidate. Estimated from the combined-run calibration; re-calibrate after real verify runs.
+ */
+export const typicalVerifyRun = {
+  discovery: { inputTokens: 900, outputTokens: 250, promptBytes: 2_200 },
+  searches: 2,
+  classification: { calls: 1, inputTokens: 7_000, outputTokens: 2_500, promptBytes: 28_000 },
+  evaluation: { calls: 1, inputTokens: 3_500, outputTokens: 1_600, promptBytes: 13_000 },
+  review: { calls: 1, inputTokens: 2_800, outputTokens: 800, promptBytes: 10_000 },
+} as const;
+
 const thinkingOverhead = { minimal: 0, low: 1_000, medium: 2_500, high: 4_000 } as const;
 function structuredOutputTokens(model: ResearchModelId, visible: number) {
   const thinking = researchModels[model].thinking;
@@ -58,8 +71,13 @@ export type RunCostEstimate = {
   peakStage: string;
 };
 
-/** Estimates what a complete run on one model costs and the budget it needs to finish. Estimates, not quotes. */
-export function estimateRunCost(model: ResearchModelId, at = new Date()): RunCostEstimate {
+/**
+ * Estimates what a complete run on one model costs and the budget it needs to finish. Estimates, not quotes.
+ * `mode` "verify" estimates a single-idea run; every other mode runs the eight-candidate pipeline.
+ */
+export function estimateRunCost(model: ResearchModelId, at = new Date(), mode = "combined"): RunCostEstimate {
+  const verify = mode === "verify";
+  const shape = verify ? typicalVerifyRun : typicalRun;
   const pricing = researchModelPricing(model, at);
   const provider = providerOf(model);
   const calls: { stage: string; reservation: number; actual: number }[] = [];
@@ -67,13 +85,14 @@ export function estimateRunCost(model: ResearchModelId, at = new Date()): RunCos
     const reservation = reservationFor(model, pricing, { promptBytes: shape.promptBytes, systemBytes: typicalRun.systemBytes, schemaBytes: typicalRun.schemaBytes, search: false }).usd;
     calls.push({ stage, reservation, actual: shape.inputTokens * pricing.input + structuredOutputTokens(model, shape.outputTokens) * pricing.output });
   };
-  structured("discovery", typicalRun.discovery);
-  for (let i = 1; i <= typicalRun.candidates; i++) {
+  structured("discovery", shape.discovery);
+  const searches = verify ? typicalVerifyRun.searches : typicalRun.candidates;
+  for (let i = 1; i <= searches; i++) {
     const reservation = reservationFor(model, pricing, { promptBytes: typicalRun.retrieval.promptBytes, search: true }).usd;
-    calls.push({ stage: `retrieval:c${i}`, reservation, actual: typicalRun.retrieval.inputTokens[provider] * pricing.input + researchModels[model].searchOutputTokens * pricing.output + typicalRun.retrieval.queries * pricing.search });
+    calls.push({ stage: verify ? (i === 1 ? "retrieval:c1" : "retrieval:c1:alt") : `retrieval:c${i}`, reservation, actual: typicalRun.retrieval.inputTokens[provider] * pricing.input + researchModels[model].searchOutputTokens * pricing.output + typicalRun.retrieval.queries * pricing.search });
   }
   for (const stage of ["classification", "evaluation", "review"] as const) {
-    for (let i = 0; i < typicalRun[stage].calls; i++) structured(`${stage}:batch:${i}`, typicalRun[stage]);
+    for (let i = 0; i < shape[stage].calls; i++) structured(`${stage}:batch:${i}`, shape[stage]);
   }
   let spent = 0;
   let requiredUsd = 0;
@@ -86,6 +105,6 @@ export function estimateRunCost(model: ResearchModelId, at = new Date()): RunCos
   return { model, expectedUsd: round(spent), requiredUsd: round(requiredUsd), peakStage };
 }
 
-export function fitsBudget(model: ResearchModelId, budgetUsd: number, at = new Date()) {
-  return estimateRunCost(model, at).requiredUsd <= budgetUsd;
+export function fitsBudget(model: ResearchModelId, budgetUsd: number, at = new Date(), mode = "combined") {
+  return estimateRunCost(model, at, mode).requiredUsd <= budgetUsd;
 }

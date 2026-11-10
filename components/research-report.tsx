@@ -27,6 +27,7 @@ const modes = {
   founder: "Founder-led discovery",
   market: "Market-led discovery",
   combined: "Founder + market discovery",
+  verify: "Idea check",
 };
 export function ResearchReportView({ report }: { report: ResearchReport }) {
   const copy = useCopy();
@@ -43,8 +44,21 @@ export function ResearchReportView({ report }: { report: ResearchReport }) {
     locale,
   );
   const evidenceCount = reportEvidenceCount(report.opportunities);
+  const supported = report.mode === "verify" ? report.opportunities[0] : undefined;
   return (
     <>
+      {supported && (
+        <section aria-labelledby="verify-verdict" className="surface flex flex-col gap-2 border-primary/40 bg-primary/5 p-5 sm:p-6">
+          <h2 id="verify-verdict" className="text-xl font-semibold text-primary">
+            {supported.confidence === "moderate"
+              ? copy("Supported by independent evidence (moderate confidence)")
+              : copy("Supported by independent evidence (limited confidence)")}
+          </h2>
+          <p className="max-w-prose text-sm leading-relaxed">
+            {copy("Independent sources describe the problem you named, so the idea passed the evidence rules. That is not proof that buyers will pay: the score compares evidence, it is not a chance of success. Test it with buyers next.")}
+          </p>
+        </section>
+      )}
       <section
         aria-labelledby="report-summary"
         className="surface flex flex-col gap-5 p-5 sm:p-6"

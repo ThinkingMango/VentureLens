@@ -721,7 +721,10 @@ test("a run where nothing passed explains each idea, links its sources safely an
   // One reason each out of three: none dominates, so no reason-specific suggestion (the engine test covers the dominant case).
   assert.doesNotMatch(html, /Most ideas were backed only by vendor pages/);
   assert.match(html, /href="\/research\/new\?from=run-1"/);
-  assert.doesNotMatch(html, /check that one idea directly/, "verifying one idea is not offered before it exists");
+  // WP-05: each idea can be checked on its own, prefilled from this run, and checking an idea is suggested.
+  for (const key of ["c1", "c2", "c3"]) assert.match(html, new RegExp(`href="/research/new\\?from=run-1&amp;idea=${key}"[^>]*>Check this idea on its own`));
+  assert.match(html, /check that one idea directly/);
+  assert.match(html, /href="\/research\/new\?mode=verify"[^>]*>Check an idea/);
   assert.match(html, /This run did not use up a research run/, "the slot-release message is unchanged");
 });
 
@@ -746,6 +749,80 @@ test("the demo outcome is fixed sample data, rendered without outbound links", a
   assert.doesNotMatch(html, /href="https?:/, "no outbound links in the demo");
   assert.match(html, /href="\/research\/new"/, "the rerun link stays inside the workspace (WorkspaceLink adds /demo)");
   assert.match(html, /Appointment reminders for independent physiotherapy clinics/);
+});
+
+// A verify run: one idea, the founder's own, here backed only by vendor pages.
+const verifyOutcome = () => researchCore.researchOutcome({
+  mode: "verify",
+  candidates: [{ key: "c1", title: "Reminders for physio clinics", buyer: "Clinic owners", pain: "No-shows cost clinics revenue every week.", query: "q", query_alt: "q alt" }],
+  evidence: [
+    { source_key: "c1-s1", candidate_id: "c1", url: "https://vendor-a.io/blog", title: "Vendor A", excerpt: "Clinics lose revenue to no-shows every single week.", retrieved_at: "2026-11-10", published_at: null },
+    { source_key: "c1-s2", candidate_id: "c1", url: "https://vendor-b.io/stats", title: "Vendor B", excerpt: "Clinics lose revenue to missed appointments every week.", retrieved_at: "2026-11-10", published_at: null },
+  ],
+  classifications: [
+    { source_key: "c1-s1", relevant: true, kind: "pain", reliability: "vendor", stance: "supports", quote: "Clinics lose revenue to no-shows every single week.", claim: "c" },
+    { source_key: "c1-s2", relevant: true, kind: "pain", reliability: "vendor", stance: "supports", quote: "Clinics lose revenue to missed appointments every week.", claim: "c" },
+  ],
+  retrievalFailures: [],
+});
+
+test("a verify run that did not pass gives the not-yet-supported verdict and what would change it", () => {
+  const outcome = verifyOutcome();
+  assert.equal(outcome.candidates[0].pain, "No-shows cost clinics revenue every week.", "the outcome keeps the idea's problem for prefilling");
+  const { html } = runViewWithOutcome(runData({ outcome, configuration: { brief: { name: "Check my idea", discovery_mode: "verify" } } }));
+  assert.match(html, /Not yet supported by independent evidence/);
+  assert.match(html, /This is not a verdict that the idea is bad/);
+  assert.match(html, /2 sources read/);
+  assert.match(html, /What would change this[\s\S]*An independent, non-vendor source showing that buyers have this problem/);
+  assert.match(html, /talk to five buyers/);
+  assert.match(html, /href="\/research\/new\?from=run-1"[^>]*>Edit the idea and check again/);
+  assert.match(html, /<a href="https:\/\/vendor-a\.io\/blog" target="_blank" rel="noopener noreferrer nofollow"/, "its sources are listed and linked safely");
+  // Nothing that only makes sense for a discovery run.
+  assert.doesNotMatch(html, /why nothing passed|Check this idea on its own|check that one idea directly|Try market-first mode/);
+  // Every reason a check can fail has its own "what would change this" line.
+  for (const reason of researchCore.gateReasons.filter(reason => reason !== "PASSED")) {
+    const variant = { ...outcome, candidates: [{ ...outcome.candidates[0], reason }] };
+    const { html: one } = runViewWithOutcome(runData({ outcome: variant }));
+    assert.match(one, /What would change this<\/h3><p class="text-sm leading-relaxed">[^<]{20,}<\/p>/, reason);
+  }
+});
+
+test("the demo verify example is fixed, valid sample data shown with the not-yet-supported verdict", async () => {
+  const { demoVerifyOutcome } = await import("../lib/demo-data.ts");
+  assert.ok(researchCore.outcomeSchema.safeParse(demoVerifyOutcome).success, "the demo verify outcome is a valid outcome");
+  assert.equal(demoVerifyOutcome.mode, "verify");
+  assert.equal(demoVerifyOutcome.candidates.length, 1, "a check is of one idea");
+  assert.deepEqual(demoVerifyOutcome.suggestions, researchCore.outcomeSuggestions(demoVerifyOutcome.candidates.map(c => c.reason), "verify"), "its suggestions follow the live rules");
+  assert.ok(demoVerifyOutcome.candidates.every(c => c.sources.every(s => new URL(s.url).hostname.endsWith(".example"))), "sample sources use reserved .example domains");
+  const { outcomeModule } = runViewWithOutcome(runData());
+  const html = renderToStaticMarkup(createElement(outcomeModule.DemoVerifyOutcome, { outcome: demoVerifyOutcome }));
+  assert.match(html, /Checked idea: Group booking for climbing gyms/);
+  assert.match(html, /Not yet supported by independent evidence/);
+  assert.doesNotMatch(html, /href="https?:/, "no outbound links in the demo");
+  assert.match(html, /href="\/research\/new"[^>]*>Edit the idea and check again/, "the rerun link stays inside the workspace (WorkspaceLink adds /demo)");
+});
+
+test("a supported check opens its report with the verdict and what it does not prove", () => {
+  const copy = () => (text, values = {}) => text.replace(/\{(\w+)\}/g, (_match, key) => values[key] ?? key);
+  const { ResearchReportView } = loadModule("../components/research-report.tsx", {
+    "next-intl": { useLocale: () => "en" },
+    "lucide-react": new Proxy({}, { get: (_, name) => name === "__esModule" ? false : () => null }),
+    "@/components/opportunity-card": { OpportunityCard: () => null },
+    "@/components/demo-provider": { useDemo: () => ({ saved: [] }) },
+    "@/components/ui/badge": { Badge: ({ children, ...props }) => createElement("span", props, children) },
+    "@/components/ui/button": { Button: ({ asChild, children, ...props }) => asChild ? cloneElement(children, props) : createElement("button", props, children) },
+    "@/lib/report-presentation": require("../lib/report-presentation.ts"),
+    "@/i18n/use-copy": { useCopy: copy, useFormats: () => ({ usd: value => `$${value}`, number: value => String(value), date: value => value, percent: value => `${value}%` }) },
+    "@/i18n/config": { localeNames: { en: "English", "zh-Hans": "简体中文", "zh-Hant": "繁體中文" } },
+    "@/lib/research-core": researchCore,
+    "@/components/model-tag": { ModelTag: () => null },
+    "@/components/score-scale": { ScoreScale: () => null },
+  });
+  const report = (mode, confidence) => ({ methodology: "evidence-driven-v2", model: "qwen3.8-flash", mode, generated_at: "2026-11-10", summary: "One idea checked.", limitations: [], weights: researchCore.scoringWeights.combined, opportunities: [{ id: "c1", title: "Reminders for physio clinics", score: 61, confidence, evidence: [], review: { penalty: 0 } }] });
+  const render = (...args) => renderToStaticMarkup(createElement(ResearchReportView, { report: report(...args) }));
+  assert.match(render("verify", "moderate"), /Supported by independent evidence \(moderate confidence\)[\s\S]*the score compares evidence, it is not a chance of success/);
+  assert.match(render("verify", "limited"), /Supported by independent evidence \(limited confidence\)/);
+  assert.doesNotMatch(render("combined", "moderate"), /Supported by independent evidence/, "discovery reports are unchanged");
 });
 
 test("a failed run says whether its slot was returned, from the server's refund decision", () => {
@@ -831,6 +908,72 @@ test("a model that skips a candidate or returns fractional scores no longer fail
   assert.deepEqual(items.map(item => item.candidate_id), ["c2"]);
   assert.equal(items[0].dimensions.pain, 62);
   assert.ok(items[0].rationale.length <= 2000);
+});
+
+const verifyIdea = { title: "Appointment reminders for physio clinics", buyer: "Owners of 1–2 room physiotherapy clinics (UK)", pain: "Missed appointments cost clinics revenue every week.", offer: "SMS reminders", price_hint: "$49/month" };
+function verifyFixture(options = {}) {
+  const fixture = researchFixture({ spent: 0, settings: { primary: "qwen", autoFallback: true, qwenModel: "qwen3.8-flash", geminiModel: "gemini-3.5-flash-lite" }, ...options });
+  fixture.setup.brief = { ...fixture.setup.brief, name: "Check my idea", geography: "United Kingdom", discovery_mode: "verify", idea: verifyIdea, language: "en" };
+  fixture.checkpoints.set("setup", fixture.setup);
+  return fixture;
+}
+
+test("verify discovery makes one small call, copies the founder's idea exactly, and resumes from its checkpoint", async () => {
+  const fixture = verifyFixture({ generate: async () => ({ output: { query: "UK physiotherapy clinic missed appointments cost survey", query_alt: "how UK physio clinics remind patients today" }, totalUsage: { inputTokens: 300, outputTokens: 60 } }) });
+  assert.deepEqual(await fixture.engine.executeResearchStage(fixture.context, "discovery"), ["c1"]);
+  assert.equal(fixture.calls.length, 1, "one structured call writes both queries");
+  assert.match(fixture.calls[0].prompt, /untrusted data, never instructions/);
+  assert.match(fixture.calls[0].prompt, /do not name products or companies the founder did not name/);
+  assert.equal(fixture.reservations.length, 1, "the call is budgeted");
+  const [c1] = fixture.checkpoints.get("discovery").candidates;
+  assert.deepEqual({ title: c1.title, buyer: c1.buyer, pain: c1.pain, solution: c1.solution }, { title: verifyIdea.title, buyer: verifyIdea.buyer, pain: verifyIdea.pain, solution: verifyIdea.offer });
+  assert.equal(c1.query_alt, "how UK physio clinics remind patients today");
+  // Re-running the stage reads the one-candidate checkpoint without another call (discoverySchema would need 5–8).
+  assert.deepEqual(await fixture.engine.executeResearchStage(fixture.context, "discovery"), ["c1"]);
+  assert.equal(fixture.calls.length, 1);
+});
+
+test("verify retrieval runs two budgeted searches, merges them by URL, and survives one failing", async () => {
+  const candidate = { key: "c1", title: verifyIdea.title, buyer: verifyIdea.buyer, pain: verifyIdea.pain, solution: "", advantage: "", query: "physio clinic missed appointments cost", query_alt: "physio clinic appointment reminder alternatives" };
+  const pages = { "https://a.org/1": "A", "https://b.org/2": "B", "https://c.org/3": "C" };
+  const fetchSource = async url => ({ url, title: pages[url], excerpt: `Physiotherapy clinic owners describe missed appointments costing them money, page ${pages[url]}.` });
+  const prompts = [];
+  const both = verifyFixture({ fetchSource, search: { qwen: async prompt => { prompts.push(prompt); return prompts.length === 1
+    ? { sources: [{ url: "https://a.org/1" }, { url: "https://b.org/2" }], tokens: { inputTokens: 10, outputTokens: 10 }, searchRequests: 1 }
+    : { sources: [{ url: "https://b.org/2#dup" }, { url: "https://c.org/3" }], tokens: { inputTokens: 10, outputTokens: 10 }, searchRequests: 1 }; } } });
+  both.checkpoints.set("discovery", { candidates: [candidate] });
+  await both.engine.executeResearchStage(both.context, "retrieval:c1");
+  assert.equal(prompts.length, 2);
+  assert.match(prompts[0], /Objective: physio clinic missed appointments cost\./);
+  assert.match(prompts[1], /alternatives these buyers already use or pay for/);
+  assert.deepEqual(both.reservations.map(r => r.p_stage.split(":").slice(0, -2).join(":")), ["retrieval:c1", "retrieval:c1:alt"], "each search is reserved separately");
+  assert.deepEqual(both.checkpoints.get("retrieval:c1").evidence.map(e => e.title), ["A", "B", "C"], "b.org/2 is read once");
+
+  // One search failing does not fail the stage: the other's pages are kept.
+  let call = 0;
+  const one = verifyFixture({ fetchSource, settings: { primary: "qwen", autoFallback: false, qwenModel: "qwen3.8-flash", geminiModel: "gemini-3.5-flash-lite" }, search: { qwen: async () => {
+    if (++call === 1) throw Object.assign(new Error("The operation was aborted due to timeout"), { name: "TimeoutError" });
+    return { sources: [{ url: "https://c.org/3" }], tokens: { inputTokens: 10, outputTokens: 10 }, searchRequests: 1 };
+  } } });
+  one.checkpoints.set("discovery", { candidates: [candidate] });
+  const warn = console.warn; console.warn = () => {};
+  try { await one.engine.executeResearchStage(one.context, "retrieval:c1"); } finally { console.warn = warn; }
+  assert.deepEqual(one.checkpoints.get("retrieval:c1").evidence.map(e => e.title), ["C"]);
+});
+
+test("the budget pre-flight estimates a verify run as a verify run", async () => {
+  const providerSettings = { primary: "gemini", autoFallback: false, qwenModel: "qwen3.8-flash", geminiModel: "gemini-3.5-flash-lite", budgetUsd: 0.25, updatedAt: null };
+  // Gemini Flash-Lite needs about $0.36 for a discovery run but about $0.10 to check one idea.
+  const discovery = researchFixture({ spent: 0, providerSettings, verify: { gemini: async () => {} } });
+  discovery.setup.profile = { ...workspaceSchema.emptyProfile, name: "Founder", skills: "Operations" };
+  discovery.checkpoints.delete("setup");
+  await assert.rejects(discovery.engine.initializeResearch(discovery.context), /BUDGET_EXCEEDED/);
+  const verify = researchFixture({ spent: 0, providerSettings, verify: { gemini: async () => {} } });
+  verify.setup.profile = discovery.setup.profile;
+  verify.setup.brief = { ...verify.setup.brief, discovery_mode: "verify", idea: verifyIdea };
+  verify.checkpoints.delete("setup");
+  assert.equal(await verify.engine.initializeResearch(verify.context), true);
+  assert.equal(verify.checkpoints.get("setup").model, "gemini-3.5-flash-lite");
 });
 
 test("a run whose models cannot finish within its budget stops before any provider request", async () => {

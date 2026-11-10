@@ -38,6 +38,15 @@ export function ResearchLibrary() {
             date: copy("Sample research history"),
           },
           {
+            id: "demo-verify",
+            target: "/research/verify-example",
+            status: "Not yet supported",
+            title: copy("Checked idea: Group booking for climbing gyms"),
+            sectors: ["Travel & hospitality"] as readonly string[],
+            count: 0,
+            date: copy("Sample research history"),
+          },
+          {
             id: "demo-no-result",
             target: "/research/no-result",
             status: "Nothing passed",

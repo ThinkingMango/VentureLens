@@ -134,6 +134,7 @@ export function AdminProviders({ initialData }: { initialData: ProviderSettingsR
                     {plan.fallback ? <><ArrowRight className="size-4 text-muted-foreground" aria-hidden="true" />{researchModels[selectedModel(plan.fallback, settings)].name}</> : <span className="text-sm font-normal text-muted-foreground">· {t("noFallback")}</span>}
                   </p>
                   <p className="text-sm text-muted-foreground">{t("costEstimate", { expected: formats.usd(estimates.primary.expectedUsd, 2), required: formats.usd(estimates.primary.requiredUsd, 2) })}</p>
+                  <p className="text-sm text-muted-foreground">{t("verifyEstimate", { expected: formats.usd(estimates.verify.primary.expectedUsd, 2), required: formats.usd(estimates.verify.primary.requiredUsd, 2) })}</p>
                   {!primaryFits && <p className="text-sm font-medium text-destructive">{t("budgetTooLow", { model: researchModels[estimates.primary.model].name, required: formats.usd(estimates.primary.requiredUsd, 2) })}</p>}
                   {primaryFits && !fallbackFits && estimates.fallback && <p className="text-sm text-muted-foreground">{t("fallbackOverBudget", { model: researchModels[estimates.fallback.model].name, required: formats.usd(estimates.fallback.requiredUsd, 2) })}</p>}
                   <p className="text-sm text-muted-foreground">{t("fallbackLimit")}</p>

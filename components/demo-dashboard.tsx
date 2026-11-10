@@ -35,12 +35,20 @@ export function DemoDashboard() {
           { name: profile.name },
         )}
       >
-        <Button asChild>
-          <Link href="/research/new">
-            <Plus />
-            {copy("New research")}
-          </Link>
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild variant="outline">
+            <Link href="/research/new?mode=verify">
+              <Lightbulb />
+              {copy("Check an idea")}
+            </Link>
+          </Button>
+          <Button asChild>
+            <Link href="/research/new">
+              <Plus />
+              {copy("New research")}
+            </Link>
+          </Button>
+        </div>
       </PageHeader>
       <div>
         <section

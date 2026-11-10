@@ -25,6 +25,12 @@ const stageHints: Record<string, string> = {
   review: "Running an adversarial critique that can reject ideas or deduct points.",
   finalizing: "Saving the report and linked sources to your workspace.",
 };
+// A "Verify my idea" check has one candidate: the founder's own idea.
+const verifyStageHints: Record<string, string> = {
+  discovery: "Writing two searches for your idea: one for the problem, one for the alternatives buyers use.",
+  retrieval: "Searching the web for evidence of the problem, what buyers spend, and the alternatives they use.",
+  evaluation: "Estimating buyer, pricing, cost, and risk for your idea if the evidence is strong enough.",
+};
 const stages = [
   "discovery",
   "retrieval",
@@ -64,6 +70,7 @@ export function ResearchRunView({
     },
   });
   const active = ["pending", "running"].includes(data.status);
+  const verifying = data.configuration.brief.discovery_mode === "verify";
   const completed = data.status === "completed" && !!data.report;
   const ExecutionContainer = completed ? "details" : "section";
   const index = stages.indexOf(data.stage);
@@ -206,8 +213,10 @@ export function ResearchRunView({
           </div>
           {active && (
             <p className="max-w-prose text-sm leading-relaxed text-muted-foreground">
-              {copy(stageHints[data.stage] ?? stageHints.queued)}{" "}
-              {copy("A full run usually takes 5–10 minutes. You can leave this page; progress is saved on the server.")}
+              {copy((verifying ? verifyStageHints[data.stage] : undefined) ?? stageHints[data.stage] ?? stageHints.queued)}{" "}
+              {verifying
+                ? copy("A check usually takes about 2–3 minutes (an estimate until enough checks have run). You can leave this page; progress is saved on the server.")
+                : copy("A full run usually takes 5–10 minutes. You can leave this page; progress is saved on the server.")}
             </p>
           )}
           <ol className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

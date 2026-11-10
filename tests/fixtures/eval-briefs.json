@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "notes": "Fixed briefs for scripts/research-eval.mjs (spec WP-01 §3). Covers every discovery mode, all three report languages and 16 target markets. Five 'verify my idea' briefs are added after WP-05. Changing a brief changes what the evaluation measures: add new briefs rather than editing old ones, so results stay comparable.",
+  "notes": "Fixed briefs for scripts/research-eval.mjs (spec WP-01 §3). Covers every discovery mode, all three report languages and 16 target markets. b25–b29 are 'verify my idea' briefs (added with WP-05). Changing a brief changes what the evaluation measures: add new briefs rather than editing old ones, so results stay comparable.",
   "profile": {
     "name": "Evaluation founder",
     "role": "Independent professional",
@@ -397,6 +397,121 @@
         "context": "創業者曾為非營利組織撰寫資助申請。",
         "discovery_mode": "founder",
         "language": "zh-Hant"
+      }
+    },
+    {
+      "id": "b25",
+      "brief": {
+        "name": "Appointment reminders for physiotherapy clinics",
+        "sectors": [
+          "Healthcare"
+        ],
+        "models": [
+          "B2B subscription"
+        ],
+        "geography": "United Kingdom",
+        "context": "Only independent clinics, not hospital groups.",
+        "discovery_mode": "verify",
+        "language": "en",
+        "idea": {
+          "title": "Appointment reminders for physiotherapy clinics",
+          "buyer": "Owners of one- or two-room physiotherapy clinics",
+          "pain": "Missed appointments cost them revenue every week, and calling patients takes the front desk hours.",
+          "offer": "Automatic SMS and WhatsApp reminders with one-tap rescheduling",
+          "price_hint": "£39 a month per clinic"
+        }
+      }
+    },
+    {
+      "id": "b26",
+      "brief": {
+        "name": "Group booking for climbing gyms",
+        "sectors": [
+          "Travel & hospitality"
+        ],
+        "models": [
+          "B2B subscription"
+        ],
+        "geography": "Germany",
+        "context": "",
+        "discovery_mode": "verify",
+        "language": "en",
+        "idea": {
+          "title": "Group booking for climbing gyms",
+          "buyer": "Owners of independent climbing gyms",
+          "pain": "School and company group bookings arrive by email and phone, and staff spend hours matching dates, instructors and waivers.",
+          "offer": "",
+          "price_hint": ""
+        }
+      }
+    },
+    {
+      "id": "b27",
+      "brief": {
+        "name": "社区团购团长的对账工具",
+        "sectors": [
+          "Retail & e-commerce"
+        ],
+        "models": [
+          "B2B subscription"
+        ],
+        "geography": "Mainland China",
+        "context": "重点看二三线城市的团长。",
+        "discovery_mode": "verify",
+        "language": "zh-Hans",
+        "idea": {
+          "title": "社区团购团长的对账工具",
+          "buyer": "二三线城市的社区团购团长",
+          "pain": "每天要在多个平台和微信群之间手工核对订单、退款和佣金，经常算错，月底对账要花好几个晚上。",
+          "offer": "自动汇总各平台订单与佣金的对账小程序",
+          "price_hint": "每月 30 元"
+        }
+      }
+    },
+    {
+      "id": "b28",
+      "brief": {
+        "name": "外贸小工厂的报关单据整理",
+        "sectors": [
+          "Manufacturing & engineering"
+        ],
+        "models": [
+          "Productized service"
+        ],
+        "geography": "Southeast Asia",
+        "context": "",
+        "discovery_mode": "verify",
+        "language": "zh-Hans",
+        "idea": {
+          "title": "外贸小工厂的报关单据整理服务",
+          "buyer": "在越南设厂、员工不足 100 人的中资外贸工厂",
+          "pain": "报关和原产地证明的单据要求经常变化，工厂靠一两个文员手工准备，出错就会导致货物滞留港口。",
+          "offer": "",
+          "price_hint": ""
+        }
+      }
+    },
+    {
+      "id": "b29",
+      "brief": {
+        "name": "補習社的家長溝通平台",
+        "sectors": [
+          "Education"
+        ],
+        "models": [
+          "B2B subscription"
+        ],
+        "geography": "Hong Kong",
+        "context": "只看學生人數少於 200 人的補習社。",
+        "discovery_mode": "verify",
+        "language": "zh-Hant",
+        "idea": {
+          "title": "補習社的家長溝通平台",
+          "buyer": "學生人數少於 200 人的香港補習社負責人",
+          "pain": "上課通知、請假補課和學費提醒都靠 WhatsApp 逐個家長發送，行政人員每週要花大量時間，還常有遺漏。",
+          "offer": "集中發送通知、處理請假補課與學費提醒的平台",
+          "price_hint": "每月 400 港元"
+        }
       }
     }
   ]
