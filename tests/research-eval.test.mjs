@@ -55,11 +55,15 @@ test("the session stops before a run that could take spend past the cap", () => 
   assert.equal(canStartNext(0.3, 0.25, 0.5), false);
 });
 
-test("the fixture covers every mode, all three languages and at least six markets, and every brief is valid", () => {
+test("the fixture covers every mode including verify, all three languages and at least six markets, and every brief is valid", () => {
   const { profile, briefs } = loadFixture(fixturePath);
   assert.ok(profile.name);
   assert.ok(briefs.length >= 20 && briefs.length <= 30, `${briefs.length} briefs`);
-  assert.deepEqual([...new Set(briefs.map(b => b.brief.discovery_mode))].sort(), ["combined", "founder", "market"]);
+  assert.deepEqual([...new Set(briefs.map(b => b.brief.discovery_mode))].sort(), ["combined", "founder", "market", "verify"]);
+  const verify = briefs.filter(b => b.brief.discovery_mode === "verify");
+  assert.ok(verify.length >= 5, "at least five verify-my-idea briefs (WP-05)");
+  assert.ok(verify.every(b => b.brief.idea), "every verify brief carries the founder's idea");
+  assert.deepEqual([...new Set(verify.map(b => b.brief.language))].sort(), ["en", "zh-Hans", "zh-Hant"]);
   assert.deepEqual([...new Set(briefs.map(b => b.brief.language))].sort(), ["en", "zh-Hans", "zh-Hant"]);
   assert.ok(new Set(briefs.map(b => b.brief.geography)).size >= 6);
   assert.equal(new Set(briefs.map(b => b.id)).size, briefs.length, "ids are unique");

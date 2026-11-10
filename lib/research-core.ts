@@ -87,6 +87,20 @@ export const candidateSchema = z.object({
   query: z.string().min(10).max(300),
 });
 export const discoverySchema = z.object({ candidates: z.array(candidateSchema).min(5).max(8) });
+/**
+ * Verify mode (WP-05): exactly one candidate, c1, built from the founder's own idea. Title, buyer and pain are the
+ * founder's text; solution is their optional offer (possibly empty) and advantage is left empty, since the evaluation
+ * scores advantage from the founder profile. `query_alt` searches for the alternatives buyers already use or pay for.
+ */
+export const verifyCandidateSchema = candidateSchema.extend({
+  key: z.literal("c1"), solution: z.string().max(800), advantage: z.string().max(800),
+  query_alt: z.string().min(10).max(300),
+});
+export const verifyDiscoverySchema = z.object({ candidates: z.array(verifyCandidateSchema).length(1) });
+/** The schema a stored discovery checkpoint is read with: verify runs hold one candidate, other modes 5–8. */
+export function discoveryCheckpointSchema(mode: Mode) {
+  return mode === "verify" ? verifyDiscoverySchema : discoverySchema;
+}
 export type Candidate = z.infer<typeof candidateSchema>;
 export const evidenceSchema = z.object({
   source_key: z.string(), candidate_id: z.string(), url: z.string().url(),
@@ -133,6 +147,10 @@ export const discoveryDraftSchema = z.object({ candidates: z.array(z.object({
   buyer: prose(800), pain: prose(800), solution: prose(800), advantage: prose(800),
   query: z.string().min(1).describe("Web-search string in the language the prompt names, 10–300 characters."),
 })).min(1).describe("Exactly 8 candidates.") });
+export const verifyDiscoveryDraftSchema = z.object({
+  query: z.string().min(1).describe("Web-search string for evidence of the buyer's problem and existing spending, 10–300 characters."),
+  query_alt: z.string().min(1).describe("Web-search string for the alternatives buyers already use or pay for, 10–300 characters."),
+});
 export const classificationDraftSchema = z.object({ items: z.array(classificationItemSchema.extend({
   quote: z.string().describe("Copied verbatim from the excerpt, 12–500 characters."), claim: prose(800),
 })) });
@@ -184,6 +202,30 @@ export function normalizeDiscovery(draft: z.infer<typeof discoveryDraftSchema>):
   if (candidates.length < 5) throw new Error("INVALID_OUTPUT");
   return discoverySchema.parse({ candidates });
 }
+/**
+ * Builds the verify run's single candidate. The founder's title, buyer and pain are copied exactly as entered (the
+ * brief schema has already trimmed them); only the two search queries come from the model, and a query that is
+ * missing or too short falls back to the founder's own words.
+ */
+export function normalizeVerifyDiscovery(draft: z.infer<typeof verifyDiscoveryDraftSchema>, idea: { title: string; buyer: string; pain: string; offer?: string }): z.infer<typeof verifyDiscoverySchema> {
+  const query = clipText(draft.query ?? "", 300);
+  const alt = clipText(draft.query_alt ?? "", 300);
+  return verifyDiscoverySchema.parse({ candidates: [{
+    key: "c1", title: idea.title, buyer: idea.buyer, pain: idea.pain, solution: idea.offer ?? "", advantage: "",
+    query: query.length >= 10 ? query : clipText(`${idea.title} ${idea.buyer}`, 300),
+    query_alt: alt.length >= 10 ? alt : clipText(idea.pain, 300),
+  }] });
+}
+/** Joins the source lists of several searches, keeping the first copy of each safe URL, in search order. */
+export function mergeSearchSources<T extends { url: string }>(...lists: T[][]): T[] {
+  const seen = new Set<string>();
+  return lists.flat().filter(item => {
+    const url = safeSourceUrl(item.url);
+    if (!url || seen.has(url)) return false;
+    seen.add(url);
+    return true;
+  });
+}
 export function normalizeClassification(draft: z.infer<typeof classificationDraftSchema>, sourceKeys: string[]): z.infer<typeof classificationSchema> {
   // A source the model skipped stays unclassified, which keeps it out of the evidence gate.
   return classificationSchema.parse({ items: matchIds(sourceKeys, draft.items, item => item.source_key).map(item => ({
@@ -217,11 +259,13 @@ export function normalizeReview(draft: z.infer<typeof reviewDraftSchema>, candid
     penalty: clampInt(item.penalty, 0, REVIEW_MAX_PENALTY), falsification: clipText(item.falsification, 800),
   })) };
 }
-export type Mode = "founder" | "market" | "combined";
+export type Mode = "founder" | "market" | "combined" | "verify";
 export const scoringWeights = {
   founder: { pain: 0.25, demand: 0.15, economics: 0.15, feasibility: 0.2, advantage: 0.25 },
   market: { pain: 0.3, demand: 0.3, economics: 0.2, feasibility: 0.2, advantage: 0 },
   combined: { pain: 0.25, demand: 0.25, economics: 0.2, feasibility: 0.15, advantage: 0.15 },
+  // Checking one idea weighs it like combined discovery: buyer evidence first, founder fit second.
+  verify: { pain: 0.25, demand: 0.25, economics: 0.2, feasibility: 0.15, advantage: 0.15 },
 } as const;
 export function safeSourceUrl(value: string): string | null {
   try {
@@ -368,7 +412,9 @@ const diagnosisSourceSchema = z.object({
 });
 export const candidateDiagnosisSchema = z.object({
   key: z.string(), title: z.string(), buyer: z.string(), query: z.string(),
-  sources: z.array(diagnosisSourceSchema).max(10),
+  /** The candidate's pain, so "Check this idea" can prefill the verify form. Outcomes saved before WP-05 have none. */
+  pain: z.string().optional(),
+  sources: z.array(diagnosisSourceSchema).max(16),
   supportingDomains: z.number().int().min(0), nonVendorSupport: z.boolean(), contradicting: z.number().int().min(0),
   reason: z.enum(gateReasons),
 });
@@ -376,7 +422,7 @@ export type CandidateDiagnosis = z.infer<typeof candidateDiagnosisSchema>;
 /** The `outcome` checkpoint: what was searched, what was found, why each candidate passed or not, and what to try next. */
 export const outcomeSchema = z.object({
   version: z.literal(OUTCOME_VERSION),
-  mode: z.enum(["founder", "market", "combined"]),
+  mode: z.enum(["founder", "market", "combined", "verify"]),
   counts: z.object({ candidates: z.number().int().min(0), sources: z.number().int().min(0), passed: z.number().int().min(0) }),
   candidates: z.array(candidateDiagnosisSchema).max(8),
   suggestions: z.array(z.enum(suggestionKeys)),
@@ -385,7 +431,7 @@ export type ResearchOutcome = z.infer<typeof outcomeSchema>;
 
 /** One diagnosis per candidate, in discovery order. Uses gateInputs, so it always agrees with evidenceGate. */
 export function diagnoseCandidates(input: {
-  candidates: Pick<Candidate, "key" | "title" | "buyer" | "query">[];
+  candidates: (Pick<Candidate, "key" | "title" | "buyer" | "query"> & { pain?: string })[];
   evidence: Evidence[];
   classifications: Classification[];
   /** The review stage's items; omit before review has run. */
@@ -408,8 +454,8 @@ export function diagnoseCandidates(input: {
       : review.reject ? "REVIEW_REJECTED"
       : "PASSED";
     return {
-      key: candidate.key, title: candidate.title, buyer: candidate.buyer, query: candidate.query,
-      sources: own.slice(0, 10).map(source => {
+      key: candidate.key, title: candidate.title, buyer: candidate.buyer, query: candidate.query, ...(candidate.pain ? { pain: candidate.pain } : {}),
+      sources: own.slice(0, 16).map(source => {
         const classification = grounded.get(source.source_key);
         const safe = safeSourceUrl(source.url);
         return { url: safe ?? "", title: clipText(source.title, 300), domain: safe ? registrableDomain(safe) : null, reliability: classification?.reliability ?? null, stance: classification?.stance ?? null, relevant: classification ? classification.relevant : null };

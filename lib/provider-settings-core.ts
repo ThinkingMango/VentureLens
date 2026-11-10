@@ -57,6 +57,11 @@ export function runCostEstimates(settings: ProviderSettings, at = new Date()) {
   return {
     primary: estimateRunCost(selectedModel(plan.primary, settings), at),
     fallback: plan.fallback ? estimateRunCost(selectedModel(plan.fallback, settings), at) : undefined,
+    // "Verify my idea" runs are smaller; shown beside the discovery estimate on the admin page.
+    verify: {
+      primary: estimateRunCost(selectedModel(plan.primary, settings), at, "verify"),
+      fallback: plan.fallback ? estimateRunCost(selectedModel(plan.fallback, settings), at, "verify") : undefined,
+    },
   };
 }
 

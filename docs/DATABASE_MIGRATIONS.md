@@ -42,7 +42,11 @@ After this change `supabase migration list` shows local and remote in sync, and 
 
 ## Written but not yet applied
 
-None. When a pull request adds a migration, list it here until it is applied, and apply it only with the owner's approval. If `apply_migration` assigns a different version, rename the file to that version before merging. Merging to `main` can apply a migration to production: the Supabase integration applied `20261109150000`, `20261109160000` and `20261110120000` that way.
+| Version | Name | File | Pull request | Notes |
+|---|---|---|---|---|
+| `20261110130000` | `verify_mode` | `supabase/migrations/20261110130000_verify_mode.sql` | WP-05 | Adds `research_projects.idea` (jsonb, at most 4000 bytes) and `verify` to the `discovery_mode` check, with a check that an idea is present exactly when the mode is `verify`. Recreates `enqueue_research` (stores the idea) and `record_run_lifecycle_event` (accepts `verify`, records `verify_started`). Additive: existing rows already satisfy the new checks. Tested in `tests/verify-mode.sql.test.mjs`. **Merging the PR applies it to production.** |
+
+When a pull request adds a migration, list it here until it is applied, and apply it only with the owner's approval. If `apply_migration` assigns a different version, rename the file to that version before merging. Merging to `main` can apply a migration to production: the Supabase integration applied `20261109150000`, `20261109160000` and `20261110120000` that way.
 
 ## Rules going forward
 

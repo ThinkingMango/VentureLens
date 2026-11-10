@@ -156,7 +156,7 @@ function loadModule(file, dependencies) {
   new Function("require", "exports", "module", "process", outputText)(dependency, module.exports, module, { env: {} });
   return module.exports;
 }
-function renderForm({ projects = [], industry = "Healthcare", isDemo = false, run = { ...emptyBrief } } = {}) {
+function renderForm({ projects = [], industry = "Healthcare", isDemo = false, run = { ...emptyBrief }, search = "", initialBrief } = {}) {
   const t = createTranslator({ locale: "zh-Hant", messages: catalogs["zh-Hant"], namespace: "ui" });
   const missing = [];
   const copy = (source, values) => { const key = messageKey(source); if (catalogs["zh-Hant"].ui[key]) return t(key, values); missing.push(source); return source; };
@@ -166,7 +166,7 @@ function renderForm({ projects = [], industry = "Healthcare", isDemo = false, ru
     "@/i18n/use-copy": { useCopy: () => copy },
     "@/i18n/errors": { feedbackSource: code => code },
     "@/lib/api-client": { postJson: async () => ({}), ApiNetworkError: Error },
-    "next/navigation": { useRouter: () => ({ push: () => {}, refresh: () => {} }) },
+    "next/navigation": { useRouter: () => ({ push: () => {}, refresh: () => {} }), useSearchParams: () => new URLSearchParams(search) },
     "next-intl": { useLocale: () => "zh-Hant" },
     "@/i18n/config": { localeNames: { en: "English", "zh-Hans": "简体中文", "zh-Hant": "繁體中文" } },
     "@/components/workspace-link": { default: ({ href, children }) => createElement("a", { href }, children) },
@@ -177,8 +177,9 @@ function renderForm({ projects = [], industry = "Healthcare", isDemo = false, ru
     "@/components/ui/field": new Proxy({}, { get: (_, name) => name === "__esModule" ? false : pass(name === "FieldLabel" ? "label" : "div") }),
     "@/lib/research-options": options,
     "@/lib/research-core": researchCore,
+    "@/lib/workspace-schema": workspaceSchema,
   });
-  return { html: renderToStaticMarkup(createElement(ResearchConfig)), missing };
+  return { html: renderToStaticMarkup(createElement(ResearchConfig, { initialBrief })), missing };
 }
 
 // The checkboxes of one multi-choice field, as [value, checked, disabled].
@@ -223,6 +224,36 @@ test("discovery mode is a set of radio cards that say what each mode does to the
   for (const [value] of radios(html)) assert.match(html, new RegExp(`aria-describedby="discovery-mode-${value}-help"[^>]*/?>.*?id="discovery-mode-${value}-help"`, "s"));
   // A saved brief reopens with its own mode selected.
   assert.deepEqual(radios(renderForm({ projects: [{ id: "p" }], run: { ...emptyBrief, discovery_mode: "market" } }).html).filter(([, checked]) => checked), [["market", true]]);
+});
+
+test("the form starts by asking what the founder wants to do, and ?mode=verify opens the idea form", () => {
+  const kinds = html => [...html.matchAll(/<input type="radio"([^>]*)\/?>/g)].map(([, attrs]) => attrs).filter(attrs => attrs.includes('name="research-kind"')).map(attrs => [/value="([^"]+)"/.exec(attrs)[1], /checked=""/.test(attrs)]);
+  const discover = renderForm();
+  assert.deepEqual(kinds(discover.html), [["verify", false], ["discover", true]], "discovery stays the default");
+  assert.match(discover.html, /我有一個想法 — 幫我驗證/);
+  assert.doesNotMatch(discover.html, /id="idea-title"/);
+  const verify = renderForm({ search: "mode=verify" });
+  assert.deepEqual(kinds(verify.html), [["verify", true], ["discover", false]]);
+  for (const id of ["idea-title", "idea-buyer", "idea-pain", "idea-offer", "idea-price"]) assert.match(verify.html, new RegExp(`id="${id}"`), id);
+  assert.match(verify.html, /id="idea-title"[^>]*maxLength="180"|maxLength="180"[^>]*id="idea-title"/);
+  assert.match(verify.html, /驗證這個想法/, "the submit button says what it does");
+  assert.match(verify.html, /約 2–3 分鐘/, "the time expectation (decision D8) is shown before starting");
+  assert.doesNotMatch(verify.html, /name="discovery-mode"/, "discovery modes are not asked when checking an idea");
+  // (Profile values in the sample are already Chinese; any English string left untranslated would show here.)
+  assert.deepEqual(verify.missing.filter(source => /[A-Za-z]{3}/.test(source)), [], "every verify-form string is translated");
+});
+
+test("a verify brief prefilled from a candidate opens with the idea's own text", () => {
+  const idea = { title: "Reminders for physio clinics", buyer: "Clinic owners", pain: "No-shows cost clinics revenue every week.", offer: "", price_hint: "" };
+  const { html, missing } = renderForm({ initialBrief: { ...emptyBrief, name: idea.title, discovery_mode: "verify", idea } });
+  assert.match(html, /id="idea-title"[^>]*value="Reminders for physio clinics"|value="Reminders for physio clinics"[^>]*id="idea-title"/);
+  assert.match(html, /No-shows cost clinics revenue every week\./);
+  assert.deepEqual(missing.filter(source => source !== idea.title && /[A-Za-z]{3}/.test(source)), []);
+  // The page builds that brief from the outcome with the founder's own client, so row-level security applies.
+  const page = readFileSync(new URL("../app/(workspace)/research/new/page.tsx", import.meta.url), "utf8");
+  assert.match(page, /from\("research_stages"\)\.select\("output"\)\.eq\("run_id", id\)\.eq\("user_id", user\.id\)\.eq\("stage_key", "outcome"\)/);
+  assert.match(page, /\/\^c\\d\{1,2\}\$\/\.test\(ideaKey\)/, "only candidate keys are accepted");
+  assert.match(page, /discovery_mode: "verify"/);
 });
 
 test("at three industries the other named industries are disabled, with a message saying why", () => {

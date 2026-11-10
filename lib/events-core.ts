@@ -7,7 +7,7 @@ import { z } from "zod";
 /** Largest props object stored, in bytes of JSON; the database enforces the same bound. */
 export const EVENT_PROPS_MAX_BYTES = 8192;
 
-const mode = z.enum(["founder", "market", "combined"]);
+const mode = z.enum(["founder", "market", "combined", "verify"]);
 const language = z.enum(["en", "zh-Hans", "zh-Hant"]);
 const errorCode = z.string().regex(/^[A-Z][A-Z0-9_]{0,39}$/);
 const count = z.number().int().min(0).max(1000);

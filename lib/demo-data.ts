@@ -345,3 +345,24 @@ export const demoOutcome: ResearchOutcome = {
   ],
   suggestions: ["TRY_MARKET_MODE", "VERIFY_SPECIFIC_IDEA"],
 };
+
+/** A fixed "Verify my idea" check for the demo (spec WP-05): one idea, not yet supported because only vendors back it. */
+export const demoVerifyOutcome: ResearchOutcome = {
+  version: 1,
+  mode: "verify",
+  counts: { candidates: 1, sources: 4, passed: 0 },
+  candidates: [
+    {
+      key: "c1", title: "Group booking for climbing gyms", buyer: "Owners of independent climbing gyms", query: "climbing gym group booking admin time", pain: "Birthday parties and corporate groups are booked by email and phone, which takes staff hours every week.",
+      sources: [
+        { url: "https://booking-vendor.example/blog", title: "Sample vendor blog", domain: "booking-vendor.example", reliability: "vendor", stance: "supports", relevant: true },
+        { url: "https://gym-software.example/features", title: "Sample vendor features page", domain: "gym-software.example", reliability: "vendor", stance: "supports", relevant: true },
+        { url: "https://climbing-news.example/feature", title: "Sample trade article", domain: "climbing-news.example", reliability: "secondary", stance: "neutral", relevant: true },
+        { url: "https://outdoor-forum.example/thread", title: "Sample forum thread", domain: "outdoor-forum.example", reliability: "primary", stance: "supports", relevant: false },
+      ],
+      supportingDomains: 2, nonVendorSupport: false, contradicting: 0, reason: "VENDOR_ONLY",
+    },
+  ],
+  suggestions: ["VERIFY_SPECIFIC_IDEA"],
+};
+
