@@ -54,3 +54,15 @@ export const skillSuggestions = [
   "Design and creativity",
   "I am starting out and still exploring my strengths.",
 ] as const;
+
+// Suggested interests for profile v2 (WP-02): added to the free-text answer, which the founder then edits.
+export const interestSuggestions = [
+  "Health and wellbeing",
+  "Education and learning",
+  "Climate and sustainability",
+  "Software for small businesses",
+  "Food and hospitality",
+  "Money and personal finance",
+  "Creative tools",
+  "Local and home services",
+] as const;

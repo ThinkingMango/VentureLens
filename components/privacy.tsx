@@ -44,7 +44,7 @@ function buildSections(disclosure: ProviderDisclosure): Section[] {
       body: ["We collect information you give us and a small amount of technical information needed to run the service:"],
       items: [
         ["Account", "Your email address, when your account was created and confirmed, and when you last signed in. We use passwordless sign-in, so we never receive or store a password."],
-        ["Founder profile", "Your name, role, industry, skills, available hours, budget range, and goal, exactly as you enter them."],
+        ["Founder profile", "Your name, role, industry, skills, available hours, budget range, and goal, exactly as you enter them. If you add them: your interests, problems you have seen, the audiences you can reach, your main strength, income target, appetite for risk, things you will not do, and the languages you work in."],
         ["Research briefs", "The brief name, sector, business model, geography, and any context notes you add."],
         ["Research results", "Run status, generated opportunities and scores, and excerpts, titles, and links from public web pages used as evidence, with their retrieval dates."],
         ["Saved items", "Opportunities you save, your notes, and the validation tasks you mark as complete."],

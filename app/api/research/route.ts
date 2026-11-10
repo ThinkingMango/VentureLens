@@ -3,7 +3,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getLocale } from "next-intl/server";
-import { researchRequestSchema, profileSchema } from "@/lib/workspace-schema";
+import { researchRequestSchema, profileSchema, profileColumns, profileV2FromRow } from "@/lib/workspace-schema";
 import { reportLanguage } from "@/lib/research-core";
 import { researchErrors, errorCode } from "@/lib/research-core";
 import { dispatchResearch, researchDetail } from "@/lib/research-service";
@@ -55,13 +55,12 @@ export async function POST(request: NextRequest) {
     if (parsed.data.action === "start") {
       const profile = await supabase
         .from("founder_profiles")
-        .select(
-          "name,role,industry,skills,hours,budget,goal,onboarding_completed",
-        )
+        .select(profileColumns)
         .eq("user_id", user.id)
         .maybeSingle();
       if (profile.error) throw new Error("WORKFLOW_INTERRUPTED");
-      const validatedProfile = profileSchema.safeParse(profile.data);
+      // A stale profile v2 answer reads as "not answered" rather than blocking the run.
+      const validatedProfile = profileSchema.safeParse(profile.data && { ...profile.data, ...profileV2FromRow(profile.data) });
       if (!profile.data?.onboarding_completed || !validatedProfile.success)
         return json(
           { code: "PROFILE_REQUIRED", error: "Complete your founder profile first." },

@@ -918,6 +918,37 @@ function verifyFixture(options = {}) {
   return fixture;
 }
 
+// WP-02: the founder context a discovery prompt carries, by mode and by which profile v2 answers are filled in.
+async function discoveryPrompt(mode, profile) {
+  const draft = { candidates: Array.from({ length: 8 }, (_, i) => ({ key: `c${i + 1}`, title: `Idea ${i + 1}`, buyer: "Clinic owners", pain: "Missed appointments cost money.", solution: "Reminders", advantage: "Operations", query: `clinic missed appointments survey ${i + 1}` })) };
+  const fixture = researchFixture({ spent: 0, settings: { primary: "qwen", autoFallback: true, qwenModel: "qwen3.8-flash", geminiModel: "gemini-3.5-flash-lite" }, generate: async () => ({ output: draft, totalUsage: { inputTokens: 300, outputTokens: 600 } }) });
+  fixture.setup.brief = { ...fixture.setup.brief, discovery_mode: mode };
+  fixture.setup.profile = profile;
+  fixture.checkpoints.set("setup", fixture.setup);
+  await fixture.engine.executeResearchStage(fixture.context, "discovery");
+  return fixture.calls[0].prompt;
+}
+
+test("discovery sends profile v2 answers only when given, honours exclusions, and sends no founder context in market mode", async () => {
+  const base = { ...workspaceSchema.emptyProfile, name: "Ada", skills: "Operations" };
+  const v2 = { ...base, distribution: "A newsletter read by 3,000 clinic owners", strength: "Operations", exclusions: "No hardware", languages: ["English", "Cantonese"], interests: "  ", revenue_target: "" };
+  const founder = await discoveryPrompt("founder", v2);
+  assert.match(founder, /"distribution":"A newsletter read by 3,000 clinic owners"/);
+  assert.match(founder, /"strength":"Operations"/);
+  assert.match(founder, /"languages":\["English","Cantonese"\]/);
+  assert.doesNotMatch(founder, /"interests"|"revenue_target"|"pain_points"/, "blank answers are left out");
+  assert.match(founder, /lists exclusions: do not propose an idea that conflicts with them/);
+  assert.doesNotMatch(founder.slice(founder.indexOf("available founder context=")), /"name"|Ada/, "the founder's name is never sent");
+  // An old profile snapshot (before v2) builds the same context as before, with no exclusions note.
+  const old = await discoveryPrompt("combined", { name: "Ada", role: "Aspiring founder", industry: "Healthcare", skills: "Operations", hours: "5–10 hours", budget: "Under $1,000", goal: "Build a sustainable side business" });
+  assert.match(old, /available founder context=\{"industry":"Healthcare","skills":"Operations","hours":"5–10 hours","budget":"Under \$1,000","goal":"Build a sustainable side business"\}/);
+  assert.doesNotMatch(old, /exclusions/);
+  // Market mode ignores the profile entirely, v2 answers included.
+  const market = await discoveryPrompt("market", v2);
+  assert.match(market, /available founder context=null/);
+  assert.doesNotMatch(market, /newsletter|exclusions/);
+});
+
 test("verify discovery makes one small call, copies the founder's idea exactly, and resumes from its checkpoint", async () => {
   const fixture = verifyFixture({ generate: async () => ({ output: { query: "UK physiotherapy clinic missed appointments cost survey", query_alt: "how UK physio clinics remind patients today" }, totalUsage: { inputTokens: 300, outputTokens: 60 } }) });
   assert.deepEqual(await fixture.engine.executeResearchStage(fixture.context, "discovery"), ["c1"]);

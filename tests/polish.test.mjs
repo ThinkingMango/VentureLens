@@ -12,6 +12,7 @@ import * as researchCore from "../lib/research-core.ts";
 import * as researchOptions from "../lib/research-options.ts";
 import * as workspaceSchema from "../lib/workspace-schema.ts";
 import * as profileOptions from "../lib/profile-options.ts";
+import * as starterProfilesModule from "../lib/starter-profiles.ts";
 
 const require = createRequire(import.meta.url);
 function loadModule(file, dependencies) {
@@ -83,8 +84,8 @@ test("research history shows whole translated sentences for counts and dates, an
   assert.deepEqual(missing.filter(source => /\d{4}/.test(source)), []);
 });
 
-test("first-run onboarding has one h1, the page title, above the step headings", () => {
-  const { copy } = realCopy();
+function renderOnboarding(props = {}) {
+  const { copy, missing } = realCopy();
   const { Onboarding } = loadModule("../components/onboarding.tsx", {
     "@/components/mobile-disclosure": { MobileDisclosure: ({ children }) => createElement("div", null, children) },
     "@/i18n/use-copy": { useCopy: () => copy },
@@ -98,12 +99,30 @@ test("first-run onboarding has one h1, the page title, above the step headings",
     "@/components/ui/field": { Field: passthrough("div"), FieldLabel: passthrough("label"), FieldGroup: passthrough("div") },
     "@/components/profile-choice": { ProfileChoice: () => null },
     "@/lib/profile-options": profileOptions, "@/lib/workspace-schema": workspaceSchema, "@/lib/utils": { cn: (...c) => c.filter(Boolean).join(" ") },
+    "@/lib/starter-profiles": starterProfilesModule,
   });
-  const html = renderToStaticMarkup(createElement(Onboarding));
+  return { html: renderToStaticMarkup(createElement(Onboarding, props)), missing };
+}
+
+test("first-run onboarding has one h1, the page title, above the step headings", () => {
+  const { html } = renderOnboarding();
   const headings = [...html.matchAll(/<h([1-6])\b[^>]*>(.*?)<\/h\1>/g)].map(m => [Number(m[1]), text(m[2]).trim()]);
   assert.equal(headings.filter(([level]) => level === 1).length, 1, "exactly one h1");
   assert.deepEqual(headings[0], [1, "Better opportunities start with you."]);
   assert.ok(headings.slice(1).every(([level]) => level >= 2), "nothing above the page title");
+});
+
+test("onboarding has six steps, two of them optional, and offers starter profiles only to new founders", () => {
+  const { html, missing } = renderOnboarding();
+  assert.match(html, /Step 1 of 6/);
+  assert.equal((html.match(/>Optional</g) ?? []).length, 2, "the two new steps are marked optional");
+  assert.match(html, /Make it personal[\s\S]*Boundaries/);
+  assert.match(html, /Start from an example/);
+  for (const starter of starterProfilesModule.starterProfiles) assert.match(html, new RegExp(`aria-pressed="false"[^>]*>[\\s\\S]*?${starter.title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
+  assert.deepEqual(missing, [], "every onboarding string is translated");
+  const { html: editing } = renderOnboarding({ editing: true });
+  assert.doesNotMatch(editing, /Start from an example/, "an existing profile is never overwritten from a template");
+  assert.match(editing, /Step 1 of 6/);
 });
 
 // Walks a rendered element tree (plain function components are called) and returns every element with an onClick.
