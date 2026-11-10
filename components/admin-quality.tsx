@@ -3,7 +3,8 @@ import Link from "next/link";
 import { useCopy, useFormats } from "@/i18n/use-copy";
 import { PageHeader } from "@/components/shared";
 import { AdminNav } from "@/components/admin-nav";
-import { formatDuration } from "@/components/admin-labels";
+import { formatDuration, modeLabel } from "@/components/admin-labels";
+import { flagReasons, type FeedbackMetrics, type FlagReason } from "@/lib/feedback-core";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { metricWindows } from "@/lib/quality-metrics";
 import type { QualityReport } from "@/lib/admin-runs";
@@ -35,7 +36,7 @@ export function AdminQuality({ report }: { report: QualityReport }) {
         title={copy("Research quality")}
         description={copy("How research runs performed over the chosen window, calculated from the run, usage, evidence and opportunity records.")}
       >
-        <nav aria-label={copy("Time window")} className="flex gap-1">
+        <nav aria-label={copy("Time window")} className="flex shrink-0 gap-1">
           {metricWindows.map(window => (
             <Link
               key={window}
@@ -100,6 +101,100 @@ export function AdminQuality({ report }: { report: QualityReport }) {
           </CardContent>
         </Card>
       </div>
+      <FeedbackSection feedback={report.feedback} />
     </div>
+  );
+}
+
+type Copy = ReturnType<typeof useCopy>;
+function reasonLabel(copy: Copy, reason: FlagReason) {
+  switch (reason) {
+    case "wrong": return copy("Wrong or not supported by the source");
+    case "outdated": return copy("Outdated");
+    case "irrelevant": return copy("Irrelevant to this opportunity");
+    case "broken_link": return copy("Broken link");
+    case "other": return copy("Something else");
+  }
+}
+
+/** Report feedback (WP-13): what founders flagged, which source domains, and how they rated reports. */
+function FeedbackSection({ feedback }: { feedback: FeedbackMetrics | null }) {
+  const copy = useCopy();
+  const formats = useFormats();
+  const mean = (value: number | null) => (value === null ? "—" : formats.number(value, { minimumFractionDigits: 1, maximumFractionDigits: 1 }));
+  const groupList = (rows: FeedbackMetrics["ratings"]["byMode"], label: (key: string) => string) =>
+    rows.length === 0 ? <p className="text-sm text-muted-foreground">{copy("No ratings in this window.")}</p> : (
+      <dl className="grid grid-cols-[1fr_auto] gap-x-6 gap-y-2 text-sm">
+        {rows.map(row => (
+          <div key={row.key} className="contents">
+            <dt className="min-w-0 break-words">{label(row.key)}</dt>
+            <dd className="tabular-nums">{copy("{mean} from {n} ratings", { mean: mean(row.mean), n: row.ratings })}</dd>
+          </div>
+        ))}
+      </dl>
+    );
+  return (
+    <section aria-labelledby="feedback-heading" className="flex flex-col gap-4">
+      <h2 id="feedback-heading" className="text-lg font-semibold">{copy("Report feedback")}</h2>
+      {!feedback ? <p className="text-sm text-muted-foreground">{copy("Report feedback could not be read.")}</p> : (
+        <>
+          <p className="text-sm text-muted-foreground">
+            {copy("{flags} flags ({claims} claims, {sources} sources) and {ratings} ratings in this window. Average rating: {mean}.", {
+              flags: feedback.flags.total, claims: feedback.flags.claims, sources: feedback.flags.sources, ratings: feedback.ratings.total, mean: mean(feedback.ratings.mean),
+            })}
+          </p>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>{copy("Flags by reason")}</CardTitle>
+                <CardDescription>{copy("Claims and sources founders flagged, by the reason they chose.")}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <dl className="grid grid-cols-[1fr_auto] gap-x-6 gap-y-2 text-sm">
+                  {flagReasons.map(reason => (
+                    <div key={reason} className="contents">
+                      <dt>{reasonLabel(copy, reason)}</dt>
+                      <dd className="tabular-nums">{feedback.flags.byReason[reason]}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>{copy("Most-flagged domains")}</CardTitle>
+                <CardDescription>{copy("Registrable domains of the sources founders flagged, most flags first.")}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {feedback.flags.topDomains.length === 0 ? <p className="text-sm text-muted-foreground">{copy("No flagged sources in this window.")}</p> : (
+                  <dl className="grid grid-cols-[1fr_auto] gap-x-6 gap-y-2 text-sm">
+                    {feedback.flags.topDomains.map(row => (
+                      <div key={row.domain} className="contents">
+                        <dt className="min-w-0 break-all font-mono text-xs">{row.domain}</dt>
+                        <dd className="tabular-nums">{row.flags}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                )}
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>{copy("Average rating by mode")}</CardTitle>
+                <CardDescription>{copy("Ratings from 1 to 5, by the run's discovery mode.")}</CardDescription>
+              </CardHeader>
+              <CardContent>{groupList(feedback.ratings.byMode, key => modeLabel(copy, key === "unknown" ? null : key))}</CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>{copy("Average rating by model")}</CardTitle>
+                <CardDescription>{copy("Ratings from 1 to 5, by the model that wrote most of the run (most output tokens).")}</CardDescription>
+              </CardHeader>
+              <CardContent>{groupList(feedback.ratings.byModel, key => (key === "unknown" ? copy("Unknown") : key))}</CardContent>
+            </Card>
+          </div>
+        </>
+      )}
+    </section>
   );
 }

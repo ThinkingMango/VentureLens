@@ -699,6 +699,7 @@ test("research detail returns the run's outcome, read with the owner's own clien
 test("the actual progress view renders blocked-request costs and a usable recovery link", () => {
   const data = { id: "run", status: "failed", stage: "retrieval", error_code: "BUDGET_EXCEEDED", retry_count: 0, model: { provider: "google-gemini", model: "gemini-4-argon", planned: false, used: ["gemini-4-argon"] }, configuration: { brief: { name: "Test 1" } }, report: null, steps: [{ stage_key: "discovery" }, { stage_key: "retrieval:c1" }], usage: { estimated_usd: 0.051042, committed_usd: 0.051042, budget_usd: 0.25, uncertain_calls: 0, input_tokens: 756, output_tokens: 4953, search_requests: 0 }, budget_block: { model: "gemini-4-argon", required_usd: 0.20448, remaining_usd: 0.198958 } };
   const { ResearchRunView } = loadModule("../components/research-run.tsx", {
+    "@/components/report-feedback": { ReportRating: ({ runId }) => createElement("aside", { "data-rating": runId }, "RATING") },
     "next/link": { default: ({ children, ...props }) => createElement("a", props, children) },
     "swr": { default: () => ({ data, mutate: async () => undefined }) },
     "@/components/ui/button": { Button: ({ asChild, children, ...props }) => asChild ? cloneElement(children, props) : createElement("button", props, children) },
@@ -739,6 +740,7 @@ function runViewWithOutcome(data) {
   };
   const outcomeModule = loadModule("../components/research-outcome.tsx", { ...shared, "lucide-react": { ExternalLink: () => null, SearchX: () => null } });
   const { ResearchRunView } = loadModule("../components/research-run.tsx", {
+    "@/components/report-feedback": { ReportRating: ({ runId }) => createElement("aside", { "data-rating": runId }, "RATING") },
     ...shared,
     "swr": { default: () => ({ data, mutate: async () => undefined }) },
     "@/components/shared": { PageHeader: ({ title }) => createElement("h1", null, title) },
@@ -889,6 +891,7 @@ test("a failed run says whether its slot was returned, from the server's refund 
   const render = quota_released => {
     const data = { id: "run", status: "failed", stage: "classification", error_code: "INVALID_OUTPUT", retry_count: 0, quota_released, model: { provider: "dashscope-beijing", model: "qwen3.8-flash", planned: false, used: ["qwen3.8-flash"] }, configuration: { brief: { name: "Test" } }, report: null, steps: [{ stage_key: "discovery" }], usage: { estimated_usd: 0.04, committed_usd: 0.04, budget_usd: 0.25, uncertain_calls: 0, input_tokens: 1, output_tokens: 1, search_requests: 1 } };
     const { ResearchRunView } = loadModule("../components/research-run.tsx", {
+    "@/components/report-feedback": { ReportRating: ({ runId }) => createElement("aside", { "data-rating": runId }, "RATING") },
       "next/link": { default: ({ children, ...props }) => createElement("a", props, children) },
       "swr": { default: () => ({ data, mutate: async () => undefined }) },
       "@/components/ui/button": { Button: ({ asChild, children, ...props }) => asChild ? cloneElement(children, props) : createElement("button", props, children) },

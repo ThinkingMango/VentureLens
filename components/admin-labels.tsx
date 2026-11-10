@@ -17,6 +17,7 @@ export function modeLabel(copy: Copy, mode: string | null) {
     case "founder": return copy("Founder fit");
     case "market": return copy("Market first");
     case "combined": return copy("Founder + market");
+    case "verify": return copy("Idea check");
     default: return "—";
   }
 }

@@ -17,6 +17,7 @@ export const feedback: Record<string, string> = {
   WORKSPACE_UNAVAILABLE:
     "Your workspace could not be loaded. Please try again.",
   SAVE_FAILED: "Your change could not be saved. Please try again.",
+  ALREADY_FLAGGED: "You already flagged this.",
   STATUS_UNAVAILABLE:
     "Research status could not refresh. Showing the last server record.",
   NETWORK_ERROR:

@@ -7,6 +7,7 @@ import type { Opportunity } from "@/lib/demo-data";
 import type { WorkspaceOpportunity } from "@/lib/workspace-schema";
 import { useDemo } from "@/components/demo-provider";
 import { DemoNote, Confidence } from "@/components/shared";
+import { FlagButton, FlagProvider } from "@/components/report-feedback";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -19,7 +20,7 @@ import {
   liveOpportunityView,
   opportunityTabs,
   topClaims,
-  type Claim,
+  type ViewClaim,
   type OpportunityTabId,
   type OpportunityView,
   type ViewSource,
@@ -124,7 +125,7 @@ export function OpportunityDetail({ view, initialTab }: { view: OpportunityView;
   const band = scoreBand(view.score);
   const isSaved = saved.includes(view.id);
   return (
-    <>
+    <FlagProvider opportunityId={view.id} demo={view.kind === "demo"}>
       <Link href="/research/results" className="flex w-fit items-center gap-2 text-sm text-muted-foreground hover:text-primary">
         <ArrowLeft className="size-4" />
         {copy("Research results")}
@@ -300,11 +301,11 @@ export function OpportunityDetail({ view, initialTab }: { view: OpportunityView;
         </div>
       </div>
       <ReadingGuide open={guideOpen} onOpenChange={setGuideOpen} returnFocus={() => guideButton.current?.focus()} />
-    </>
+    </FlagProvider>
   );
 }
 
-function ClaimText({ claim, sources, openSource }: { claim: Claim; sources: Map<string, ViewSource>; openSource: (key: string) => void }) {
+function ClaimText({ claim, sources, openSource }: { claim: ViewClaim; sources: Map<string, ViewSource>; openSource: (key: string) => void }) {
   const copy = useCopy();
   return (
     <p>
@@ -482,6 +483,7 @@ function SourceCard({ source }: { source: ViewSource }) {
           })}
         </p>
       )}
+      <FlagButton target="source" targetKey={source.key} label={source.title} className="-ml-1.5 w-fit" />
     </article>
   );
 }
@@ -507,6 +509,7 @@ function EvidenceTab({ view, sources, openSource }: { view: OpportunityView; sou
                     {claim.kind === "assumption" && claim.confirm && (
                       <p className="text-muted-foreground">{copy("To confirm: {hint}", { hint: claim.confirm })}</p>
                     )}
+                    <FlagButton target="claim" targetKey={claim.key} label={claim.text} className="-ml-1.5 w-fit" />
                   </li>
                 ))}
               </ul>

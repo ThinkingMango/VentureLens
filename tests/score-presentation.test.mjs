@@ -105,6 +105,7 @@ test("cards and the opportunity page show the rating and every step of the score
     "@/components/ui/button": { Button: pass("button") }, "@/components/ui/badge": { Badge: pass("span") },
     "@/components/ui/dialog": { Dialog: () => null, DialogContent: pass("div"), DialogHeader: pass("div"), DialogTitle: pass("h2"), DialogDescription: pass("p") },
     "@/i18n/demo": { useDemoContent: () => ({}) }, "@/lib/report-presentation": presentation,
+    "@/components/report-feedback": { FlagProvider: ({ children }) => children, FlagButton: () => null },
     "@/lib/opportunity-view": require("../lib/opportunity-view.ts"), "@/lib/utils": { cn: (...c) => c.filter(Boolean).join(" ") },
   });
   const detail = text(renderToStaticMarkup(createElement(live.LiveOpportunityDetail, { opportunity })));

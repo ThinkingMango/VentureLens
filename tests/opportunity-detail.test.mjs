@@ -10,6 +10,7 @@ import * as presentation from "../lib/report-presentation.ts";
 import * as view from "../lib/opportunity-view.ts";
 import { opportunities, researchReports } from "../lib/demo-data.ts";
 import { messageKey, locales } from "../i18n/config.ts";
+import * as feedbackCore from "../lib/feedback-core.ts";
 
 const require = createRequire(import.meta.url);
 const catalogs = Object.fromEntries(locales.map(l => [l, JSON.parse(readFileSync(new URL(`../messages/${l}.json`, import.meta.url), "utf8"))]));
@@ -22,10 +23,28 @@ function copyFor(locale) {
   const copy = (source, values) => { const key = messageKey(source); if (catalogs[locale].ui[key]) return t(key, values); missing.push(source); return source; };
   return { copy, missing };
 }
+function load(file, dependencies) {
+  const source = readFileSync(new URL(file, import.meta.url), "utf8");
+  const { outputText } = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } });
+  const module = { exports: {} };
+  new Function("require", "exports", "module", outputText)(name => Object.hasOwn(dependencies, name) ? dependencies[name] : require(name), module.exports, module);
+  return module.exports;
+}
+const dialog = (open = false) => ({
+  Dialog: ({ open: shown, children }) => (shown || open ? createElement("div", { "data-guide": "" }, children) : null),
+  DialogContent: pass("div"), DialogHeader: pass("div"), DialogTitle: pass("h2"), DialogDescription: pass("p"), DialogFooter: pass("div"),
+});
+/** The flag and rating controls (WP-13), with their network and toast dependencies replaced. */
+function feedbackModule(copy, posted = []) {
+  return load("../components/report-feedback.tsx", {
+    "@/i18n/use-copy": { useCopy: () => copy }, "@/i18n/errors": { feedbackSource: code => String(code) },
+    "@/lib/api-client": { postJson: async (url, body) => { posted.push(body); return { ok: true, status: 200, body: {} }; } },
+    "@/lib/feedback-core": feedbackCore, "sonner": { toast: { success() {}, info() {}, error() {} } },
+    "@/components/ui/button": { Button: pass("button") }, "@/components/ui/dialog": dialog(), "@/lib/utils": { cn: (...c) => c.filter(Boolean).join(" ") },
+  });
+}
 /** The opportunity page with its UI dependencies replaced; `guide` renders the reading guide as if it were open. */
 function detailModule(copy, { guide = false } = {}) {
-  const source = readFileSync(new URL("../components/opportunity-detail.tsx", import.meta.url), "utf8");
-  const { outputText } = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } });
   const dependencies = {
     "@/i18n/use-copy": { useCopy: () => copy, useFormats: () => ({ date: value => `date(${value})` }) },
     "@/components/workspace-link": { default: ({ href, children, ...props }) => createElement("a", { href, ...props }, children) },
@@ -33,18 +52,14 @@ function detailModule(copy, { guide = false } = {}) {
     "@/components/shared": { DemoNote: () => createElement("p", null, "DEMO-BANNER"), Confidence: ({ level }) => createElement("span", null, `confidence:${level}`) },
     "@/components/ui/button": { Button: pass("button") },
     "@/components/ui/badge": { Badge: pass("span") },
-    "@/components/ui/dialog": {
-      Dialog: ({ open, children }) => (open || guide ? createElement("div", { "data-guide": "" }, children) : null),
-      DialogContent: pass("div"), DialogHeader: pass("div"), DialogTitle: pass("h2"), DialogDescription: pass("p"),
-    },
+    "@/components/ui/dialog": dialog(guide),
+    "@/components/report-feedback": feedbackModule(copy),
     "@/lib/utils": { cn: (...c) => c.filter(Boolean).join(" ") },
     "@/i18n/demo": { useDemoContent: () => ({ opportunity: o => o, report: id => researchReports[id] }) },
     "@/lib/report-presentation": presentation,
     "@/lib/opportunity-view": view,
   };
-  const module = { exports: {} };
-  new Function("require", "exports", "module", outputText)(name => Object.hasOwn(dependencies, name) ? dependencies[name] : require(name), module.exports, module);
-  return module.exports;
+  return load("../components/opportunity-detail.tsx", dependencies);
 }
 
 const v1 = { id: "o1", title: "Clinic billing", category: "Healthcare", description: "d", buyer: "Clinics", pain: "Billing pain", score: 57, confidence: "moderate", revenue: "$49/month", cost: "$5/month", risk: "Key risk", scores: [80, 68, 78, 72, 58], icon: "workflow" };
@@ -178,4 +193,37 @@ test("every tab of the live and demo pages is translated in both Chinese catalog
         const { missing } = render(component, { opportunity, initialTab: tab }, { locale, guide: true });
         assert.deepEqual(missing, [], `${locale} ${component} ${tab}`);
       }
+});
+
+test("every claim and source card on the Evidence tab has a Flag control keyed to what it flags", () => {
+  const { html, missing } = render("LiveOpportunityDetail", { opportunity: v3, initialTab: "evidence" });
+  const labels = [...html.matchAll(/aria-label="(Flag (?:claim|source): [^"]+)"/g)].map(([, label]) => label);
+  assert.deepEqual(labels.filter(label => label.startsWith("Flag claim")).length, v3.claims.length, "one per claim");
+  assert.deepEqual(labels.filter(label => label.startsWith("Flag source")), ["Flag source: Title c1-s1", "Flag source: Title c1-s3", "Flag source: Title c1-s2"], "one per source card, counter-evidence included");
+  assert.ok(labels.includes("Flag claim: Clinics would pay $49."));
+  assert.deepEqual(missing, []);
+  // The overview's key claims stay uncluttered; flags live where the full evidence is.
+  assert.doesNotMatch(render("LiveOpportunityDetail", { opportunity: v3 }).html, /Flag claim/);
+  // Claims keep their stored position as their key, whatever order they are shown in.
+  assert.deepEqual(view.liveOpportunityView(v3).claims.map(c => c.key), ["claim-0", "claim-1", "claim-2", "claim-3"]);
+  // The demo's synthetic sources can be flagged too; nothing is sent (see the component test).
+  assert.match(render("DemoOpportunityDetail", { opportunity: opportunities[0], initialTab: "evidence" }).html, /aria-label="Flag source: /);
+});
+
+test("the rating form offers five labelled stars and shows a saved rating", () => {
+  for (const locale of ["en", "zh-Hans", "zh-Hant"]) {
+    const { copy, missing } = copyFor(locale);
+    const { ReportRating } = feedbackModule(copy);
+    const fresh = renderToStaticMarkup(createElement(ReportRating, { runId: "r1", initial: null }));
+    const saved = renderToStaticMarkup(createElement(ReportRating, { runId: "r1", initial: { rating: 4, comment: "Useful sources" } }));
+    if (locale === "en") {
+      assert.equal(fresh.match(/type="radio"/g).length, 5);
+      assert.match(text(fresh), /1 of 5: Not useful .* 5 of 5: Very useful/);
+      assert.match(text(fresh), /Choose 1 to 5 stars\. Comment \(optional\) Save rating/);
+      assert.match(fresh, /<button[^>]*type="submit"[^>]*disabled=""/, "nothing to save before a star is chosen");
+      assert.match(saved, /<input[^>]*checked=""[^>]*value="4"/);
+      assert.match(text(saved), /Useful Comment \(optional\) Useful sources Update rating Your rating: 4 of 5/);
+    }
+    assert.deepEqual(missing, [], locale);
+  }
 });
