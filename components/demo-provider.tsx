@@ -59,6 +59,8 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
     models: ["B2B subscription"],
     geography: "United States",
     context: "",
+    angles: [],
+    explore_new: false,
   });
   const [completed, setCompleted] = useState<string[]>([]);
   const toggle = (items: string[], id: string) =>

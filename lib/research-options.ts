@@ -123,7 +123,32 @@ export function choiceLabel(values: readonly string[], translate: (value: string
  * as rules rather than left to the brief JSON, because "several industries" can mean either "each of these" or
  * "only where they meet", and the engine must read it one way.
  */
-export function briefFocus(brief: { sectors: readonly string[]; models: readonly string[] }): string {
+/**
+ * Run focus (WP-03): quick constraints for one run, without editing the profile. They deliberately do not overlap the
+ * industries and business models above. Canonical English values; translated only for display.
+ */
+export const angleOptions = [
+  "Bootstrapped (no funding needed)",
+  "Runs async / low-touch",
+  "No paid ads to start",
+  "Sells to small businesses",
+  "Sells to professionals",
+  "Sells to consumers",
+  "Local / in-person",
+  "Remote-only",
+  "Privacy-first",
+  "Mobile-first",
+  "Regulated market is OK",
+  "Uses my existing audience",
+  "Recurring revenue from day one",
+  "Can launch in 30 days",
+] as const;
+export type Angle = (typeof angleOptions)[number];
+export const maxAngles = 6;
+/** How many angles the form shows before "Show all". */
+export const visibleAngles = 8;
+
+export function briefFocus(brief: { sectors: readonly string[]; models: readonly string[]; angles?: readonly string[] }): string {
   const sectors = brief.sectors.filter((value) => value !== anySector);
   const models = brief.models.filter((value) => value !== businessModelLead);
   const industry = !sectors.length
@@ -136,7 +161,10 @@ export function briefFocus(brief: { sectors: readonly string[]; models: readonly
     : models.length === 1
       ? `Business model: every hypothesis must use ${models[0]}, named in its description.`
       : `Business models: every hypothesis must use exactly one of ${models.join("; ")}, named in its description. These are the founder's acceptable models; do not spread hypotheses across them for the sake of variety.`;
-  return `${industry} ${model}`;
+  const angles = brief.angles?.length
+    ? ` Constraints for this run: ${brief.angles.join("; ")}. Every hypothesis must satisfy all of them.`
+    : "";
+  return `${industry} ${model}${angles}`;
 }
 
 // Buyers discuss their problems in their own language, so evidence for a local market is mostly found by searching

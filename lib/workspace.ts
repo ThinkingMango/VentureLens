@@ -67,7 +67,7 @@ export async function readWorkspace(
   supabase: Awaited<ReturnType<typeof createClient>>,
   user: { id: string; email?: string },
 ): Promise<WorkspaceData> {
-  const [
+  let [
     memoryResult,
     profileResult,
     projectsResult,
@@ -89,7 +89,7 @@ export async function readWorkspace(
       .maybeSingle(),
     supabase
       .from("research_projects")
-      .select("id,name,sectors,models,geography,context,discovery_mode,created_at")
+      .select("id,name,sectors,models,geography,context,discovery_mode,angles,explore_new,created_at")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false }),
     supabase
@@ -112,6 +112,16 @@ export async function readWorkspace(
       .eq("user_id", user.id)
       .maybeSingle(),
   ]);
+  // A database without the WP-03 columns (the minute between a deploy and its migration) still loads the workspace:
+  // briefs read without their run focus, as "none" and "off".
+  if (projectsResult.error?.code === "42703") {
+    const legacy = await supabase
+      .from("research_projects")
+      .select("id,name,sectors,models,geography,context,discovery_mode,created_at")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false });
+    projectsResult = { ...legacy, data: legacy.data?.map((project) => ({ ...project, angles: [], explore_new: false })) ?? null } as typeof projectsResult;
+  }
   const failed = [
     profileResult,
     projectsResult,

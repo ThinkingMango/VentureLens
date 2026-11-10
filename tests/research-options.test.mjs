@@ -256,6 +256,28 @@ test("a verify brief prefilled from a candidate opens with the idea's own text",
   assert.match(page, /discovery_mode: "verify"/);
 });
 
+test("run focus: eight angles until 'show all', a count that warns from four, a cap of six, and explore-new", () => {
+  const angleChips = html => [...html.matchAll(/<input type="checkbox"([^>]*)\/?>/g)].map(([, attrs]) => attrs)
+    .filter(attrs => options.angleOptions.some(angle => attrs.includes(`value="${angle}"`)))
+    .map(attrs => [/value="([^"]+)"/.exec(attrs)[1], /checked=""/.test(attrs), /disabled=""/.test(attrs)]);
+  const fresh = renderForm();
+  assert.deepEqual(angleChips(fresh.html).map(([value]) => value), options.angleOptions.slice(0, 8), "eight shown at first");
+  assert.match(fresh.html, /顯示全部 14 個/, "with a 'show all' link");
+  assert.match(fresh.html, /已選擇 0\/6 個/);
+  assert.match(fresh.html, /id="explore-new"/);
+  assert.match(fresh.html, /本次研究的重點/, "context is relabelled 'Focus for this run'");
+  assert.match(fresh.html, /例如：大阪的牙醫診所 · 面向自由譯者的工具 · 我經營咖啡店時遇到的問題/, "with three examples");
+  assert.deepEqual(fresh.missing.filter(source => /angle|Angle|Explore|Focus for|chosen|Show all|constraints for this run/.test(source)), []);
+  // An angle beyond the first eight is shown without "show all"; at four the count warns; at six the rest are disabled.
+  const four = renderForm({ projects: [{ id: "p" }], run: { ...emptyBrief, angles: ["Privacy-first", "Mobile-first", "Remote-only", "Can launch in 30 days"] } });
+  assert.equal(angleChips(four.html).length, 14, "a chosen angle is never hidden");
+  assert.match(four.html, /text-amber-700[^>]*>已選擇 4\/6 個。方向越多/);
+  const six = renderForm({ projects: [{ id: "p" }], run: { ...emptyBrief, angles: options.angleOptions.slice(0, 6), explore_new: true } });
+  assert.ok(angleChips(six.html).every(([, checked, disabled]) => checked !== disabled), "unchosen angles are disabled at six");
+  assert.match(six.html, /已選擇 6\/6 個，這是一次研究能兼顧的上限/);
+  assert.match(six.html, /id="explore-new"[^>]*checked=""|checked=""[^>]*id="explore-new"/);
+});
+
 test("at three industries the other named industries are disabled, with a message saying why", () => {
   const run = { ...emptyBrief, sectors: ["Healthcare", "Education", "Legal & compliance"] };
   const { html } = renderForm({ projects: [{ id: "p" }], run });

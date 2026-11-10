@@ -34,6 +34,9 @@ import {
   targetMarketGroups,
   targetMarketLead,
   toggleChoice,
+  angleOptions,
+  maxAngles,
+  visibleAngles,
 } from "@/lib/research-options";
 import { PageHeader, DemoNote } from "@/components/shared";
 import { ResearchAccessCard } from "@/components/research-access-card";
@@ -154,6 +157,12 @@ export function ResearchConfig({ initialBrief }: { initialBrief?: ResearchBrief 
     setDraft({ ...draft, idea: { ...idea, ...patch } });
   }
   const [submitting, setSubmitting] = useState(false);
+  // Run focus (WP-03): the first eight angles are shown until "Show all", unless one beyond them is already chosen.
+  const [allAngles, setAllAngles] = useState(false);
+  const angles = draft.angles ?? [];
+  const shownAngles = allAngles || angles.some((angle) => angleOptions.indexOf(angle) >= visibleAngles) ? angleOptions : angleOptions.slice(0, visibleAngles);
+  const toggleAngle = (angle: (typeof angleOptions)[number]) =>
+    setDraft({ ...draft, angles: angles.includes(angle) ? angles.filter((a) => a !== angle) : angles.length < maxAngles ? [...angles, angle] : angles });
   const requestKey = useRef<string | null>(null);
   const [nameError, setNameError] = useState("");
   const [formError, setFormError] = useState("");
@@ -663,9 +672,64 @@ export function ResearchConfig({ initialBrief }: { initialBrief?: ResearchBrief 
                 <h2 id="research-constraints-group" className="text-lg font-semibold">
                   {copy("Your real-world constraints")}
                 </h2>
+              <FieldSet id="angles" aria-describedby="angles-help angles-count" className="gap-3">
+                <FieldLegend variant="label" className="mb-0">
+                  {copy("Angles for this run")}{" "}
+                  <span className="font-normal text-muted-foreground">{copy("(optional)")}</span>
+                </FieldLegend>
+                <div className="flex flex-wrap gap-2">
+                  {shownAngles.map((angle) => (
+                    <ChoiceChip
+                      key={angle}
+                      value={angle}
+                      label={copy(angle)}
+                      checked={angles.includes(angle)}
+                      disabled={!angles.includes(angle) && angles.length >= maxAngles}
+                      onToggle={() => toggleAngle(angle)}
+                    />
+                  ))}
+                </div>
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                  <p
+                    id="angles-count"
+                    aria-live="polite"
+                    className={angles.length >= 4 ? "text-sm font-medium text-amber-700 dark:text-amber-400" : "text-sm text-muted-foreground"}
+                  >
+                    {angles.length >= maxAngles
+                      ? copy("{count} of {max} chosen, the most one run can respect. Untick one to choose another.", { count: angles.length, max: maxAngles })
+                      : angles.length >= 4
+                        ? copy("{count} of {max} chosen. Many angles narrow the search; fewer ideas may pass.", { count: angles.length, max: maxAngles })
+                        : copy("{count} of {max} chosen", { count: angles.length, max: maxAngles })}
+                  </p>
+                  {shownAngles.length < angleOptions.length && (
+                    <Button type="button" variant="link" className="h-auto min-h-11 px-0" onClick={() => setAllAngles(true)}>
+                      {copy("Show all {count}", { count: angleOptions.length })}
+                    </Button>
+                  )}
+                </div>
+                <FieldDescription id="angles-help">
+                  {copy("Quick constraints for this run only. Your founder profile is not changed.")}
+                </FieldDescription>
+              </FieldSet>
+              <Field orientation="horizontal" className="items-start gap-3">
+                <input
+                  id="explore-new"
+                  type="checkbox"
+                  className="mt-1 size-4 shrink-0 accent-[var(--primary)]"
+                  checked={draft.explore_new ?? false}
+                  aria-describedby="explore-new-help"
+                  onChange={(event) => setDraft({ ...draft, explore_new: event.target.checked })}
+                />
+                <div className="flex flex-col gap-1">
+                  <FieldLabel htmlFor="explore-new">{copy("Explore something new")}</FieldLabel>
+                  <FieldDescription id="explore-new-help">
+                    {copy("Steers this run away from the kind of ideas you have already seen. It needs at least one earlier run; without one it has no effect.")}
+                  </FieldDescription>
+                </div>
+              </Field>
               <Field>
                 <FieldLabel htmlFor="context">
-                  {copy("Anything else to keep in mind?")}{" "}
+                  {copy("Focus for this run")}{" "}
                   <span className="text-muted-foreground">
                     {copy("(optional)")}
                   </span>
@@ -680,7 +744,7 @@ export function ResearchConfig({ initialBrief }: { initialBrief?: ResearchBrief 
                   maxLength={1000}
                   className="field-select min-h-24"
                   placeholder={copy(
-                    "A buyer group, a problem you’ve noticed, a city or region, or a niche you know well…",
+                    "For example: dental clinics in Osaka · tools for freelance translators · problems I saw running a café",
                   )}
                 />
                 <FieldDescription id="context-help">

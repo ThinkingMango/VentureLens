@@ -7,6 +7,8 @@ import {
   maxResearchSectors,
   researchSectors,
   targetMarkets,
+  angleOptions,
+  maxAngles,
 } from "./research-options.ts";
 
 export const revenueTargetOptions = ["Side income (<$1k/mo)", "$1–5k/mo", "$5–20k/mo", "$20k+/mo"] as const;
@@ -105,6 +107,13 @@ const briefShape = z.object({
   context: z.string().trim().max(1000).default(""),
   discovery_mode: z.enum(discoveryModes).optional(),
   idea: ideaSchema.optional(),
+  // Run focus (WP-03). Briefs saved before WP-03 have neither and read as "none" and "off".
+  angles: z
+    .array(z.enum(angleOptions))
+    .max(maxAngles, "Choose up to 6 angles.")
+    .refine((values) => new Set(values).size === values.length, "Choose each angle once.")
+    .default([]),
+  explore_new: z.boolean().default(false),
 });
 // An idea is required when checking an idea, and only then: a discovery brief that carried one would send text the
 // founder no longer sees to the research model.
@@ -225,6 +234,8 @@ export const emptyBrief: ResearchBrief = {
   models: ["B2B subscription"],
   geography: "United States",
   context: "",
+  angles: [],
+  explore_new: false,
 };
 export function safeReturnPath(
   value: string | null | undefined,
