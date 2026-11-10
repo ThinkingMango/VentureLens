@@ -11,6 +11,8 @@ export type ResearchReport = {
   limitations: string[];
   weights: Record<string, number>;
   opportunities: WorkspaceOpportunity[];
+  /** Ideas discovery proposed that the founder had already seen, dropped before research (WP-04). */
+  skipped_duplicates?: number;
 };
 export type ResearchModelInfo = {
   provider: string | null;

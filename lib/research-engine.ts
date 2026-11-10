@@ -19,7 +19,7 @@ import {
   normalizeDiscovery, normalizeClassification, normalizeEvaluation, normalizeReview,
   groundedClassifications, eligibleEvidence, evidenceGate, weightedScore, safeSourceUrl,
   scoringWeights, scoreParts, REVIEW_MAX_PENALTY, researchErrors, errorCode, researchPolicy, reportLanguage, reportNarrative, confidenceLevel,
-  researchOutcome, founderContext, type Candidate, type Classification, type Evidence, type Mode, type ResearchOutcome, type Review,
+  researchOutcome, founderContext, buildHistory, historyPromptBlock, dedupeCandidates, duplicatesOutcome, historyEntrySchema, type HistoryEntry, type Candidate, type Classification, type Evidence, type Mode, type ResearchOutcome, type Review,
 } from "@/lib/research-core";
 
 const pricingSchema = z.object({ input: z.number().positive().max(0.00001), output: z.number().positive().max(0.00003), search: z.number().positive().max(0.05), checked_at: z.string() });
@@ -76,6 +76,36 @@ async function recordOutcome(ctx: Context, input: { candidates: Candidate[]; evi
   await saveOutcome(ctx, outcome);
   return outcome;
 }
+/**
+ * Idea memory (WP-04): the founder's earlier ideas, read once when the run is set up and frozen in its setup checkpoint.
+ * Their 24 most recent opportunities, plus every candidate of their last 5 runs (passed or not), after their
+ * "Clear idea memory" marker. Memory only steers discovery, so a failure to read it is logged and the run goes on
+ * without it rather than failing.
+ */
+async function collectHistory(ctx: Context): Promise<HistoryEntry[]> {
+  try {
+    const client = db();
+    const profile = checked(await client.from("founder_profiles").select("history_reset_at").eq("user_id", ctx.userId).maybeSingle()) as { history_reset_at?: string | null } | null;
+    const resetAt = profile?.history_reset_at ?? null;
+    let opportunities = client.from("opportunities").select("title,payload,created_at").eq("user_id", ctx.userId).neq("run_id", ctx.runId);
+    let runs = client.from("research_runs").select("id,created_at").eq("user_id", ctx.userId).neq("id", ctx.runId);
+    if (resetAt) { opportunities = opportunities.gt("created_at", resetAt); runs = runs.gt("created_at", resetAt); }
+    const [opportunityRows, runRows] = await Promise.all([
+      opportunities.order("created_at", { ascending: false }).limit(24).then(checked),
+      runs.order("created_at", { ascending: false }).limit(5).then(checked),
+    ]) as [{ title: string; payload: Record<string, unknown> | null; created_at: string }[] | null, { id: string; created_at: string }[] | null];
+    const runAt = new Map((runRows ?? []).map(run => [run.id, run.created_at]));
+    const stages = runAt.size ? (checked(await client.from("research_stages").select("run_id,output").eq("user_id", ctx.userId).eq("stage_key", "discovery").in("run_id", [...runAt.keys()])) as { run_id: string; output: { candidates?: unknown } | null }[] | null) ?? [] : [];
+    return buildHistory({
+      opportunities: (opportunityRows ?? []).map(row => ({ title: row.title, buyer: row.payload?.buyer, pain: row.payload?.pain, category: row.payload?.category, at: row.created_at })),
+      candidates: stages.flatMap(stage => (Array.isArray(stage.output?.candidates) ? stage.output.candidates : []).map((candidate: Record<string, unknown>) => ({ ...candidate, at: runAt.get(stage.run_id) ?? "" }))),
+      resetAt,
+    });
+  } catch (error) {
+    log("warn", "idea memory unavailable; discovery runs without it", ctx, describeFailure(error));
+    return [];
+  }
+}
 export async function initializeResearch(ctx: Context) {
   const client = db();
   const row = checked(await client.from("research_runs").select("id,status,workflow_id,configuration,budget_usd").eq("id", ctx.runId).eq("user_id", ctx.userId).single());
@@ -120,8 +150,10 @@ export async function initializeResearch(ctx: Context) {
     const pricing = pricingSchema.parse(researchModelPricing(providerSettings.qwenModel));
     const fallbackPricing = pricingSchema.parse(researchModelPricing(providerSettings.geminiModel));
     const active = activeProvider === GEMINI_PROVIDER ? "gemini" : "qwen";
+    // A check of one idea needs no memory: it researches exactly what the founder wrote.
+    const history = configuration.brief.discovery_mode === "verify" ? [] : await collectHistory(ctx);
     await checkpoint(ctx, "setup", {
-      ...configuration, pricing, fallback_pricing: fallbackPricing, active_provider: activeProvider, provider_settings: providerSettings,
+      ...configuration, history, pricing, fallback_pricing: fallbackPricing, active_provider: activeProvider, provider_settings: providerSettings,
       // The fallback stays available mid-run only when it, too, can finish within the budget.
       fallback_allowed: order.length > 1 && !verifyFailure,
       model: selectedModel(active, providerSettings), provider: activeProvider, methodology,
@@ -297,7 +329,9 @@ export async function executeResearchStage(ctx: Context, key: string): Promise<s
   }
   const stage = key.split(":")[0];
   checked(await client.from("research_runs").update({ stage }).eq("id", ctx.runId).eq("user_id", ctx.userId).eq("workflow_id", ctx.workflowId).eq("status", "running"));
-  const setup = await previous<{ brief: z.infer<typeof researchRequestSchema>; profile: z.infer<typeof profileSchema>; pricing: Pricing }>(ctx, "setup");
+  const setup = await previous<{ brief: z.infer<typeof researchRequestSchema>; profile: z.infer<typeof profileSchema>; pricing: Pricing; history?: unknown }>(ctx, "setup");
+  // Runs set up before WP-04 have no history.
+  const history = z.array(historyEntrySchema).catch([]).parse(setup.history ?? []);
   const { brief, pricing } = setup;
   const mode: Mode = brief.discovery_mode ?? "combined";
   const language = reportLanguage(brief.language);
@@ -312,9 +346,17 @@ export async function executeResearchStage(ctx: Context, key: string): Promise<s
     return output.candidates.map(c => c.key);
   }
   if (key === "discovery") {
-    const output = await structured(ctx, key, discoveryDraftSchema, normalizeDiscovery, `Generate 8 specific, mutually distinct GenAI business opportunity hypotheses that a small team could validate. No retrieval happens in this stage, so never claim anything is verified. Keys must be c1 through c8. Keep each title under 180 characters and each other field under 800 characters. Write "query" as a web-search string in ${searchLanguage(brief.geography)} that would find independent evidence of the buyer's problem and what they already spend on it (surveys, industry reports, forum discussions, news), naming the buyer, the problem and the target geography. Do not name products or ask for tools or software. Mode=${mode}: founder starts from the founder's skills, channels, and resource advantages; market starts only from market pain and existing spending and does not infer founder fit; combined considers both. ${briefFocus(brief)} Brief=${JSON.stringify(brief)}; available founder context=${JSON.stringify(profile)}.${profile?.exclusions ? " The founder context lists exclusions: do not propose an idea that conflicts with them." : ""}`, pricing);
-    await checkpoint(ctx, key, output);
-    return output.candidates.map(c => c.key);
+    const output = await structured(ctx, key, discoveryDraftSchema, normalizeDiscovery, `Generate 8 specific, mutually distinct GenAI business opportunity hypotheses that a small team could validate. No retrieval happens in this stage, so never claim anything is verified. Keys must be c1 through c8. Keep each title under 180 characters and each other field under 800 characters. Write "query" as a web-search string in ${searchLanguage(brief.geography)} that would find independent evidence of the buyer's problem and what they already spend on it (surveys, industry reports, forum discussions, news), naming the buyer, the problem and the target geography. Do not name products or ask for tools or software. Mode=${mode}: founder starts from the founder's skills, channels, and resource advantages; market starts only from market pain and existing spending and does not infer founder fit; combined considers both. ${briefFocus(brief)} Brief=${JSON.stringify(brief)}; available founder context=${JSON.stringify(profile)}.${historyPromptBlock(history)}${profile?.exclusions ? " The founder context lists exclusions: do not propose an idea that conflicts with them." : ""}`, pricing);
+    // Idea memory: drop ideas the founder has already seen. Fewer than five may remain, which is fine; none means the
+    // run ends with an explained outcome instead of researching repeats.
+    const { kept, skipped } = dedupeCandidates(output.candidates, history);
+    if (skipped.length) log("warn", "skipped ideas the founder has already seen", ctx, { skipped: skipped.length, kept: kept.length });
+    if (!kept.length) {
+      await saveOutcome(ctx, duplicatesOutcome(skipped, mode));
+      throw new Error("INSUFFICIENT_EVIDENCE");
+    }
+    await checkpoint(ctx, key, { candidates: kept, ...(skipped.length ? { skipped_duplicates: skipped.length } : {}) });
+    return kept.map(c => c.key);
   }
   const discovery = discoveryCheckpointSchema(mode).parse(await previous(ctx, "discovery"));
   if (stage === "retrieval") {
@@ -407,7 +449,7 @@ export async function executeResearchStage(ctx: Context, key: string): Promise<s
     const models = [...new Set((attempts ?? []).map(attempt => attempt.model))];
     const providers = [...new Set((attempts ?? []).map(attempt => attempt.provider))];
     const narrative = reportNarrative(language, { candidates: discovery.candidates.length, evidence: evidence.length, opportunities: opportunities.length });
-    const report = { methodology, language, model: models.length === 1 ? models[0] : "mixed", provider: providers.length === 1 ? providers[0] : "mixed", models, providers, mode, generated_at: new Date().toISOString(), summary: narrative.summary, limitations: narrative.limitations, weights: scoringWeights[mode], opportunities };
+    const report = { methodology, language, model: models.length === 1 ? models[0] : "mixed", provider: providers.length === 1 ? providers[0] : "mixed", models, providers, mode, generated_at: new Date().toISOString(), summary: narrative.summary, limitations: narrative.limitations, weights: scoringWeights[mode], opportunities, ...("skipped_duplicates" in discovery && discovery.skipped_duplicates ? { skipped_duplicates: discovery.skipped_duplicates } : {}) };
     checked(await client.rpc("finish_research", { p_run: ctx.runId, p_user: ctx.userId, p_workflow: ctx.workflowId, p_report: report }));
   } else throw new Error("INVALID_OUTPUT");
   return [];

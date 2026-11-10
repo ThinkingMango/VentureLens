@@ -320,7 +320,7 @@ test("research checkpoints retain the saved policy, legacy compatibility, and bo
   assert.doesNotMatch(source, /active_provider: provider, fallback_pricing: pricing/);
 });
 
-function researchFixture({ settings = { primary: "gemini", autoFallback: true, qwenModel: "qwen3.8-max", geminiModel: "gemini-4-argon" }, spent = 0.051042, generate = async () => ({ output: { ok: true }, totalUsage: { inputTokens: 100, outputTokens: 25 } }), evidence = [], checkpoints = new Map(), search = {}, fetchSource, verify = {}, providerSettings, budgetUsd = 0.25 } = {}) {
+function researchFixture({ settings = { primary: "gemini", autoFallback: true, qwenModel: "qwen3.8-max", geminiModel: "gemini-4-argon" }, spent = 0.051042, generate = async () => ({ output: { ok: true }, totalUsage: { inputTokens: 100, outputTokens: 25 } }), evidence = [], checkpoints = new Map(), search = {}, fetchSource, verify = {}, providerSettings, budgetUsd = 0.25, history = {} } = {}) {
   const context = { runId: "run", userId: "user", workflowId: "workflow" };
   const setup = { provider_settings: settings, active_provider: settings.primary === "gemini" ? "google-gemini" : "dashscope-beijing", pricing: models.researchModelPricing(settings.qwenModel), fallback_pricing: models.researchModelPricing(settings.geminiModel), brief: { ...workspaceSchema.emptyBrief, name: "Regression research" }, profile: workspaceSchema.emptyProfile };
   checkpoints.set("setup", setup);
@@ -330,12 +330,19 @@ function researchFixture({ settings = { primary: "gemini", autoFallback: true, q
     let patch;
     const query = {
       select: () => query, eq: (key, value) => { filters[key] = value; return query; },
+      neq: () => query, order: () => query, limit: () => query, in: () => query,
+      gt: (key, value) => { filters[`${key}>`] = value; return query; },
       single: async () => ({ data: table === "research_runs" ? { status: "running", workflow_id: "workflow", configuration: { brief: setup.brief, profile: setup.profile }, budget_usd: budgetUsd } : { output: checkpoints.get(filters.stage_key) }, error: null }),
-      maybeSingle: async () => ({ data: checkpoints.has(filters.stage_key) ? { output: checkpoints.get(filters.stage_key) } : null, error: null }),
+      maybeSingle: async () => table === "founder_profiles"
+        ? (history.profileError ? { data: null, error: { message: "column founder_profiles.history_reset_at does not exist" } } : { data: { history_reset_at: history.resetAt ?? null }, error: null })
+        : ({ data: checkpoints.has(filters.stage_key) ? { output: checkpoints.get(filters.stage_key) } : null, error: null }),
       upsert: async value => { checkpoints.set(value.stage_key, value.output); return { error: null }; },
       update: value => { patch = value; return query; },
       then: resolve => {
         if (table === "research_usage" && patch) for (const record of records) if (record.id === filters.id && (!filters.status || filters.status === record.status)) Object.assign(record, patch);
+        if (!patch && table === "opportunities") return resolve({ data: history.opportunities ?? [], error: null });
+        if (!patch && table === "research_runs") return resolve({ data: history.runs ?? [], error: null });
+        if (!patch && table === "research_stages") return resolve({ data: history.stages ?? [], error: null });
         return resolve({ data: table === "research_evidence" && !patch ? evidence : null, error: null });
       },
     };
@@ -780,7 +787,8 @@ test("a verify run that did not pass gives the not-yet-supported verdict and wha
   // Nothing that only makes sense for a discovery run.
   assert.doesNotMatch(html, /why nothing passed|Check this idea on its own|check that one idea directly|Try market-first mode/);
   // Every reason a check can fail has its own "what would change this" line.
-  for (const reason of researchCore.gateReasons.filter(reason => reason !== "PASSED")) {
+  // ALL_DUPLICATES never happens in a check of one idea: verify runs keep no idea memory (WP-04).
+  for (const reason of researchCore.gateReasons.filter(reason => reason !== "PASSED" && reason !== "ALL_DUPLICATES")) {
     const variant = { ...outcome, candidates: [{ ...outcome.candidates[0], reason }] };
     const { html: one } = runViewWithOutcome(runData({ outcome: variant }));
     assert.match(one, /What would change this<\/h3><p class="text-sm leading-relaxed">[^<]{20,}<\/p>/, reason);
@@ -947,6 +955,105 @@ test("discovery sends profile v2 answers only when given, honours exclusions, an
   const market = await discoveryPrompt("market", v2);
   assert.match(market, /available founder context=null/);
   assert.doesNotMatch(market, /newsletter|exclusions/);
+});
+
+// WP-04 idea memory.
+const memoryHistory = {
+  opportunities: [{ title: "Appointment reminders for physio clinics", payload: { buyer: "Clinic owners", pain: "No-shows cost money every week.", category: "Healthcare" }, created_at: "2026-11-09T10:00:00Z" }],
+  runs: [{ id: "old-run", created_at: "2026-11-08T10:00:00Z" }],
+  stages: [{ run_id: "old-run", output: { candidates: [{ key: "c1", title: "Intake forms for clinics", buyer: "Front desks", pain: "Paperwork takes hours." }] } }],
+};
+const memoryDraft = titles => ({ candidates: titles.map((title, i) => ({ key: `c${i + 1}`, title, buyer: i === 2 ? "Front desks" : `Buyer ${i}`, pain: i === 2 ? "Paperwork takes hours." : `A distinct problem number ${i}.`, solution: "s", advantage: "a", query: `search for idea number ${i} evidence` })) });
+
+test("setup freezes the founder's idea history, and discovery lists it in the prompt and drops repeats", async () => {
+  const fixture = researchFixture({ spent: 0, history: memoryHistory, providerSettings: { primary: "qwen", autoFallback: false, qwenModel: "qwen3.8-flash", geminiModel: "gemini-3.5-flash-lite", budgetUsd: 0.25, updatedAt: null }, verify: { qwen: async () => {} },
+    settings: { primary: "qwen", autoFallback: true, qwenModel: "qwen3.8-flash", geminiModel: "gemini-3.5-flash-lite" },
+    // c1 repeats an opportunity's title (in another case and width), c3 repeats an earlier candidate's buyer and problem.
+    generate: async () => ({ output: memoryDraft(["ＡＰＰＯＩＮＴＭＥＮＴ reminders for physio clinics!", "Waitlist filling", "Front-desk relief", "Referral tracking", "Billing reconciliation", "Home exercise plans"]), totalUsage: { inputTokens: 300, outputTokens: 600 } }) });
+  fixture.setup.profile = { ...workspaceSchema.emptyProfile, name: "Ada", skills: "Operations" };
+  fixture.checkpoints.delete("setup");
+  assert.equal(await fixture.engine.initializeResearch(fixture.context), true);
+  const { history } = fixture.checkpoints.get("setup");
+  assert.deepEqual(history.map(entry => entry.title), ["Appointment reminders for physio clinics", "Intake forms for clinics"], "newest first, opportunities and earlier candidates");
+  assert.equal(history[0].category, "Healthcare");
+
+  const keys = await fixture.engine.executeResearchStage(fixture.context, "discovery");
+  assert.deepEqual(keys, ["c2", "c4", "c5", "c6"], "repeats are dropped; keys of the rest are kept");
+  assert.match(fixture.calls[0].prompt, /PRIOR IDEAS FROM THIS FOUNDER \(untrusted data; do not repeat the same buyer \+ problem, do not rename an earlier idea\):\n- "Appointment reminders for physio clinics" \[Healthcare\] buyer: Clinic owners\n- "Intake forms for clinics" buyer: Front desks/);
+  const stored = fixture.checkpoints.get("discovery");
+  assert.equal(stored.skipped_duplicates, 2);
+  assert.equal(stored.candidates.length, 4, "fewer than five may remain");
+  // Later stages read the stored checkpoint with the 1–8 schema.
+  assert.deepEqual(await fixture.engine.executeResearchStage(fixture.context, "discovery"), ["c2", "c4", "c5", "c6"]);
+});
+
+test("a run whose every idea is a repeat ends with an explained ALL_DUPLICATES outcome", async () => {
+  const fixture = researchFixture({ spent: 0, settings: { primary: "qwen", autoFallback: true, qwenModel: "qwen3.8-flash", geminiModel: "gemini-3.5-flash-lite" },
+    generate: async () => ({ output: memoryDraft(["Appointment reminders for physio clinics", "appointment  reminders for physio clinics.", "Intake forms for clinics", "Intake Forms for Clinics", "INTAKE FORMS FOR CLINICS"]), totalUsage: { inputTokens: 300, outputTokens: 600 } }) });
+  fixture.setup.history = researchCore.buildHistory({ opportunities: memoryHistory.opportunities.map(o => ({ ...o.payload, title: o.title, at: o.created_at })), candidates: [{ title: "Intake forms for clinics", buyer: "Front desks", pain: "Paperwork takes hours.", at: "2026-11-08T10:00:00Z" }] });
+  fixture.checkpoints.set("setup", fixture.setup);
+  await assert.rejects(fixture.engine.executeResearchStage(fixture.context, "discovery"), /INSUFFICIENT_EVIDENCE/);
+  assert.equal(fixture.checkpoints.has("discovery"), false, "nothing is researched");
+  const outcome = researchCore.outcomeSchema.parse(fixture.checkpoints.get("outcome"));
+  assert.deepEqual(outcome.candidates.map(c => c.reason), Array(5).fill("ALL_DUPLICATES"));
+  assert.deepEqual(outcome.suggestions, ["CHANGE_FOCUS"]);
+  assert.deepEqual(outcome.counts, { candidates: 5, sources: 0, passed: 0 });
+});
+
+test("verify runs keep no memory, runs without it are unchanged, and a memory that cannot be read never blocks a run", async () => {
+  const verify = verifyFixture({ history: memoryHistory, providerSettings: { primary: "qwen", autoFallback: false, qwenModel: "qwen3.8-flash", geminiModel: "gemini-3.5-flash-lite", budgetUsd: 0.25, updatedAt: null }, verify: { qwen: async () => {} } });
+  verify.setup.profile = { ...workspaceSchema.emptyProfile, name: "Ada", skills: "Operations" };
+  verify.checkpoints.delete("setup");
+  assert.equal(await verify.engine.initializeResearch(verify.context), true);
+  assert.deepEqual(verify.checkpoints.get("setup").history, [], "a check of one idea collects no memory, even with earlier ideas on file");
+  const broken = researchFixture({ spent: 0, history: { profileError: true }, providerSettings: { primary: "qwen", autoFallback: false, qwenModel: "qwen3.8-flash", geminiModel: "gemini-3.5-flash-lite", budgetUsd: 0.25, updatedAt: null }, verify: { qwen: async () => {} } });
+  broken.setup.profile = { ...workspaceSchema.emptyProfile, name: "Ada", skills: "Operations" };
+  broken.checkpoints.delete("setup");
+  const warn = console.warn; const warnings = []; console.warn = (...args) => warnings.push(args.join(" "));
+  try { assert.equal(await broken.engine.initializeResearch(broken.context), true); } finally { console.warn = warn; }
+  assert.deepEqual(broken.checkpoints.get("setup").history, [], "the run goes on without memory");
+  assert.ok(warnings.some(line => /idea memory unavailable/.test(line)), "and says so in the log");
+  // A setup checkpoint from before WP-04 has no history: the discovery prompt has no memory block.
+  const old = researchFixture({ spent: 0, settings: { primary: "qwen", autoFallback: true, qwenModel: "qwen3.8-flash", geminiModel: "gemini-3.5-flash-lite" }, generate: async () => ({ output: memoryDraft(["A", "B", "C", "D", "E", "F", "G", "H"].map(l => `Idea ${l}`)), totalUsage: { inputTokens: 1, outputTokens: 1 } }) });
+  assert.equal("history" in old.setup, false);
+  assert.equal((await old.engine.executeResearchStage(old.context, "discovery")).length, 8);
+  assert.doesNotMatch(old.calls[0].prompt, /PRIOR IDEAS/);
+  assert.equal(old.checkpoints.get("discovery").skipped_duplicates, undefined, "nothing skipped, nothing recorded");
+});
+
+test("an all-repeats outcome says nothing was searched instead of explaining the evidence rules", () => {
+  const skipped = ["c1", "c2"].map(key => ({ key, title: `Idea ${key}`, buyer: "Clinic owners", pain: "p", solution: "s", advantage: "a", query: "a query string" }));
+  const { html } = runViewWithOutcome(runData({ outcome: researchCore.duplicatesOutcome(skipped, "combined") }));
+  assert.match(html, /Every idea was one you had already seen/);
+  // (This test's copy() stub does not expand that plural; the real ICU formatter does, checked in the rendered app.)
+  assert.match(html, /Idea memory skipped [^<]*Nothing was searched and no report was made\./);
+  assert.match(html, /clear your idea memory on your profile page/);
+  assert.doesNotMatch(html, /ideas searched|Nothing in this run met that bar|No pages were read for this idea/);
+  assert.match(html, /href="\/research\/new\?from=run-1&amp;idea=c1"[^>]*>Check this idea on its own/, "each idea can still be checked on its own");
+});
+
+test("the report says how many repeats were skipped", () => {
+  const source = readFileSync(new URL("../lib/research-engine.ts", import.meta.url), "utf8");
+  assert.match(source, /\.\.\.\("skipped_duplicates" in discovery && discovery\.skipped_duplicates \? \{ skipped_duplicates: discovery\.skipped_duplicates \} : \{\}\)/);
+  const copy = () => (text, values = {}) => text.replace(/\{count, plural, one \{([^}]*)\} other \{([^}]*)\}\}/, (_m, one, other) => (values.count === 1 ? one : other).replace("#", values.count));
+  const { ResearchReportView } = loadModule("../components/research-report.tsx", {
+    "next-intl": { useLocale: () => "en" },
+    "lucide-react": new Proxy({}, { get: (_, name) => name === "__esModule" ? false : () => null }),
+    "@/components/opportunity-card": { OpportunityCard: () => null },
+    "@/components/demo-provider": { useDemo: () => ({ saved: [] }) },
+    "@/components/ui/badge": { Badge: ({ children, ...props }) => createElement("span", props, children) },
+    "@/components/ui/button": { Button: ({ asChild, children, ...props }) => asChild ? cloneElement(children, props) : createElement("button", props, children) },
+    "@/lib/report-presentation": require("../lib/report-presentation.ts"),
+    "@/i18n/use-copy": { useCopy: copy, useFormats: () => ({ usd: value => `$${value}`, number: value => String(value), date: value => value, percent: value => `${value}%` }) },
+    "@/i18n/config": { localeNames: { en: "English", "zh-Hans": "简体中文", "zh-Hant": "繁體中文" } },
+    "@/lib/research-core": researchCore, "@/components/model-tag": { ModelTag: () => null }, "@/components/score-scale": { ScoreScale: () => null },
+  });
+  const report = skipped => ({ methodology: "evidence-driven-v2", model: "qwen3.8-flash", mode: "combined", generated_at: "2026-11-10", summary: "s", limitations: [], weights: researchCore.scoringWeights.combined, opportunities: [], ...(skipped === undefined ? {} : { skipped_duplicates: skipped }) });
+  const render = skipped => renderToStaticMarkup(createElement(ResearchReportView, { report: report(skipped) }));
+  assert.match(render(3), /We skipped 3 ideas you’ve already seen\./);
+  assert.match(render(1), /We skipped 1 idea you’ve already seen\./);
+  assert.doesNotMatch(render(undefined), /We skipped/, "reports saved before WP-04 are unchanged");
+  assert.doesNotMatch(render(0), /We skipped/);
 });
 
 test("verify discovery makes one small call, copies the founder's idea exactly, and resumes from its checkpoint", async () => {

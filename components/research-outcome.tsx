@@ -18,6 +18,7 @@ function reasonText(copy: Copy, reason: GateReason) {
     case "VENDOR_ONLY": return copy("Support came only from companies selling a solution, or did not show buyer pain or demand. The evidence rules need at least one independent source that does.");
     case "REVIEW_REJECTED": return copy("It passed the evidence rules, but the adversarial review found the conclusion unsupported.");
     case "NOT_EVALUATED": return copy("It passed the evidence rules but was not evaluated in this run.");
+    case "ALL_DUPLICATES": return copy("You have already seen this idea in an earlier run, so it was not researched again.");
     case "PASSED": return copy("Passed the evidence rules and the review.");
   }
 }
@@ -27,6 +28,7 @@ function suggestionText(copy: Copy, key: SuggestionKey) {
     case "NARROW_BUYER": return copy("Most ideas had support from a single publisher. Name a narrower buyer or problem in the brief's focus, so searches find more independent sources.");
     case "CHANGE_GEOGRAPHY": return copy("Many searches found little to read. Try a broader or different target market.");
     case "VERIFY_SPECIFIC_IDEA": return copy("If you already have a specific idea, check that one idea directly.");
+    case "CHANGE_FOCUS": return copy("Every idea this run proposed was one you had already seen. Change the brief's focus, industries or market, or clear your idea memory on your profile page to see earlier ideas again.");
   }
 }
 /** For a verify run that did not pass: what evidence would change the verdict, by the reason it failed. */
@@ -39,6 +41,7 @@ function whatWouldChange(copy: Copy, reason: GateReason) {
     case "VENDOR_ONLY": return copy("An independent, non-vendor source showing that buyers have this problem or pay to solve it.");
     case "REVIEW_REJECTED": return copy("A clearer link between the evidence and the idea, or a narrower buyer, so the review can accept the conclusion.");
     case "NOT_EVALUATED": return copy("Running the check again.");
+    case "ALL_DUPLICATES": return null;
     case "PASSED": return null;
   }
 }
@@ -94,7 +97,7 @@ function CandidateRow({ candidate, demo, checkHref }: { candidate: CandidateDiag
             );
           })}
         </ul>
-      ) : (
+      ) : candidate.reason === "ALL_DUPLICATES" ? null : (
         <p className="text-sm text-muted-foreground">{copy("No pages were read for this idea.")}</p>
       )}
       {checkHref && (
@@ -114,6 +117,8 @@ export function ResearchOutcomeView({ outcome, variant, runId, demo = false }: {
   const copy = useCopy();
   const notPassed = outcome.candidates.filter(candidate => candidate.reason !== "PASSED");
   const verifyRun = outcome.mode === "verify";
+  // WP-04: idea memory skipped every proposed idea, so nothing was searched.
+  const allRepeats = notPassed.length > 0 && notPassed.every(candidate => candidate.reason === "ALL_DUPLICATES");
   // A check of one idea needs no "check one idea" suggestion; a discovery run offers it per idea and in general.
   const suggestions = verifyRun ? outcome.suggestions.filter(key => key !== "VERIFY_SPECIFIC_IDEA") : outcome.suggestions;
   // WorkspaceLink maps the path into /demo in the demo workspace.
@@ -170,18 +175,28 @@ export function ResearchOutcomeView({ outcome, variant, runId, demo = false }: {
       <div className="flex flex-col gap-2">
         <div className="flex items-center gap-2 text-primary">
           <SearchX className="size-5 shrink-0" aria-hidden="true" />
-          <h2 id="outcome-heading" className="text-xl font-semibold text-foreground">{copy("What we looked for, and why nothing passed")}</h2>
+          <h2 id="outcome-heading" className="text-xl font-semibold text-foreground">
+            {allRepeats ? copy("Every idea was one you had already seen") : copy("What we looked for, and why nothing passed")}
+          </h2>
         </div>
-        <p className="text-sm text-muted-foreground">
-          {copy("{count, plural, one {# idea searched} other {# ideas searched}}", { count: outcome.counts.candidates })}
-          {" · "}
-          {copy("{count, plural, one {# source read} other {# sources read}}", { count: outcome.counts.sources })}
-          {" · "}
-          {copy("{count} passed", { count: outcome.counts.passed })}
-        </p>
-        <p className="max-w-prose text-sm leading-relaxed">
-          {copy("An idea becomes an opportunity only with supporting sources from at least two independent publishers, one of them first-hand or independent evidence of buyer pain or demand. Nothing in this run met that bar, so no report was made. A result like this is still useful: it tells you where the evidence is thin.")}
-        </p>
+        {allRepeats ? (
+          <p className="max-w-prose text-sm leading-relaxed">
+            {copy("{count, plural, one {Idea memory skipped the # idea this run proposed, because you saw it in an earlier run.} other {Idea memory skipped all # ideas this run proposed, because you saw them in earlier runs.}} Nothing was searched and no report was made.", { count: outcome.counts.candidates })}
+          </p>
+        ) : (
+          <>
+            <p className="text-sm text-muted-foreground">
+              {copy("{count, plural, one {# idea searched} other {# ideas searched}}", { count: outcome.counts.candidates })}
+              {" · "}
+              {copy("{count, plural, one {# source read} other {# sources read}}", { count: outcome.counts.sources })}
+              {" · "}
+              {copy("{count} passed", { count: outcome.counts.passed })}
+            </p>
+            <p className="max-w-prose text-sm leading-relaxed">
+              {copy("An idea becomes an opportunity only with supporting sources from at least two independent publishers, one of them first-hand or independent evidence of buyer pain or demand. Nothing in this run met that bar, so no report was made. A result like this is still useful: it tells you where the evidence is thin.")}
+            </p>
+          </>
+        )}
       </div>
       <ul className="flex flex-col gap-4">
         {notPassed.map(candidate => <CandidateRow key={candidate.key} candidate={candidate} demo={demo} checkHref={checkHref(candidate.key)} />)}

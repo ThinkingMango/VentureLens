@@ -80,6 +80,14 @@ export function ResearchReportView({ report }: { report: ResearchReport }) {
           <p className="max-w-prose whitespace-pre-line leading-relaxed">
             {report.summary}
           </p>
+          {report.skipped_duplicates ? (
+            <p className="max-w-prose text-sm text-muted-foreground">
+              {copy(
+                "{count, plural, one {We skipped # idea you’ve already seen.} other {We skipped # ideas you’ve already seen.}}",
+                { count: report.skipped_duplicates },
+              )}
+            </p>
+          ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2 border-t pt-4 text-sm">
           <span>

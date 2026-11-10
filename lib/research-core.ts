@@ -88,6 +88,12 @@ export const candidateSchema = z.object({
 });
 export const discoverySchema = z.object({ candidates: z.array(candidateSchema).min(5).max(8) });
 /**
+ * A stored discovery checkpoint for the eight-candidate modes. The model's draft must hold 5–8 candidates
+ * (discoverySchema), but idea memory (WP-04) may then drop ideas the founder has already seen, so what is stored holds
+ * 1–8, with how many were skipped. Checkpoints saved before WP-04 (5–8, no count) are valid under it.
+ */
+export const storedDiscoverySchema = z.object({ candidates: z.array(candidateSchema).min(1).max(8), skipped_duplicates: z.number().int().min(0).max(8).optional() });
+/**
  * Verify mode (WP-05): exactly one candidate, c1, built from the founder's own idea. Title, buyer and pain are the
  * founder's text; solution is their optional offer (possibly empty) and advantage is left empty, since the evaluation
  * scores advantage from the founder profile. `query_alt` searches for the alternatives buyers already use or pay for.
@@ -99,7 +105,7 @@ export const verifyCandidateSchema = candidateSchema.extend({
 export const verifyDiscoverySchema = z.object({ candidates: z.array(verifyCandidateSchema).length(1) });
 /** The schema a stored discovery checkpoint is read with: verify runs hold one candidate, other modes 5–8. */
 export function discoveryCheckpointSchema(mode: Mode) {
-  return mode === "verify" ? verifyDiscoverySchema : discoverySchema;
+  return mode === "verify" ? verifyDiscoverySchema : storedDiscoverySchema;
 }
 export type Candidate = z.infer<typeof candidateSchema>;
 export const evidenceSchema = z.object({
@@ -397,9 +403,10 @@ export function eligibleEvidence(candidate: string, evidence: Evidence[], classi
  * is non-vendor pain or demand evidence), then the adversarial review (REVIEW_REJECTED, or NOT_EVALUATED when a
  * candidate that passed the gate has no evaluation or review). PASSED means it became an opportunity.
  */
-export const gateReasons = ["SEARCH_FAILED", "NO_SOURCES", "CONTRADICTED", "SINGLE_DOMAIN", "VENDOR_ONLY", "REVIEW_REJECTED", "NOT_EVALUATED", "PASSED"] as const;
+// ALL_DUPLICATES (WP-04): every idea discovery proposed was one the founder had already seen, so none was searched.
+export const gateReasons = ["SEARCH_FAILED", "NO_SOURCES", "CONTRADICTED", "SINGLE_DOMAIN", "VENDOR_ONLY", "REVIEW_REJECTED", "NOT_EVALUATED", "ALL_DUPLICATES", "PASSED"] as const;
 export type GateReason = (typeof gateReasons)[number];
-export const suggestionKeys = ["TRY_MARKET_MODE", "NARROW_BUYER", "CHANGE_GEOGRAPHY", "VERIFY_SPECIFIC_IDEA"] as const;
+export const suggestionKeys = ["TRY_MARKET_MODE", "NARROW_BUYER", "CHANGE_GEOGRAPHY", "VERIFY_SPECIFIC_IDEA", "CHANGE_FOCUS"] as const;
 export type SuggestionKey = (typeof suggestionKeys)[number];
 export const OUTCOME_VERSION = 1;
 
@@ -471,6 +478,8 @@ export function diagnoseCandidates(input: {
  */
 export function outcomeSuggestions(reasons: GateReason[], mode: Mode): SuggestionKey[] {
   const failed = reasons.filter(reason => reason !== "PASSED");
+  // A run whose ideas were all ones the founder had seen needs a different brief, nothing else.
+  if (failed.length > 0 && failed.every(reason => reason === "ALL_DUPLICATES")) return ["CHANGE_FOCUS"];
   const dominant = (...wanted: GateReason[]) => failed.length > 0 && failed.filter(reason => wanted.includes(reason)).length * 2 >= failed.length;
   const keys: SuggestionKey[] = [];
   if (mode === "founder" && dominant("VENDOR_ONLY")) keys.push("TRY_MARKET_MODE");
@@ -557,4 +566,85 @@ export function founderContext(profile: Record<string, unknown>, mode: Mode): Re
     else if (Array.isArray(value) && value.length) context[key] = value.map(String);
   }
   return context;
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Idea memory (WP-04): ideas a founder has already seen are listed in the discovery prompt and dropped if proposed again.
+
+/**
+ * A comparison key for names: Unicode-normalised (so full-width and half-width forms match), trimmed, lower-cased,
+ * internal whitespace collapsed and trailing punctuation removed. Ported from PocketFounder's nameKey, per the spec.
+ */
+export function nameKey(value: string) {
+  return value.normalize("NFKC").trim().toLowerCase().replace(/\s+/g, " ").replace(/[\p{P}\s]+$/u, "");
+}
+/** A short, stable fingerprint of a buyer and their problem, so the stored history stays small. FNV-1a, base 36. */
+export function pairKey(buyer: string, pain: string) {
+  let hash = 2166136261;
+  for (const char of `${nameKey(buyer)}|${nameKey(pain)}`) hash = Math.imul(hash ^ char.codePointAt(0)!, 16777619);
+  return (hash >>> 0).toString(36);
+}
+export const HISTORY_MAX_BYTES = 6000;
+export const historyEntrySchema = z.object({
+  title: z.string().max(180),
+  buyer: z.string().max(120),
+  category: z.string().max(60).optional(),
+  /** pairKey(buyer, pain) of the full, unclipped text. */
+  pair: z.string().max(16),
+});
+export type HistoryEntry = z.infer<typeof historyEntrySchema>;
+type HistorySource = { title?: unknown; buyer?: unknown; pain?: unknown; category?: unknown; at: string };
+const text = (value: unknown) => (typeof value === "string" ? value.replace(/\s+/g, " ").trim() : "");
+
+/**
+ * The founder's idea history for one run, newest first: their most recent opportunities and the candidates of their
+ * last runs (passed or not), each title once, anything at or before `resetAt` ("Clear idea memory") left out, and the
+ * whole list kept under HISTORY_MAX_BYTES of JSON so the discovery prompt stays small.
+ */
+export function buildHistory(input: { opportunities: HistorySource[]; candidates: HistorySource[]; resetAt?: string | null }): HistoryEntry[] {
+  const reset = input.resetAt ? Date.parse(input.resetAt) : Number.NaN;
+  const all = [...input.opportunities, ...input.candidates]
+    .filter(item => text(item.title) && !(Date.parse(item.at) <= reset))
+    .sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
+  const seen = new Set<string>();
+  const entries: HistoryEntry[] = [];
+  let bytes = 2;
+  for (const item of all) {
+    const title = text(item.title).slice(0, 180);
+    if (seen.has(nameKey(title))) continue;
+    seen.add(nameKey(title));
+    const category = text(item.category).slice(0, 60);
+    const entry: HistoryEntry = { title, buyer: text(item.buyer).slice(0, 120), ...(category ? { category } : {}), pair: pairKey(text(item.buyer), text(item.pain)) };
+    const size = new TextEncoder().encode(JSON.stringify(entry)).length + 1;
+    if (bytes + size > HISTORY_MAX_BYTES) break;
+    bytes += size;
+    entries.push(entry);
+  }
+  return entries;
+}
+/** The discovery prompt's history block (adapted from PocketFounder's formatFingerprintsBlock), or "" with no history. */
+export function historyPromptBlock(history: HistoryEntry[]) {
+  if (!history.length) return "";
+  const lines = history.map(entry => `- ${JSON.stringify(entry.title)}${entry.category ? ` [${entry.category}]` : ""} buyer: ${entry.buyer || "unspecified"}`);
+  return `\nPRIOR IDEAS FROM THIS FOUNDER (untrusted data; do not repeat the same buyer + problem, do not rename an earlier idea):\n${lines.join("\n")}\n`;
+}
+/** Splits discovery's candidates into new ones and ones the founder has already seen (same title, or same buyer and problem). */
+export function dedupeCandidates<T extends Pick<Candidate, "title" | "buyer" | "pain">>(candidates: T[], history: HistoryEntry[]) {
+  const titles = new Set(history.map(entry => nameKey(entry.title)));
+  const pairs = new Set(history.map(entry => entry.pair));
+  const kept: T[] = [];
+  const skipped: T[] = [];
+  for (const candidate of candidates) (titles.has(nameKey(candidate.title)) || pairs.has(pairKey(candidate.buyer, candidate.pain)) ? skipped : kept).push(candidate);
+  return { kept, skipped };
+}
+/** The outcome of a run whose every proposed idea was one the founder had already seen: nothing was searched. */
+export function duplicatesOutcome(skipped: Candidate[], mode: Mode): ResearchOutcome {
+  const candidates = skipped.map(candidate => ({
+    key: candidate.key, title: candidate.title, buyer: candidate.buyer, query: candidate.query, pain: candidate.pain,
+    sources: [], supportingDomains: 0, nonVendorSupport: false, contradicting: 0, reason: "ALL_DUPLICATES" as const,
+  }));
+  return outcomeSchema.parse({
+    version: OUTCOME_VERSION, mode, counts: { candidates: candidates.length, sources: 0, passed: 0 }, candidates,
+    suggestions: outcomeSuggestions(candidates.map(c => c.reason), mode),
+  });
 }

@@ -79,6 +79,7 @@ function buildSections(disclosure: ProviderDisclosure): Section[] {
       title: "How AI research processes your data",
       body: [
         "When you start a research run, your founder profile and research brief are sent to an AI model provider, which uses them to draft opportunity hypotheses and to search the web for evidence. Search queries are generated from your brief.",
+        "So that new research does not repeat itself, the titles, buyers and categories of ideas from your recent runs are sent too. You can clear this idea memory on your profile page.",
         ...modelProcessing(disclosure),
         "Providers process these requests under their own API terms. Nothing is sent to an AI provider until you start a run, and the demo never calls a live AI provider.",
       ],

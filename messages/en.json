@@ -1623,7 +1623,19 @@
     "m1mnypcw": "Money and personal finance",
     "m1y58crn": "Creative tools",
     "mg6rf2o": "Local and home services",
-    "mcrisx0": "Your name, role, industry, skills, available hours, budget range, and goal, exactly as you enter them. If you add them: your interests, problems you have seen, the audiences you can reach, your main strength, income target, appetite for risk, things you will not do, and the languages you work in."
+    "mcrisx0": "Your name, role, industry, skills, available hours, budget range, and goal, exactly as you enter them. If you add them: your interests, problems you have seen, the audiences you can reach, your main strength, income target, appetite for risk, things you will not do, and the languages you work in.",
+    "m13hfnp3": "So that new research does not repeat itself, the titles, buyers and categories of ideas from your recent runs are sent too. You can clear this idea memory on your profile page.",
+    "m1qsog01": "{count, plural, one {We skipped # idea you’ve already seen.} other {We skipped # ideas you’ve already seen.}}",
+    "m1iyzcnm": "You have already seen this idea in an earlier run, so it was not researched again.",
+    "m1hwgvep": "Every idea this run proposed was one you had already seen. Change the brief's focus, industries or market, or clear your idea memory on your profile page to see earlier ideas again.",
+    "mpqmqfd": "Idea memory",
+    "m8ezuw4": "New research avoids ideas you have already seen in your recent runs, so each run brings something new.",
+    "mnysepg": "Last cleared on {date}.",
+    "m17owt1m": "Earlier ideas may be suggested again in new research. Your reports and saved opportunities are not changed.",
+    "m4p7qk": "Clear idea memory",
+    "mrorxh": "Idea memory cleared",
+    "m1cfg2uj": "Every idea was one you had already seen",
+    "m14tthd1": "{count, plural, one {Idea memory skipped the # idea this run proposed, because you saw it in an earlier run.} other {Idea memory skipped all # ideas this run proposed, because you saw them in earlier runs.}} Nothing was searched and no report was made."
   },
   "language": {
     "label": "Interface language",
