@@ -20,11 +20,16 @@ import {
 } from "lucide-react";
 import { useDemo } from "@/components/demo-provider";
 import {
+  anySector,
   businessModelGroups,
   businessModelLead,
+  businessModels,
+  maxBusinessModels,
+  maxResearchSectors,
   researchSectors,
   targetMarketGroups,
   targetMarketLead,
+  toggleChoice,
 } from "@/lib/research-options";
 import { PageHeader, DemoNote } from "@/components/shared";
 import { ResearchAccessCard } from "@/components/research-access-card";
@@ -36,6 +41,8 @@ import {
   FieldGroup,
   FieldDescription,
   FieldError,
+  FieldSet,
+  FieldLegend,
 } from "@/components/ui/field";
 const pipeline = [
   ["Discover", "Up to eight narrow hypotheses from your brief and profile."],
@@ -50,13 +57,43 @@ const pipeline = [
   ],
   ["Save", "A private report with linked sources you can reopen any time."],
 ];
+// One option of a multi-choice field: a native checkbox (so keyboard, form and screen-reader behaviour come for free)
+// drawn as a chip with a 44px touch target.
+function ChoiceChip({
+  value,
+  label,
+  checked,
+  disabled,
+  onToggle,
+}: {
+  value: string;
+  label: string;
+  checked: boolean;
+  disabled: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <label className="inline-flex min-h-11 cursor-pointer select-none items-center gap-1.5 rounded-full border bg-card px-3.5 py-2 text-sm leading-tight transition-colors hover:border-primary/60 has-[:checked]:border-primary has-[:checked]:bg-primary/10 has-[:checked]:font-medium has-[:checked]:text-primary has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-primary has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50 has-[:disabled]:hover:border-border">
+      <input
+        type="checkbox"
+        className="sr-only"
+        value={value}
+        checked={checked}
+        disabled={disabled}
+        onChange={onToggle}
+      />
+      {checked && <Check aria-hidden className="size-4 shrink-0" />}
+      {label}
+    </label>
+  );
+}
 export function ResearchConfig() {
   const copy = useCopy();
   const { run, setRun, profile, isDemo, href, busy, refresh, data } = useDemo();
   // A first brief starts from the founder's own industry when it is one of the research industries.
   const [draft, setDraft] = useState(() =>
     !isDemo && !data?.projects.length && (researchSectors as readonly string[]).includes(profile.industry)
-      ? { ...run, sector: profile.industry as typeof run.sector }
+      ? { ...run, sectors: [profile.industry as (typeof run.sectors)[number]] }
       : run,
   );
   const [submitting, setSubmitting] = useState(false);
@@ -261,55 +298,107 @@ export function ResearchConfig() {
                   )}
                 </FieldDescription>
               </Field>
-              <Field>
-                <FieldLabel htmlFor="sector">
+              <FieldSet
+                id="sectors"
+                aria-describedby="sectors-help"
+                className="gap-3"
+              >
+                <FieldLegend variant="label" className="mb-0">
                   {copy("Industry or market")}
-                </FieldLabel>
-                <select
-                  id="sector"
-                  className="field-select"
-                  value={draft.sector}
-                  onChange={(e) =>
-                    setDraft({
-                      ...draft,
-                      sector: e.target.value as typeof draft.sector,
-                    })
-                  }
-                >
-                  {researchSectors.map((v) => (
-                    <option key={v} value={v}>
-                      {copy(v)}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-              <Field>
-                <FieldLabel htmlFor="model">
+                </FieldLegend>
+                <div className="flex flex-wrap gap-2">
+                  {[anySector, ...researchSectors.filter((v) => v !== anySector)].map((v) => {
+                    const checked = draft.sectors.includes(v);
+                    return (
+                      <ChoiceChip
+                        key={v}
+                        value={v}
+                        label={copy(v)}
+                        checked={checked}
+                        disabled={
+                          !checked &&
+                          v !== anySector &&
+                          draft.sectors.filter((s) => s !== anySector).length >= maxResearchSectors
+                        }
+                        onToggle={() =>
+                          setDraft({
+                            ...draft,
+                            sectors: toggleChoice(researchSectors, draft.sectors, v, anySector, maxResearchSectors),
+                          })
+                        }
+                      />
+                    );
+                  })}
+                </div>
+                <FieldDescription id="sectors-help" aria-live="polite">
+                  {draft.sectors.length >= maxResearchSectors
+                    ? copy(
+                        "You’ve chosen {count} industries, the most one run covers well. Untick one to choose another.",
+                        { count: maxResearchSectors },
+                      )
+                    : copy(
+                        "Choose up to {count}. Each run explores eight ideas in total, so fewer industries means deeper research in each.",
+                        { count: maxResearchSectors },
+                      )}
+                </FieldDescription>
+              </FieldSet>
+              <FieldSet
+                id="models"
+                aria-describedby="models-help"
+                className="gap-3"
+              >
+                <FieldLegend variant="label" className="mb-0">
                   {copy("Business model")}
-                </FieldLabel>
-                <select
-                  id="model"
-                  className="field-select"
-                  value={draft.model}
-                  onChange={(e) =>
-                    setDraft({
-                      ...draft,
-                      model: e.target.value as typeof draft.model,
-                    })
-                  }
-                >
-                  <option value={businessModelLead}>{copy(businessModelLead)}</option>
-                  {businessModelGroups.map((group) => (
-                    <optgroup key={group.label} label={copy(group.label)}>
+                </FieldLegend>
+                <div className="flex flex-wrap gap-2">
+                  <ChoiceChip
+                    value={businessModelLead}
+                    label={copy(businessModelLead)}
+                    checked={draft.models.includes(businessModelLead)}
+                    disabled={false}
+                    onToggle={() =>
+                      setDraft({
+                        ...draft,
+                        models: toggleChoice(businessModels, draft.models, businessModelLead, businessModelLead, maxBusinessModels),
+                      })
+                    }
+                  />
+                </div>
+                {businessModelGroups.map((group) => (
+                  <div
+                    key={group.label}
+                    role="group"
+                    aria-label={copy(group.label)}
+                    className="flex flex-col gap-2"
+                  >
+                    <span aria-hidden className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      {copy(group.label)}
+                    </span>
+                    <div className="flex flex-wrap gap-2">
                       {group.options.map((v) => (
-                        <option key={v} value={v}>
-                          {copy(v)}
-                        </option>
+                        <ChoiceChip
+                          key={v}
+                          value={v}
+                          label={copy(v)}
+                          checked={draft.models.includes(v)}
+                          disabled={false}
+                          onToggle={() =>
+                            setDraft({
+                              ...draft,
+                              models: toggleChoice(businessModels, draft.models, v, businessModelLead, maxBusinessModels),
+                            })
+                          }
+                        />
                       ))}
-                    </optgroup>
-                  ))}
-                </select>
-              </Field>
+                    </div>
+                  </div>
+                ))}
+                <FieldDescription id="models-help">
+                  {copy(
+                    "Choose every model you would accept. Each idea uses one of them.",
+                  )}
+                </FieldDescription>
+              </FieldSet>
               <Field>
                 <FieldLabel htmlFor="geography">
                   {copy("Target market")}

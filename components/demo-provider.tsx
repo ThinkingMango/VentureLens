@@ -44,8 +44,8 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
   });
   const [run, setRun] = useState<ResearchBrief>({
     name: "GenAI opportunities for service businesses",
-    sector: "Professional services",
-    model: "B2B subscription",
+    sectors: ["Professional services"],
+    models: ["B2B subscription"],
     geography: "United States",
     context: "",
   });

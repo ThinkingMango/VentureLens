@@ -136,15 +136,19 @@ test("every literal translation call is present in all catalogs", () => {
 test("Chinese labels never replace persisted canonical enum values", () => {
   const brief = {
     name: "用户自己的研究",
-    sector: "Professional services",
-    model: "B2B subscription",
+    sectors: ["Professional services", "Healthcare"],
+    models: ["B2B subscription", "Productized service"],
     geography: "United States",
     context: "Keep my text unchanged",
     discovery_mode: "market",
   };
   assert.deepEqual(projectSchema.parse(brief), brief);
   assert.equal(
-    projectSchema.safeParse({ ...brief, sector: "专业服务" }).success,
+    projectSchema.safeParse({ ...brief, sectors: ["专业服务"] }).success,
+    false,
+  );
+  assert.equal(
+    projectSchema.safeParse({ ...brief, models: ["B2B subscription", "产品化服务"] }).success,
     false,
   );
   const profile = { ...emptyProfile, name: "自訂姓名", skills: "自訂內容" };

@@ -1,5 +1,6 @@
 "use client";
 import { MobileDisclosure } from "@/components/mobile-disclosure";
+import { choiceLabel } from "@/lib/research-options";
 import { useCopy, useFormats } from "@/i18n/use-copy";
 
 import { useState } from "react";
@@ -268,7 +269,7 @@ export function LiveDashboard() {
           <SectionTitle title={copy("Your latest research")} href="/research" />
           <h2 className="font-semibold">{data.projects[0].name}</h2>
           <p className="text-muted-foreground">
-            {copy(data.projects[0].sector)} · {copy(data.projects[0].geography)}
+            {choiceLabel(data.projects[0].sectors, (v) => copy(v))} · {copy(data.projects[0].geography)}
           </p>
           <p className="text-sm text-muted-foreground">
             {firstRun

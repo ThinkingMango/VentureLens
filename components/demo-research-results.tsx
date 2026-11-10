@@ -1,5 +1,6 @@
 "use client";
 import { MobileDisclosure } from "@/components/mobile-disclosure";
+import { choiceLabel } from "@/lib/research-options";
 import { useCopy } from "@/i18n/use-copy";
 
 import { useState } from "react";
@@ -56,8 +57,8 @@ export function DemoResearchResults({
       copy(demoNotice),
       copy("Research: {name}", { name: run.name }),
       copy("Configuration: {sector}; {model}; {geography}", {
-        sector: copy(run.sector),
-        model: copy(run.model),
+        sector: choiceLabel(run.sectors, (v) => copy(v)),
+        model: choiceLabel(run.models, (v) => copy(v)),
         geography: copy(run.geography),
       }),
       copy(
@@ -121,7 +122,8 @@ export function DemoResearchResults({
             <Badge variant="secondary">{copy("Demonstration report")}</Badge>
             {!savedOnly && (
               <p className="text-sm text-muted-foreground">
-                {copy(run.sector)} · {copy(run.model)} · {copy(run.geography)}
+                {choiceLabel(run.sectors, (v) => copy(v))} ·{" "}
+                {choiceLabel(run.models, (v) => copy(v))} · {copy(run.geography)}
               </p>
             )}
           </div>

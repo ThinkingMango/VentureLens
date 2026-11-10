@@ -82,7 +82,7 @@ export async function readWorkspace(
       .maybeSingle(),
     supabase
       .from("research_projects")
-      .select("id,name,sector,model,geography,context,discovery_mode,created_at")
+      .select("id,name,sectors,models,geography,context,discovery_mode,created_at")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false }),
     supabase
