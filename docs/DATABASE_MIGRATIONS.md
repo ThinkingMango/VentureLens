@@ -2,7 +2,7 @@
 
 Supabase project: **VentureLens** (`ndrxywlouwigawhgrtrj`, ap-southeast-1).
 
-## Applied history (as of 2026-11-09)
+## Applied history (as of 2026-11-10)
 
 Read from `supabase_migrations.schema_migrations` on the live project:
 
@@ -17,6 +17,8 @@ Read from `supabase_migrations.schema_migrations` on the live project:
 | `20261106141806` | `research_dev_access_max_runs_limit` | `supabase/migrations/20261106141806_research_dev_access_max_runs_limit.sql` | identical (applied with `apply_migration`, file renamed to the assigned version) |
 | `20261109150000` | `cap_failed_run_refunds` | `supabase/migrations/20261109150000_cap_failed_run_refunds.sql` | identical (applied from the repository file after #28 merged, under the file's own version; stored one statement per element, see below) |
 | `20261109160000` | `normalize_gmail_signup_grants` | `supabase/migrations/20261109160000_normalize_gmail_signup_grants.sql` | identical (applied from the repository file after #29 merged, under the file's own version; stored one statement per element, see below) |
+| `20261110025844` | `multi_choice_brief` | `supabase/migrations/20261110025844_multi_choice_brief.sql` | identical apart from the file's `begin;` / `commit;` lines, which production does not store (applied with `apply_migration`, file renamed to the assigned version in `f9aad97`; checked 2026-11-10) |
+| `20261110120000` | `product_events` | `supabase/migrations/20261110120000_product_events.sql` | identical (applied from the repository file after #40 merged, under the file's own version; stored one statement per element; checked 2026-11-10) |
 
 "Identical" means the MD5 of the SQL with all whitespace removed matches between the repository file and the `statements` column of the applied migration.
 
@@ -40,11 +42,7 @@ After this change `supabase migration list` shows local and remote in sync, and 
 
 ## Written but not yet applied
 
-These files are in the repository but have **not** been applied to the production project. Apply them only with the owner's approval. If `apply_migration` assigns a different version, rename the file to that version before merging.
-
-| File | Work package | Notes |
-| --- | --- | --- |
-| `20261110120000_product_events.sql` | WP-01 | New table `public.product_events`, readable and writable by the service role only. Adds a trigger on `research_runs` that records `run_started` and `run_finished`. Tested on a disposable PostgreSQL 16 (`tests/product-events.sql.test.mjs`) |
+None. When a pull request adds a migration, list it here until it is applied, and apply it only with the owner's approval. If `apply_migration` assigns a different version, rename the file to that version before merging. Merging to `main` can apply a migration to production: the Supabase integration applied `20261109150000`, `20261109160000` and `20261110120000` that way.
 
 ## Rules going forward
 
