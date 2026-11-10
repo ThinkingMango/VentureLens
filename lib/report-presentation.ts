@@ -99,3 +99,6 @@ export function claimsBySection(claims: Claims | undefined) {
     .map((section) => ({ section, claims: (claims ?? []).filter((claim) => claim.section === section) }))
     .filter((group) => group.claims.length > 0);
 }
+
+/** The five rated dimensions, in the order of `scores`. */
+export const dimensionLabels = ["Buyer pain", "Demand", "Unit economics", "Delivery feasibility", "Founder advantage"] as const;

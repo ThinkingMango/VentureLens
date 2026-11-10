@@ -411,7 +411,7 @@ export function groundedClassifications(evidence: Evidence[], items: Classificat
 export function registrableDomain(url: string): string | null {
   return getDomain(new URL(url).hostname.replace(/\.$/, ''), { allowPrivateDomains: true }) ?? null;
 }
-export type GatedEvidence = Evidence & { stance: Classification["stance"] };
+export type GatedEvidence = Evidence & { stance: Classification["stance"]; reliability?: Classification["reliability"] };
 /**
  * The evidence gate for one candidate.
  *
@@ -449,7 +449,8 @@ export function gateInputs(candidate: string, evidence: Evidence[], classificati
     const domain = registrableDomain(url);
     if (!domain) continue;
     urls.add(url);
-    relevant.push({ source: { ...e, stance: classification.stance }, domain, classification });
+    // Reliability travels with the source (WP-09) so the opportunity page can label first-hand, independent and vendor pages.
+    relevant.push({ source: { ...e, stance: classification.stance, reliability: classification.reliability }, domain, classification });
   }
   const supporting = relevant.filter(({ source }) => source.stance === 'supports');
   const supportingDomains = new Set(supporting.map(({ domain }) => domain)).size;

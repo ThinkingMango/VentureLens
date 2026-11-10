@@ -97,17 +97,15 @@ test("cards and the opportunity page show the rating and every step of the score
   const opportunity = { id: "o1", title: "Clinic billing assistant", category: "Healthcare", description: "d", buyer: "Clinics", pain: "Billing", score: 57, confidence: "moderate", revenue: "r", cost: "c", risk: "k", scores: [80, 68, 78, 72, 58], icon: "workflow", penalty: 15, evidence: [], validation: ["Interview ten clinics"] };
   assert.match(text(renderToStaticMarkup(createElement(card.OpportunityCard, { opportunity }))), /57 \/100 moderate Promising/);
 
-  const live = loadModule("../components/live-workspace.tsx", {
-    "@/components/mobile-disclosure": { MobileDisclosure: ({ children }) => createElement("div", null, children) },
+  const live = loadModule("../components/opportunity-detail.tsx", {
     "@/i18n/use-copy": { useCopy: () => copy, useFormats: () => ({ date: String, number: String }) },
-    "next/link": { default: ({ href, children }) => createElement("a", { href }, children) },
+    "@/components/workspace-link": { default: ({ href, children }) => createElement("a", { href }, children) },
     "@/components/demo-provider": { useDemo: () => ({ saved: [], toggleSave: () => {}, completed: [], toggleTask: () => {}, busy: false }) },
-    "@/components/shared": { PageHeader: ({ title }) => createElement("h1", null, title), SectionTitle: ({ title }) => createElement("h2", null, title), Confidence: ({ level }) => createElement("span", null, level) },
-    "@/components/ui/button": { Button: pass("button") }, "@/components/ui/badge": { Badge: pass("span") }, "@/components/ui/input": { Input: props => createElement("input", props) },
-    "@/components/opportunity-card": card, "@/lib/research-core": researchCore, "@/lib/report-presentation": presentation,
-    "@/components/opportunity-evidence": { OpportunityEvidence: () => null }, "@/lib/utils": { cn: (...c) => c.filter(Boolean).join(" ") },
-    "@/components/research-access-card": { ResearchAccessCard: () => null },
-    "@/lib/research-options": researchOptions,
+    "@/components/shared": { DemoNote: () => null, Confidence: ({ level }) => createElement("span", null, level) },
+    "@/components/ui/button": { Button: pass("button") }, "@/components/ui/badge": { Badge: pass("span") },
+    "@/components/ui/dialog": { Dialog: () => null, DialogContent: pass("div"), DialogHeader: pass("div"), DialogTitle: pass("h2"), DialogDescription: pass("p") },
+    "@/i18n/demo": { useDemoContent: () => ({}) }, "@/lib/report-presentation": presentation,
+    "@/lib/opportunity-view": require("../lib/opportunity-view.ts"), "@/lib/utils": { cn: (...c) => c.filter(Boolean).join(" ") },
   });
   const detail = text(renderToStaticMarkup(createElement(live.LiveOpportunityDetail, { opportunity })));
   assert.match(detail, /Promising/);
