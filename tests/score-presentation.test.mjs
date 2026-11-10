@@ -25,7 +25,8 @@ test("the review deducts at most 15 points, and the score parts add up to the sc
   assert.deepEqual(scoreParts(dims, "combined", 3, 15), { beforeReview: 72, cap: 85, score: 57 });
   assert.equal(weightedScore(dims, "combined", 3, 15), 57, "weightedScore is unchanged for the same inputs");
   assert.deepEqual(scoreParts({ pain: 100, demand: 100, economics: 100, feasibility: 100, advantage: 100 }, "combined", 2, 0), { beforeReview: 100, cap: 70, score: 70 });
-  assert.equal(researchCore.methodology, "evidence-driven-v2");
+  // v3 (WP-07) adds claims; the scoring rules above are unchanged from v2.
+  assert.equal(researchCore.methodology, "evidence-driven-v3");
 });
 
 test("the breakdown reads stored parts, and derives them exactly for earlier reports", () => {

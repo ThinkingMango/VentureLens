@@ -76,3 +76,26 @@ export const scoreBands: ScoreBand[] = [
 export function scoreBand(score: number): ScoreBand {
   return scoreBands.find((band) => score >= band.min) ?? scoreBands[scoreBands.length - 1];
 }
+
+// Claim-level citations (WP-07).
+type Claims = NonNullable<WorkspaceOpportunity["claims"]>;
+export const claimSectionOrder = ["buyer", "pain", "demand", "competition", "economics", "risk"] as const;
+/**
+ * Citation numbers for an opportunity's sources: [1] is the first source card, [2] the second, and so on. Numbers follow
+ * the order the sources are listed, so a chip and the card it points to always agree, whatever order claims cite them.
+ */
+export function citationNumbers(evidence: WorkspaceOpportunity["evidence"]): Map<string, number> {
+  const numbers = new Map<string, number>();
+  for (const source of evidence ?? []) if (!numbers.has(source.source_key)) numbers.set(source.source_key, numbers.size + 1);
+  return numbers;
+}
+/** The page anchor of a source card, safe to use as an element id whatever characters the source key holds. */
+export function sourceAnchor(sourceKey: string) {
+  return `source-${sourceKey.replace(/[^A-Za-z0-9_-]/g, "-")}`;
+}
+/** Claims grouped by section in a fixed reading order (buyer to risk), keeping each section's own order; empty sections are left out. */
+export function claimsBySection(claims: Claims | undefined) {
+  return claimSectionOrder
+    .map((section) => ({ section, claims: (claims ?? []).filter((claim) => claim.section === section) }))
+    .filter((group) => group.claims.length > 0);
+}

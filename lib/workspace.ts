@@ -20,7 +20,8 @@ import {
  * step and the source links they count. The opportunity page reads the full record with readOpportunity().
  */
 export function workspaceOpportunity(item: WorkspaceOpportunity): WorkspaceOpportunity {
-  const { rationale: _rationale, critique: _critique, falsification: _falsification, assumptions: _assumptions, ...summary } = item;
+  // Claims (WP-07) are read on the opportunity page, which loads the full payload; the workspace list does not need them.
+  const { rationale: _rationale, critique: _critique, falsification: _falsification, assumptions: _assumptions, claims: _claims, ...summary } = item;
   return {
     ...summary,
     evidence: item.evidence?.map(({ excerpt: _excerpt, ...source }) => source),

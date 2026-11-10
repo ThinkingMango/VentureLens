@@ -484,6 +484,85 @@ test("finalizing counts only supporting evidence and saves counter-evidence with
   assert.deepEqual(workspaceSchema.opportunitySchema.parse(c1).evidence.map(e => e.stance), ["supports", "supports", "contradicts"]);
 });
 
+test("methodology v3: evaluation asks for claims citing only gated sources, and the report stores the normalised claims", async () => {
+  const checkpoints = new Map();
+  const candidates = Array.from({ length: 5 }, (_, i) => ({ key: `c${i + 1}`, title: `Candidate ${i + 1}`, buyer: "Agencies", pain: "Slow proposals", solution: "Drafting assistant", advantage: "Domain network", query: "agency proposal preparation time survey" }));
+  checkpoints.set("discovery", { candidates });
+  const page = (key, candidate, url, text) => ({ source_key: key, candidate_id: candidate, url, title: `Source ${key}`, excerpt: text, retrieved_at: "2026-11-10T00:00:00.000Z", published_at: null });
+  const evidence = [
+    page("c1-s1", "c1", "https://buyers.org/pain", "Agencies report spending ten hours every week preparing proposals."),
+    page("c1-s2", "c1", "https://survey.org/analysis", "An independent survey confirms proposal preparation delays agency sales."),
+    page("c1-s3", "c1", "https://critics.net/review", "Critics argue that proposal software rarely changes agency win rates."),
+    page("c1-s4", "c1", "https://offtopic.org/x", "An unrelated page about something else entirely, kept for the test."),
+  ];
+  const stance = { "c1-s3": "contradicts" };
+  checkpoints.set("classification", { items: evidence.map(e => ({ source_key: e.source_key, relevant: e.source_key !== "c1-s4", kind: "pain", reliability: "secondary", stance: stance[e.source_key] ?? "supports", quote: e.excerpt, claim: "Buyer pain" })) });
+  const dimensions = { pain: 80, demand: 70, economics: 60, feasibility: 70, advantage: 50 };
+  const claims = [
+    { text: "Agencies spend about ten hours a week on proposals.", kind: "observed", section: "pain", source_keys: ["c1-s1", "c1-s1", "c9-s9"] },
+    { text: "Critics doubt that proposal tools change win rates.", kind: "observed", section: "risk", source_keys: ["c1-s3"] },
+    { text: "A faster first draft would be worth paying for.", kind: "observed", section: "demand", source_keys: ["c1-s3", "c1-s4"] },
+    { text: "Owners of 5–20 person agencies would buy it.", kind: "assumption", section: "buyer", source_keys: ["c1-s1"], confirm: "Ten interviews with agency owners." },
+    { text: "An unknown section is dropped.", kind: "observed", section: "vibes", source_keys: ["c1-s1"] },
+  ];
+  let prompt = "";
+  const fixture = researchFixture({ spent: 0, evidence, checkpoints, generate: async options => {
+    prompt = options.prompt;
+    return { output: { items: [{ candidate_id: "c1", description: "Drafting assistant", category: "Services", revenue: "Assumed, unverified", cost: "Assumed, unverified", risk: "Unverified demand", assumptions: ["Unverified"], validation: ["Interview buyers"], dimensions, rationale: "Cites c1-s1", claims }] }, totalUsage: { inputTokens: 100, outputTokens: 400 } };
+  } });
+  await fixture.engine.executeResearchStage(fixture.context, "evaluation");
+  assert.match(prompt, /"claims": 3–12 claims per candidate/);
+  assert.match(prompt, /A "contradicting" source may be cited only by a risk claim\./);
+  assert.match(prompt, /Citable source_keys per candidate=\{"c1":\{"supporting":\["c1-s1","c1-s2"\],"contradicting":\["c1-s3"\]\}\}/, "only gated sources, split by stance; the irrelevant page is not citable");
+  const stored = checkpoints.get("evaluation").items[0].claims;
+  assert.deepEqual(stored.map(c => [c.section, c.kind, c.source_keys]), [
+    ["pain", "observed", ["c1-s1"]],
+    ["risk", "inference", ["c1-s3"]],
+    ["demand", "inference", []],
+    ["buyer", "assumption", []],
+  ]);
+  assert.equal(stored[3].confirm, "Ten interviews with agency owners.");
+
+  checkpoints.set("review", { items: [{ candidate_id: "c1", reject: false, critique: "Needs interviews", penalty: 0, falsification: "Run a paid pilot" }] });
+  await fixture.engine.executeResearchStage(fixture.context, "finalizing");
+  const report = fixture.reservations.find(call => call.p_report)?.p_report;
+  assert.equal(report.methodology, "evidence-driven-v3");
+  const [c1] = report.opportunities;
+  assert.equal(c1.methodology_version, 3);
+  assert.deepEqual(c1.claims, stored, "the report keeps the evaluation's normalised claims");
+  const cited = new Set(c1.claims.flatMap(c => c.source_keys));
+  assert.ok([...cited].every(key => c1.evidence.some(source => source.source_key === key)), "every cited source is listed on the opportunity");
+  assert.ok(c1.claims.filter(c => c.kind === "observed").every(c => c.source_keys.some(key => c1.evidence.find(s => s.source_key === key)?.stance !== "contradicts")), "no observed claim rests on counter-evidence alone");
+  assert.deepEqual(workspaceSchema.opportunitySchema.parse(c1).claims, stored, "claims survive the workspace read path");
+});
+
+test("the opportunity page shows claims by section with citation chips that point at numbered source cards", () => {
+  const copy = () => (text, values = {}) => text.replace(/\{(\w+)\}/g, (_m, key) => values[key] ?? key);
+  const { OpportunityEvidence } = loadModule("../components/opportunity-evidence.tsx", {
+    "@/i18n/use-copy": { useCopy: copy, useFormats: () => ({ date: value => value }) },
+    "@/lib/research-core": researchCore, "@/lib/report-presentation": require("../lib/report-presentation.ts"),
+  });
+  const source = (key, stance) => ({ source_key: key, url: `https://example.org/${key}`, title: `Title ${key}`, excerpt: "x", retrieved_at: "2026-11-10", published_at: null, stance });
+  const base = { id: "o", title: "t", category: "c", description: "d", buyer: "b", pain: "p", score: 60, confidence: "limited", revenue: "r", cost: "c", risk: "k", scores: [60, 60, 60, 60, 60], icon: "workflow", evidence: [source("c1-s1", "supports"), source("c1-s2", "supports"), source("c1-s3", "contradicts")], rationale: "why" };
+  const v3 = { ...base, methodology_version: 3, claims: [
+    { text: "Critics doubt win rates change.", kind: "inference", section: "risk", source_keys: ["c1-s3"] },
+    { text: "Agencies spend ten hours a week on proposals.", kind: "observed", section: "pain", source_keys: ["c1-s2", "c1-s1"] },
+    { text: "Owners of small agencies would buy it.", kind: "assumption", section: "buyer", source_keys: [], confirm: "Ten owner interviews." },
+  ] };
+  const html = renderToStaticMarkup(createElement(OpportunityEvidence, { opportunity: v3 }));
+  assert.match(html, /What the research claims/);
+  // Sections in reading order: buyer, pain, risk.
+  assert.ok(html.indexOf(">Buyer<") < html.indexOf(">Pain<") && html.indexOf(">Pain<") < html.indexOf(">Risk<"));
+  assert.match(html, /Agencies spend ten hours a week on proposals\.<a href="#source-c1-s2"[^>]*aria-label="Source 2: Title c1-s2"[^>]*>\[2\]<\/a><a href="#source-c1-s1"[^>]*>\[1\]<\/a>/);
+  assert.match(html, />Assumption<\/span>Owners of small agencies would buy it\.<\/p><p[^>]*>To confirm: Ten owner interviews\.<\/p>/);
+  assert.match(html, />Inference<\/span>Critics doubt win rates change\.<a href="#source-c1-s3"/);
+  assert.match(html, /<article id="source-c1-s1"[^>]*target:ring-2[^>]*>[\s\S]*?\[1\]/, "the cited card carries the anchor and its number");
+  // An older opportunity (no claims) renders the evidence exactly as before, without a claims section.
+  const old = renderToStaticMarkup(createElement(OpportunityEvidence, { opportunity: base }));
+  assert.doesNotMatch(old, /What the research claims|Inference|Assumption/);
+  assert.match(old, /Evidence and original sources/);
+});
+
 test("finalizing saves an outcome that agrees with the report, listing the candidates that did not pass", async () => {
   const checkpoints = new Map();
   const candidates = Array.from({ length: 5 }, (_, i) => ({ key: `c${i + 1}`, title: `Candidate ${i + 1}`, buyer: "Agencies", pain: "Slow proposals", solution: "Assistant", advantage: "Network", query: "agency proposal preparation time survey" }));
