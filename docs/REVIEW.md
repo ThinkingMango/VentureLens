@@ -220,7 +220,7 @@ Gross margin on AI cost alone is >90 %. The real cost drivers will be **failed r
 | P1 | ~~`app_settings` table; move provider settings and budget cap (B5, B8)~~ **done 2026-11-05** (migration `app_settings_and_role_admin`); pricing still in code | — | — |
 | P1 | ~~Admin by `app_metadata.role` only; drop email constant from client (B6)~~ **done 2026-11-05** | — | — |
 | P1 | Realistic retrieval reservation + async usage reconciliation (B7) | 1 d | research |
-| P1 | CI workflow (typecheck, test, build, db reset) | 0.5 d | infra |
+| P1 | ~~CI workflow (typecheck, test, build, db reset)~~ **done 2026-11-10** (`.github/workflows/ci.yml`; SQL tests run every migration on a fresh PostgreSQL 16 database) | — | — |
 | P1 | Live opportunity tabs to demo parity; disclaimer consolidation | 1.5 d | frontend |
 | P1 | Prettier + split `research-engine.ts` (B18) | 1 d | research |
 | P2 | Entitlements ledger replacing `research_dev_access` (pre-Stripe) | 2 d | backend |
