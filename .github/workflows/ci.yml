@@ -1,0 +1,84 @@
+# Typecheck, unit + SQL tests and a production build on every pull request and every push to main.
+# Needs no secrets: the build and the unit tests run without Supabase or model-provider keys, and the SQL tests run
+# every migration against the disposable PostgreSQL service below. The tests that need real credentials or incur
+# provider cost (test:integration, test:research:e2e) are deliberately not run here.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A newer push to the same branch or pull request supersedes the run in progress.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Typecheck, test and build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      # Read by tests/*.sql.test.mjs; each test creates its own throwaway database on this server and drops it after.
+      TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/postgres
+    services:
+      postgres:
+        # Supabase runs PostgreSQL 15+; the SQL tests need a server where the user may create databases.
+        image: postgres:16
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v5
+
+      # Installs the pnpm version pinned by "packageManager" in package.json.
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        id: install
+        run: pnpm install --frozen-lockfile
+
+      # The SQL tests skip themselves (and pass) when psql or the database is missing, which would leave CI green
+      # without running them. Fail loudly here instead.
+      - name: Check the test database is reachable
+        run: psql "$TEST_DATABASE_URL" -v ON_ERROR_STOP=1 -X -A -t -c "select version()"
+
+      - name: Typecheck
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: pnpm typecheck
+
+      # Once dependencies are installed, every check runs and reports even after an earlier one fails, so one push
+      # shows all failures at once.
+      - name: Unit and SQL tests
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: pnpm test
+
+      - name: Restore the Next.js build cache
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        uses: actions/cache@v6
+        with:
+          path: .next/cache
+          key: nextjs-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('app/**', 'components/**', 'lib/**', 'i18n/**', 'messages/**', 'workflows/**', '*.ts', '*.mjs', '*.json') }}
+          restore-keys: |
+            nextjs-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
+
+      - name: Build
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: pnpm build

@@ -84,6 +84,8 @@ TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:5432/postgres pnpm test:sql
                          # runs every migration on a throwaway database and tests the run-quota SQL
 ```
 
+CI (`.github/workflows/ci.yml`) runs `pnpm typecheck`, `pnpm test` (including the SQL tests, against a PostgreSQL 16 service) and `pnpm build` on every pull request and every push to `main`. It needs no secrets; `test:integration` and `test:research:e2e` stay manual because they need credentials and incur provider cost.
+
 ## Repository layout
 
 ```
