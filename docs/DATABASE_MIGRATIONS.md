@@ -19,6 +19,7 @@ Read from `supabase_migrations.schema_migrations` on the live project:
 | `20261109160000` | `normalize_gmail_signup_grants` | `supabase/migrations/20261109160000_normalize_gmail_signup_grants.sql` | identical (applied from the repository file after #29 merged, under the file's own version; stored one statement per element, see below) |
 | `20261110025844` | `multi_choice_brief` | `supabase/migrations/20261110025844_multi_choice_brief.sql` | identical apart from the file's `begin;` / `commit;` lines, which production does not store (applied with `apply_migration`, file renamed to the assigned version in `f9aad97`; checked 2026-11-10) |
 | `20261110120000` | `product_events` | `supabase/migrations/20261110120000_product_events.sql` | identical (applied from the repository file after #40 merged, under the file's own version; stored one statement per element; checked 2026-11-10) |
+| `20261110130000` | `verify_mode` | `supabase/migrations/20261110130000_verify_mode.sql` | identical (applied from the repository file after #43 merged, under the file's own version; stored one statement per element without the final semicolons; checked 2026-11-10) |
 
 "Identical" means the MD5 of the SQL with all whitespace removed matches between the repository file and the `statements` column of the applied migration.
 
@@ -42,11 +43,7 @@ After this change `supabase migration list` shows local and remote in sync, and 
 
 ## Written but not yet applied
 
-| Version | Name | File | Pull request | Notes |
-|---|---|---|---|---|
-| `20261110130000` | `verify_mode` | `supabase/migrations/20261110130000_verify_mode.sql` | WP-05 | Adds `research_projects.idea` (jsonb, at most 4000 bytes) and `verify` to the `discovery_mode` check, with a check that an idea is present exactly when the mode is `verify`. Recreates `enqueue_research` (stores the idea) and `record_run_lifecycle_event` (accepts `verify`, records `verify_started`). Additive: existing rows already satisfy the new checks. Tested in `tests/verify-mode.sql.test.mjs`. **Merging the PR applies it to production.** |
-
-When a pull request adds a migration, list it here until it is applied, and apply it only with the owner's approval. If `apply_migration` assigns a different version, rename the file to that version before merging. Merging to `main` can apply a migration to production: the Supabase integration applied `20261109150000`, `20261109160000` and `20261110120000` that way.
+None. When a pull request adds a migration, list it here until it is applied, and apply it only with the owner's approval. If `apply_migration` assigns a different version, rename the file to that version before merging. Merging to `main` can apply a migration to production: the Supabase integration applied `20261109150000`, `20261109160000`, `20261110120000` and `20261110130000` that way.
 
 ## Rules going forward
 
