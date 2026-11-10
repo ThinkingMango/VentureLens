@@ -1,5 +1,5 @@
 // Runs the migrations in supabase/migrations against a throwaway PostgreSQL database and checks the multi-choice
-// research brief (20261110120000_multi_choice_brief.sql): existing briefs are backfilled, new and legacy writers both
+// research brief (20261110025844_multi_choice_brief.sql): existing briefs are backfilled, new and legacy writers both
 // produce consistent rows, and the database bounds the selections.
 //
 // Needs `psql` and TEST_DATABASE_URL, as tests/quota-ledger.sql.test.mjs describes.
@@ -15,7 +15,7 @@ const skip = !server ? "set TEST_DATABASE_URL to run the SQL tests" : !hasPsql ?
 
 const root = new URL("../", import.meta.url);
 const path = relative => fileURLToPath(new URL(relative, root));
-const multiChoice = "20261110120000_multi_choice_brief.sql";
+const multiChoice = "20261110025844_multi_choice_brief.sql";
 function psql(url, args) {
   return execFileSync("psql", [url, "-v", "ON_ERROR_STOP=1", "-X", "-q", "-A", "-t", ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
 }
