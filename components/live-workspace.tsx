@@ -1,7 +1,7 @@
 "use client";
 import { MobileDisclosure } from "@/components/mobile-disclosure";
 import { choiceLabel } from "@/lib/research-options";
-import { useCopy, useFormats } from "@/i18n/use-copy";
+import { useCopy } from "@/i18n/use-copy";
 
 import { useState } from "react";
 import Link from "next/link";
@@ -10,34 +10,21 @@ import {
   ArrowUpRight,
   Bookmark,
   Check,
-  Circle,
   Compass,
-  Link2,
   Plus,
   Lightbulb,
   Sparkles,
   Telescope,
 } from "lucide-react";
 import { useDemo } from "@/components/demo-provider";
-import { PageHeader, SectionTitle, Confidence } from "@/components/shared";
+import { PageHeader, SectionTitle } from "@/components/shared";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { OpportunityCard } from "@/components/opportunity-card";
 import { Input } from "@/components/ui/input";
 import type { WorkspaceOpportunity } from "@/lib/workspace-schema";
 import { stageLabels } from "@/lib/research-core";
-import { reportEvidenceCount, scoreBand, scoreBreakdown } from "@/lib/report-presentation";
-import { OpportunityEvidence } from "@/components/opportunity-evidence";
 import { cn } from "@/lib/utils";
 import { ResearchAccessCard } from "@/components/research-access-card";
-
-export const liveDimensionLabels = [
-  "Buyer pain",
-  "Demand",
-  "Unit economics",
-  "Delivery feasibility",
-  "Founder advantage",
-];
 
 export function WorkspaceEmpty({
   title,
@@ -422,255 +409,6 @@ export function LiveResearchResults({
           }
         />
       )}
-    </>
-  );
-}
-export function LiveOpportunityDetail({
-  opportunity: item,
-}: {
-  opportunity: WorkspaceOpportunity;
-}) {
-  const copy = useCopy();
-  const { saved, toggleSave, completed, toggleTask, busy } = useDemo();
-  const tasks = [
-    "Write down the riskiest assumption",
-    "Find five potential buyers",
-    "Run problem-discovery conversations",
-    "Test a small, paid manual pilot",
-  ];
-  const taskCount = tasks.filter((_, i) =>
-    completed.includes(`${item.id}-${i}`),
-  ).length;
-  const sources = reportEvidenceCount([item]);
-  const breakdown = scoreBreakdown(item);
-  return (
-    <>
-      <Link
-        href="/research/results"
-        className="flex w-fit items-center gap-2 text-sm text-muted-foreground hover:text-primary"
-      >
-        <ArrowRight className="size-4 rotate-180" />
-        {copy("Research results")}
-      </Link>
-      <PageHeader title={item.title} description={item.description}>
-        <Button
-          variant="outline"
-          disabled={busy}
-          aria-pressed={saved.includes(item.id)}
-          onClick={() => toggleSave(item.id)}
-        >
-          <Bookmark
-            className={
-              saved.includes(item.id) ? "fill-primary/15 text-primary" : ""
-            }
-          />
-          {saved.includes(item.id)
-            ? copy("Saved opportunity")
-            : copy("Save opportunity")}
-        </Button>
-      </PageHeader>
-      <dl className="grid grid-cols-2 gap-4 border-y py-4 sm:grid-cols-[1.4fr_1fr_1fr]">
-        <div className="col-span-2 flex flex-col gap-1 sm:col-span-1">
-          <dt className="text-sm text-muted-foreground">
-            {copy("Likely buyer")}
-          </dt>
-          <dd className="font-medium">{item.buyer}</dd>
-        </div>
-        <div className="flex flex-col gap-1">
-          <dt className="text-sm text-muted-foreground">
-            {copy("Research score")}
-          </dt>
-          <dd className="font-semibold tabular-nums">{item.score}/100</dd>
-        </div>
-        <div className="flex flex-col gap-1">
-          <dt className="text-sm text-muted-foreground">
-            {copy("Linked sources")}
-          </dt>
-          <dd className="flex items-center gap-1.5 font-semibold tabular-nums">
-            <Link2 className="size-4 text-primary" />
-            {sources}
-          </dd>
-        </div>
-      </dl>
-      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_300px]">
-        <div className="flex min-w-0 flex-col gap-6">
-          <section className="surface flex flex-col gap-5 p-6">
-            <h2 className="text-xl font-semibold">
-              {copy("Opportunity overview")}
-            </h2>
-            <dl className="flex flex-col gap-4">
-              {[
-                ["Buyer problem", item.pain],
-                ["Key risk", item.risk],
-                ["Business model and pricing assumptions", item.revenue],
-                ["Delivery cost assumptions", item.cost],
-              ].map(([label, value]) => (
-                <div key={label}>
-                  <dt className="text-sm text-muted-foreground">
-                    {copy(String(label))}
-                  </dt>
-                  <dd className="mt-1 leading-relaxed">{value}</dd>
-                </div>
-              ))}
-            </dl>
-          </section>
-          <OpportunityEvidence opportunity={item} />
-          <section className="surface flex flex-col gap-4 p-6">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-xl font-semibold">
-                {copy("Your first validation sprint")}
-              </h2>
-              <span
-                className="text-sm text-muted-foreground"
-                aria-live="polite"
-              >
-                {copy("{count} of {total} steps complete", {
-                  count: taskCount,
-                  total: tasks.length,
-                })}
-              </span>
-            </div>
-            <div className="progress-track" aria-hidden="true">
-              <div
-                className="progress-fill"
-                style={{ width: `${(taskCount / tasks.length) * 100}%` }}
-              />
-            </div>
-            <p className="text-sm text-muted-foreground">
-              {copy(
-                "Checklist progress is saved with this opportunity. No messages or meeting invitations are sent.",
-              )}
-            </p>
-            {tasks.map((task, index) => (
-              <label
-                key={task}
-                className="flex cursor-pointer items-center gap-3 border-t py-4"
-              >
-                <input
-                  className="size-5"
-                  type="checkbox"
-                  disabled={busy}
-                  checked={completed.includes(`${item.id}-${index}`)}
-                  onChange={() => toggleTask(`${item.id}-${index}`)}
-                />
-                <span
-                  className={cn(
-                    completed.includes(`${item.id}-${index}`) &&
-                      "text-muted-foreground line-through",
-                  )}
-                >
-                  {copy(task)}
-                </span>
-              </label>
-            ))}
-          </section>
-        </div>
-        <aside className="flex min-w-0 flex-col gap-5 xl:sticky xl:top-6">
-          <section
-            className="surface flex flex-col gap-5 p-6"
-            aria-labelledby="live-score-title"
-          >
-            <div className="flex items-center justify-between gap-3">
-              <h2 id="live-score-title" className="font-semibold">
-                {copy("Score breakdown")}
-              </h2>
-              <Badge variant="outline">{copy("Evidence-driven")}</Badge>
-            </div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-4xl font-semibold tabular-nums tracking-tight">
-                {item.score}
-              </span>
-              <span className="text-sm text-muted-foreground">/ 100</span>
-            </div>
-            <p className="font-medium">{copy(scoreBand(item.score).label)}</p>
-            <Confidence level={item.confidence} />
-            <dl className="flex flex-col gap-4 border-t pt-5">
-              {liveDimensionLabels.map((label, i) => (
-                <div key={label} className="flex flex-col gap-2">
-                  <div className="flex justify-between gap-3 text-sm">
-                    <dt className="text-muted-foreground">{copy(label)}</dt>
-                    <dd className="font-medium tabular-nums">
-                      {item.scores[i]}
-                      <span className="sr-only"> {copy("out of 100")}</span>
-                    </dd>
-                  </div>
-                  <div className="progress-track" aria-hidden="true">
-                    <div
-                      className="progress-fill"
-                      style={{ width: `${item.scores[i]}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </dl>
-            <section aria-labelledby="score-steps-title" className="flex flex-col gap-3 border-t pt-5">
-              <h3 id="score-steps-title" className="text-sm font-semibold">
-                {copy("How this score was reached")}
-              </h3>
-              <dl className="flex flex-col gap-2 text-sm">
-                <div className="flex justify-between gap-3">
-                  <dt className="min-w-0 text-muted-foreground">{copy("Weighted rating before review")}</dt>
-                  <dd className="shrink-0 whitespace-nowrap font-medium tabular-nums">{breakdown.beforeReview}</dd>
-                </div>
-                <div className="flex justify-between gap-3">
-                  <dt className="min-w-0 text-muted-foreground">{copy("Adversarial review deduction")}</dt>
-                  <dd className="shrink-0 whitespace-nowrap font-medium tabular-nums">{breakdown.deduction > 0 ? `−${breakdown.deduction}` : "0"}</dd>
-                </div>
-                <div className="flex justify-between gap-3">
-                  <dt className="min-w-0 text-muted-foreground">
-                    {copy(breakdown.cap === 85 ? "Evidence cap (3+ independent supporting sources)" : "Evidence cap (fewer than 3 independent supporting sources)")}
-                  </dt>
-                  <dd className="shrink-0 whitespace-nowrap font-medium tabular-nums">{breakdown.cap}</dd>
-                </div>
-                <div className="flex justify-between gap-3 border-t pt-2">
-                  <dt className="min-w-0 font-medium">{copy("Score")}</dt>
-                  <dd className="shrink-0 whitespace-nowrap font-semibold tabular-nums">{breakdown.score}</dd>
-                </div>
-              </dl>
-              {breakdown.capped && (
-                <p className="text-sm text-muted-foreground">
-                  {copy("The evidence cap set this score. More independent supporting sources would raise the cap.")}
-                </p>
-              )}
-            </section>
-            <p className="text-sm text-muted-foreground">
-              {copy(
-                "Scores compare hypotheses, not success probabilities. Validate with buyers.",
-              )}
-            </p>
-          </section>
-          {item.validation?.[0] && (
-            <section className="flex flex-col gap-3 px-1">
-              <h2 className="font-semibold">{copy("What to test first")}</h2>
-              <p className="text-sm leading-relaxed text-muted-foreground">
-                {item.validation[0]}
-              </p>
-            </section>
-          )}
-          <ul className="flex flex-col gap-2 px-1 text-sm text-muted-foreground">
-            {[
-              [
-                "Dimension scores",
-                "Model-estimated, 0–100, weighted by discovery mode.",
-              ],
-              [
-                "Confidence",
-                "Reflects how many independent sources support this hypothesis.",
-              ],
-            ].map(([k, v]) => (
-              <li key={k} className="flex gap-2">
-                <Circle className="mt-1.5 size-2 shrink-0 fill-current text-primary" />
-                <span>
-                  <strong className="font-medium text-foreground">
-                    {copy(k)}:
-                  </strong>{" "}
-                  {copy(v)}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </aside>
-      </div>
     </>
   );
 }

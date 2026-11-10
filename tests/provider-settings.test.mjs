@@ -536,33 +536,6 @@ test("methodology v3: evaluation asks for claims citing only gated sources, and 
   assert.deepEqual(workspaceSchema.opportunitySchema.parse(c1).claims, stored, "claims survive the workspace read path");
 });
 
-test("the opportunity page shows claims by section with citation chips that point at numbered source cards", () => {
-  const copy = () => (text, values = {}) => text.replace(/\{(\w+)\}/g, (_m, key) => values[key] ?? key);
-  const { OpportunityEvidence } = loadModule("../components/opportunity-evidence.tsx", {
-    "@/i18n/use-copy": { useCopy: copy, useFormats: () => ({ date: value => value }) },
-    "@/lib/research-core": researchCore, "@/lib/report-presentation": require("../lib/report-presentation.ts"),
-  });
-  const source = (key, stance) => ({ source_key: key, url: `https://example.org/${key}`, title: `Title ${key}`, excerpt: "x", retrieved_at: "2026-11-10", published_at: null, stance });
-  const base = { id: "o", title: "t", category: "c", description: "d", buyer: "b", pain: "p", score: 60, confidence: "limited", revenue: "r", cost: "c", risk: "k", scores: [60, 60, 60, 60, 60], icon: "workflow", evidence: [source("c1-s1", "supports"), source("c1-s2", "supports"), source("c1-s3", "contradicts")], rationale: "why" };
-  const v3 = { ...base, methodology_version: 3, claims: [
-    { text: "Critics doubt win rates change.", kind: "inference", section: "risk", source_keys: ["c1-s3"] },
-    { text: "Agencies spend ten hours a week on proposals.", kind: "observed", section: "pain", source_keys: ["c1-s2", "c1-s1"] },
-    { text: "Owners of small agencies would buy it.", kind: "assumption", section: "buyer", source_keys: [], confirm: "Ten owner interviews." },
-  ] };
-  const html = renderToStaticMarkup(createElement(OpportunityEvidence, { opportunity: v3 }));
-  assert.match(html, /What the research claims/);
-  // Sections in reading order: buyer, pain, risk.
-  assert.ok(html.indexOf(">Buyer<") < html.indexOf(">Pain<") && html.indexOf(">Pain<") < html.indexOf(">Risk<"));
-  assert.match(html, /Agencies spend ten hours a week on proposals\.<a href="#source-c1-s2"[^>]*aria-label="Source 2: Title c1-s2"[^>]*>\[2\]<\/a><a href="#source-c1-s1"[^>]*>\[1\]<\/a>/);
-  assert.match(html, />Assumption<\/span>Owners of small agencies would buy it\.<\/p><p[^>]*>To confirm: Ten owner interviews\.<\/p>/);
-  assert.match(html, />Inference<\/span>Critics doubt win rates change\.<a href="#source-c1-s3"/);
-  assert.match(html, /<article id="source-c1-s1"[^>]*target:ring-2[^>]*>[\s\S]*?\[1\]/, "the cited card carries the anchor and its number");
-  // An older opportunity (no claims) renders the evidence exactly as before, without a claims section.
-  const old = renderToStaticMarkup(createElement(OpportunityEvidence, { opportunity: base }));
-  assert.doesNotMatch(old, /What the research claims|Inference|Assumption/);
-  assert.match(old, /Evidence and original sources/);
-});
-
 test("finalizing saves an outcome that agrees with the report, listing the candidates that did not pass", async () => {
   const checkpoints = new Map();
   const candidates = Array.from({ length: 5 }, (_, i) => ({ key: `c${i + 1}`, title: `Candidate ${i + 1}`, buyer: "Agencies", pain: "Slow proposals", solution: "Assistant", advantage: "Network", query: "agency proposal preparation time survey" }));

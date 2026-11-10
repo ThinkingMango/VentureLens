@@ -4,7 +4,7 @@ import { Dashboard } from "@/components/dashboard";
 import { ResearchConfig } from "@/components/research-config";
 import { ResearchLibrary } from "@/components/research-library";
 import { ResearchResults } from "@/components/research-results";
-import { OpportunityDetail } from "@/components/opportunity-detail";
+import { DemoOpportunityDetail } from "@/components/opportunity-detail";
 import { Onboarding } from "@/components/onboarding";
 import { Billing } from "@/components/billing";
 import { opportunities, demoOutcome, demoVerifyOutcome } from "@/lib/demo-data";
@@ -36,7 +36,7 @@ export default async function DemoPage({
     const opportunity = opportunities.find((item) => item.id === path[1]);
     if (opportunity)
       content = (
-        <OpportunityDetail opportunity={opportunity} initialTab={query.tab} />
+        <DemoOpportunityDetail opportunity={opportunity} initialTab={typeof query.tab === "string" ? query.tab : undefined} />
       );
   }
   if (!content) notFound();
