@@ -19,6 +19,7 @@ import {
   Lock,
 } from "lucide-react";
 import { useDemo } from "@/components/demo-provider";
+import { scoringWeights } from "@/lib/research-core";
 import {
   anySector,
   businessModelGroups,
@@ -57,6 +58,26 @@ const pipeline = [
   ],
   ["Save", "A private report with linked sources you can reopen any time."],
 ];
+// The three discovery modes, each described by what it changes in the engine (lib/research-engine.ts): where
+// hypotheses start, whether the founder profile is read, and how much founder advantage weighs in the score. The weight
+// is read from scoringWeights, so the copy cannot drift from the scoring.
+const discoveryModes = [
+  {
+    value: "combined",
+    title: "Combined discovery",
+    text: "Weighs buyer demand and your fit together. Your advantage counts for {weight}% of the score.",
+  },
+  {
+    value: "founder",
+    title: "Founder advantage",
+    text: "Starts from your skills, channels and resources. Your advantage counts for {weight}% of the score.",
+  },
+  {
+    value: "market",
+    title: "Market-first",
+    text: "Starts only from buyer pain and spending. Your profile isn’t used, and advantage doesn’t count.",
+  },
+] as const;
 // One option of a multi-choice field: a native checkbox (so keyboard, form and screen-reader behaviour come for free)
 // drawn as a chip with a 44px touch target.
 function ChoiceChip({
@@ -266,38 +287,46 @@ export function ResearchConfig() {
                 <h2 id="discovery-preferences-group" className="text-lg font-semibold">
                   {copy("Discovery preferences")}
                 </h2>
-              <Field>
-                <FieldLabel htmlFor="discovery-mode">
+              <FieldSet id="discovery-mode" className="gap-3">
+                <FieldLegend variant="label" className="mb-0">
                   {copy("Discovery mode")}
-                </FieldLabel>
-                <select
-                  id="discovery-mode"
-                  className="field-select"
-                  value={draft.discovery_mode ?? "combined"}
-                  onChange={(e) =>
-                    setDraft({
-                      ...draft,
-                      discovery_mode: e.target.value as
-                        "founder" | "market" | "combined",
-                    })
-                  }
-                >
-                  <option value="combined">
-                    {copy("Combined discovery")}
-                  </option>
-                  <option value="founder">
-                    {copy("Founder advantage")}
-                  </option>
-                  <option value="market">
-                    {copy("Market-first")}
-                  </option>
-                </select>
-                <FieldDescription>
-                  {copy(
-                    "Market-first excludes personal context from discovery and scoring. Other modes consider your skills and resources.",
-                  )}
-                </FieldDescription>
-              </Field>
+                </FieldLegend>
+                <div className="grid gap-2">
+                  {discoveryModes.map((mode) => (
+                    <label
+                      key={mode.value}
+                      className="flex cursor-pointer gap-3 rounded-xl border bg-card p-4 transition-colors hover:border-primary/60 has-[:checked]:border-primary has-[:checked]:bg-primary/5 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-primary"
+                    >
+                      <input
+                        type="radio"
+                        name="discovery-mode"
+                        value={mode.value}
+                        checked={(draft.discovery_mode ?? "combined") === mode.value}
+                        onChange={() =>
+                          setDraft({ ...draft, discovery_mode: mode.value })
+                        }
+                        aria-describedby={`discovery-mode-${mode.value}-help`}
+                        className="mt-0.5 size-4 shrink-0"
+                      />
+                      <span className="flex min-w-0 flex-col gap-1">
+                        <span className="font-medium leading-snug">
+                          {copy(mode.title)}
+                        </span>
+                        <span
+                          id={`discovery-mode-${mode.value}-help`}
+                          className="text-sm leading-snug text-muted-foreground"
+                        >
+                          {copy(mode.text, {
+                            weight: Math.round(
+                              scoringWeights[mode.value].advantage * 100,
+                            ),
+                          })}
+                        </span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </FieldSet>
               <FieldSet
                 id="sectors"
                 aria-describedby="sectors-help"
