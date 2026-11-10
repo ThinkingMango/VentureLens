@@ -20,6 +20,7 @@ Read from `supabase_migrations.schema_migrations` on the live project:
 | `20261110025844` | `multi_choice_brief` | `supabase/migrations/20261110025844_multi_choice_brief.sql` | identical apart from the file's `begin;` / `commit;` lines, which production does not store (applied with `apply_migration`, file renamed to the assigned version in `f9aad97`; checked 2026-11-10) |
 | `20261110120000` | `product_events` | `supabase/migrations/20261110120000_product_events.sql` | identical (applied from the repository file after #40 merged, under the file's own version; stored one statement per element; checked 2026-11-10) |
 | `20261110130000` | `verify_mode` | `supabase/migrations/20261110130000_verify_mode.sql` | identical (applied from the repository file after #43 merged, under the file's own version; stored one statement per element without the final semicolons; checked 2026-11-10) |
+| `20261110140000` | `founder_profile_v2` | `supabase/migrations/20261110140000_founder_profile_v2.sql` | identical (applied from the repository file after #45 merged, under the file's own version; stored one statement per element without the final semicolons; checked 2026-11-10) |
 
 "Identical" means the MD5 of the SQL with all whitespace removed matches between the repository file and the `statements` column of the applied migration.
 
@@ -43,11 +44,7 @@ After this change `supabase migration list` shows local and remote in sync, and 
 
 ## Written but not yet applied
 
-| Version | Name | File | Pull request | Notes |
-|---|---|---|---|---|
-| `20261110140000` | `founder_profile_v2` | `supabase/migrations/20261110140000_founder_profile_v2.sql` | WP-02 | Adds eight columns to `founder_profiles` (`interests`, `pain_points`, `revenue_target`, `strength`, `distribution`, `languages text[]`, `exclusions`, `risk_tolerance`), each `not null` with an empty default and a length check; `languages` holds at most five non-null names. Additive: existing profiles read as "not answered". RLS, policies and grants unchanged. Tested in `tests/founder-profile.sql.test.mjs`. **Merging the PR applies it to production.** |
-
-When a pull request adds a migration, list it here until it is applied, and apply it only with the owner's approval. If `apply_migration` assigns a different version, rename the file to that version before merging. Merging to `main` can apply a migration to production: the Supabase integration applied `20261109150000`, `20261109160000`, `20261110120000` and `20261110130000` that way.
+None. When a pull request adds a migration, list it here until it is applied, and apply it only with the owner's approval. If `apply_migration` assigns a different version, rename the file to that version before merging. Merging to `main` can apply a migration to production: the Supabase integration applied `20261109150000`, `20261109160000`, `20261110120000`, `20261110130000` and `20261110140000` that way.
 
 ## Rules going forward
 
