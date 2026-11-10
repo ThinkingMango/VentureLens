@@ -11,6 +11,7 @@ import * as workspaceSchema from "../lib/workspace-schema.ts";
 import { founderIndustries } from "../lib/profile-options.ts";
 import { messageKey, locales } from "../i18n/config.ts";
 import { decodeHtml } from "../lib/research-source.ts";
+import * as researchCore from "../lib/research-core.ts";
 
 const { projectSchema, emptyBrief, emptyProfile } = workspaceSchema;
 const require = createRequire(import.meta.url);
@@ -175,6 +176,7 @@ function renderForm({ projects = [], industry = "Healthcare", isDemo = false, ru
     "@/components/ui/button": { Button: pass("button") }, "@/components/ui/input": { Input: props => createElement("input", props) },
     "@/components/ui/field": new Proxy({}, { get: (_, name) => name === "__esModule" ? false : pass(name === "FieldLabel" ? "label" : "div") }),
     "@/lib/research-options": options,
+    "@/lib/research-core": researchCore,
   });
   return { html: renderToStaticMarkup(createElement(ResearchConfig)), missing };
 }
@@ -204,6 +206,23 @@ test("the research form shows the grouped options in the interface language and 
   // A first brief starts from the founder's own industry when it can be researched.
   assert.deepEqual(sectors.filter(([, checked]) => checked).map(([v]) => v), ["Healthcare"]);
   assert.deepEqual(models.filter(([, checked]) => checked).map(([v]) => v), emptyBrief.models);
+});
+
+test("discovery mode is a set of radio cards that say what each mode does to the score", () => {
+  const radios = html => [...html.matchAll(/<input type="radio"([^>]*)\/?>/g)].map(([, attrs]) => attrs).filter(attrs => attrs.includes('name="discovery-mode"')).map(attrs => [/value="([^"]+)"/.exec(attrs)[1], /checked=""/.test(attrs)]);
+  const { html, missing } = renderForm();
+  assert.equal(/<select[^>]*id="discovery-mode"/.test(html), false, "no longer a dropdown");
+  assert.deepEqual(radios(html), [["combined", true], ["founder", false], ["market", false]], "combined is the default");
+  // Titles and descriptions are translated, and the advantage weight comes from the scoring weights.
+  assert.match(html, /綜合探索.*?你的優勢佔評分的 15%/s);
+  assert.match(html, /創業者優勢.*?你的優勢佔評分的 25%/s);
+  assert.match(html, /市場優先.*?不使用你的背景，優勢也不計入評分/s);
+  assert.equal(researchCore.scoringWeights.market.advantage, 0, "the market-first card says advantage does not count");
+  assert.deepEqual(missing.filter(source => /score|advantage|Combined|Founder|Market-first/i.test(source)), []);
+  // Each card's description is announced with its radio.
+  for (const [value] of radios(html)) assert.match(html, new RegExp(`aria-describedby="discovery-mode-${value}-help"[^>]*/?>.*?id="discovery-mode-${value}-help"`, "s"));
+  // A saved brief reopens with its own mode selected.
+  assert.deepEqual(radios(renderForm({ projects: [{ id: "p" }], run: { ...emptyBrief, discovery_mode: "market" } }).html).filter(([, checked]) => checked), [["market", true]]);
 });
 
 test("at three industries the other named industries are disabled, with a message saying why", () => {
