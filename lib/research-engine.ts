@@ -11,7 +11,7 @@ import { researchProviderSettings } from "@/lib/provider-settings";
 import { defaultProviderSettings, providerPlan, providerSettingsSchema, type ProviderSettings } from "@/lib/provider-settings-core";
 import { selectedModel, researchModelPricing, geminiThinkingOptions, qwenModelSchema, geminiModelSchema, type ResearchModelId } from "@/lib/research-models";
 import { reservationFor, estimateRunCost } from "@/lib/research-budget";
-import { searchLanguage } from "@/lib/research-options";
+import { briefFocus, searchLanguage } from "@/lib/research-options";
 import { researchRequestSchema, profileSchema, opportunitySchema } from "@/lib/workspace-schema";
 import {
   methodology, discoverySchema, classificationSchema, evaluationSchema, reviewSchema,
@@ -263,7 +263,7 @@ export async function executeResearchStage(ctx: Context, key: string): Promise<s
   const language = reportLanguage(brief.language);
   const profile = mode === "market" ? null : { industry: setup.profile.industry, skills: setup.profile.skills, hours: setup.profile.hours, budget: setup.profile.budget, goal: setup.profile.goal };
   if (key === "discovery") {
-    const output = await structured(ctx, key, discoveryDraftSchema, normalizeDiscovery, `Generate 8 specific, mutually distinct GenAI business opportunity hypotheses that a small team could validate. No retrieval happens in this stage, so never claim anything is verified. Keys must be c1 through c8. Keep each title under 180 characters and each other field under 800 characters. Write "query" as a web-search string in ${searchLanguage(brief.geography)} that would find independent evidence of the buyer's problem and what they already spend on it (surveys, industry reports, forum discussions, news), naming the buyer, the problem and the target geography. Do not name products or ask for tools or software. Mode=${mode}: founder starts from the founder's skills, channels, and resource advantages; market starts only from market pain and existing spending and does not infer founder fit; combined considers both. Brief=${JSON.stringify(brief)}; available founder context=${JSON.stringify(profile)}.`, pricing);
+    const output = await structured(ctx, key, discoveryDraftSchema, normalizeDiscovery, `Generate 8 specific, mutually distinct GenAI business opportunity hypotheses that a small team could validate. No retrieval happens in this stage, so never claim anything is verified. Keys must be c1 through c8. Keep each title under 180 characters and each other field under 800 characters. Write "query" as a web-search string in ${searchLanguage(brief.geography)} that would find independent evidence of the buyer's problem and what they already spend on it (surveys, industry reports, forum discussions, news), naming the buyer, the problem and the target geography. Do not name products or ask for tools or software. Mode=${mode}: founder starts from the founder's skills, channels, and resource advantages; market starts only from market pain and existing spending and does not infer founder fit; combined considers both. ${briefFocus(brief)} Brief=${JSON.stringify(brief)}; available founder context=${JSON.stringify(profile)}.`, pricing);
     await checkpoint(ctx, key, output);
     return output.candidates.map(c => c.key);
   }

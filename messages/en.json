@@ -1303,7 +1303,10 @@
     "mhnc299": "Evidence cap (fewer than 3 independent supporting sources)",
     "mx9tsfp": "Score",
     "mn53pfh": "The evidence cap set this score. More independent supporting sources would raise the cap.",
-    "m1kyxviq": "Scores are capped at 70 with limited evidence and 85 otherwise. Adversarial review can only deduct points, at most {points}, and not again for evidence gaps the ratings already reflect."
+    "m1kyxviq": "Scores are capped at 70 with limited evidence and 85 otherwise. Adversarial review can only deduct points, at most {points}, and not again for evidence gaps the ratings already reflect.",
+    "mn4syyd": "You’ve chosen {count} industries, the most one run covers well. Untick one to choose another.",
+    "msk1r00": "Choose up to {count}. Each run explores eight ideas in total, so fewer industries means deeper research in each.",
+    "mf5o7gb": "Choose every model you would accept. Each idea uses one of them."
   },
   "language": {
     "label": "Interface language",

@@ -17,6 +17,9 @@ const require = createRequire(import.meta.url);
 const catalogs = Object.fromEntries(locales.map(l => [l, JSON.parse(readFileSync(new URL(`../messages/${l}.json`, import.meta.url), "utf8"))]));
 const brief = { ...emptyBrief, name: "Research" };
 
+// A brief as it was stored, and sent, before industries and business models became multi-choice.
+const legacyBrief = { name: "Research", sector: "Professional services", model: "B2B subscription", geography: "United States", context: "" };
+
 test("every value accepted before the lists grew is still accepted, so saved briefs and runs stay valid", () => {
   const before = {
     sector: ["Professional services", "B2B SaaS", "Finance & operations", "Education", "Healthcare"],
@@ -24,17 +27,71 @@ test("every value accepted before the lists grew is still accepted, so saved bri
     geography: ["United States", "United Kingdom", "European Union", "Global / English-speaking"],
   };
   for (const [field, values] of Object.entries(before))
-    for (const value of values) assert.equal(projectSchema.safeParse({ ...brief, [field]: value }).success, true, `${field}: ${value}`);
+    for (const value of values) assert.equal(projectSchema.safeParse({ ...legacyBrief, [field]: value }).success, true, `${field}: ${value}`);
+});
+
+test("a single-choice brief from before multi-choice is read as one-item selections", () => {
+  // Stored run configurations are re-parsed on retry (lib/research-engine.ts), so this shape must keep parsing.
+  const parsed = projectSchema.parse(legacyBrief);
+  assert.deepEqual(parsed.sectors, ["Professional services"]);
+  assert.deepEqual(parsed.models, ["B2B subscription"]);
+  assert.equal("sector" in parsed || "model" in parsed, false, "the legacy keys are not carried forward");
+  const request = workspaceSchema.researchRequestSchema.parse({ ...legacyBrief, language: "zh-Hant" });
+  assert.deepEqual([request.sectors, request.models, request.language], [["Professional services"], ["B2B subscription"], "zh-Hant"]);
+  for (const [field, value] of [["sector", "invalid"], ["model", "专业服务"]])
+    assert.equal(projectSchema.safeParse({ ...legacyBrief, [field]: value }).success, false, `${field}: ${value}`);
 });
 
 test("the new options are accepted, and anything off the lists is still rejected", () => {
-  for (const [field, list] of [["sector", options.researchSectors], ["model", options.businessModels], ["geography", options.targetMarkets]]) {
-    for (const value of list) assert.equal(projectSchema.parse({ ...brief, [field]: value })[field], value);
+  for (const [field, list, wrap] of [["sectors", options.researchSectors, v => [v]], ["models", options.businessModels, v => [v]], ["geography", options.targetMarkets, v => v]]) {
+    for (const value of list) assert.deepEqual(projectSchema.parse({ ...brief, [field]: wrap(value) })[field], wrap(value));
     // A translated label is never a stored value: the form always submits the canonical English option value.
     for (const rejected of ["invalid", "", "专业服务", "香港", list[0].toLowerCase()])
-      assert.equal(projectSchema.safeParse({ ...brief, [field]: rejected }).success, false, `${field}: ${rejected}`);
+      assert.equal(projectSchema.safeParse({ ...brief, [field]: wrap(rejected) }).success, false, `${field}: ${rejected}`);
   }
   assert.ok(options.researchSectors.length >= 18 && options.businessModels.length >= 11 && options.targetMarkets.length >= 20);
+});
+
+test("industries take up to three, models any number, and the open option only on its own", () => {
+  const ok = (patch) => projectSchema.safeParse({ ...brief, ...patch }).success;
+  assert.equal(ok({ sectors: ["Healthcare", "Legal & compliance", "Education"] }), true);
+  assert.equal(ok({ sectors: ["Healthcare", "Legal & compliance", "Education", "B2B SaaS"] }), false, "more than three industries");
+  assert.equal(ok({ sectors: [] }), false, "an empty selection");
+  assert.equal(ok({ sectors: ["Healthcare", "Healthcare"] }), false, "a repeated industry");
+  assert.equal(ok({ sectors: ["Open to any industry", "Healthcare"] }), false, "open with a named industry");
+  assert.equal(ok({ sectors: "Healthcare" }), false, "a bare string next to the new key shape");
+  const named = options.businessModels.filter(v => v !== options.businessModelLead);
+  assert.equal(ok({ models: named }), true, "every named model at once");
+  assert.equal(ok({ models: [] }), false);
+  assert.equal(ok({ models: ["Open to possibilities", "B2B subscription"] }), false);
+  assert.equal(ok({ models: ["Open to possibilities"] }), true);
+});
+
+test("ticking options keeps the selection valid, in list order, and never empty", () => {
+  const { researchSectors: list, anySector: open, maxResearchSectors: max, toggleChoice } = options;
+  let picked = [open];
+  picked = toggleChoice(list, picked, "Healthcare", open, max);
+  assert.deepEqual(picked, ["Healthcare"], "a named industry replaces the open option");
+  picked = toggleChoice(list, picked, "B2B SaaS", open, max);
+  assert.deepEqual(picked, ["B2B SaaS", "Healthcare"], "kept in list order, not click order");
+  picked = toggleChoice(list, picked, "Legal & compliance", open, max);
+  assert.deepEqual(toggleChoice(list, picked, "Education", open, max), picked, "at the cap, another tick changes nothing");
+  assert.deepEqual(toggleChoice(list, picked, open, open, max), [open], "the open option clears the named ones");
+  assert.deepEqual(toggleChoice(list, ["Healthcare"], "Healthcare", open, max), [open], "unticking the last falls back to open");
+  for (const selection of [picked, [open], ["Healthcare"]])
+    assert.equal(projectSchema.safeParse({ ...brief, sectors: selection }).success, true);
+  assert.equal(options.choiceLabel(["Healthcare", "Legal & compliance"], v => v.toUpperCase()), "HEALTHCARE + LEGAL & COMPLIANCE");
+});
+
+test("the discovery prompt spells out how several industries and models are to be used", () => {
+  const focus = (sectors, models) => options.briefFocus({ sectors, models });
+  assert.match(focus(["Open to any industry"], ["Open to possibilities"]), /open to any industry.*Business model: open/s);
+  assert.match(focus(["Healthcare"], ["B2B subscription"]), /every hypothesis must sit in Healthcare\..*every hypothesis must use B2B subscription/s);
+  const several = focus(["Healthcare", "Legal & compliance"], ["B2B subscription", "Productized service"]);
+  assert.match(several, /at least one of Healthcare; Legal & compliance\. Cover each of these industries with at least one hypothesis; hypotheses that combine them are welcome\./);
+  assert.match(several, /exactly one of B2B subscription; Productized service, named in its description/);
+  const engine = readFileSync(new URL("../lib/research-engine.ts", import.meta.url), "utf8");
+  assert.match(engine, /combined considers both\. \$\{briefFocus\(brief\)\} Brief=/);
 });
 
 test("grouped lists show every option exactly once, and every profile industry can be researched", () => {
@@ -98,7 +155,7 @@ function loadModule(file, dependencies) {
   new Function("require", "exports", "module", "process", outputText)(dependency, module.exports, module, { env: {} });
   return module.exports;
 }
-function renderForm({ projects = [], industry = "Healthcare", isDemo = false } = {}) {
+function renderForm({ projects = [], industry = "Healthcare", isDemo = false, run = { ...emptyBrief } } = {}) {
   const t = createTranslator({ locale: "zh-Hant", messages: catalogs["zh-Hant"], namespace: "ui" });
   const missing = [];
   const copy = (source, values) => { const key = messageKey(source); if (catalogs["zh-Hant"].ui[key]) return t(key, values); missing.push(source); return source; };
@@ -112,7 +169,7 @@ function renderForm({ projects = [], industry = "Healthcare", isDemo = false } =
     "next-intl": { useLocale: () => "zh-Hant" },
     "@/i18n/config": { localeNames: { en: "English", "zh-Hans": "简体中文", "zh-Hant": "繁體中文" } },
     "@/components/workspace-link": { default: ({ href, children }) => createElement("a", { href }, children) },
-    "@/components/demo-provider": { useDemo: () => ({ run: { ...emptyBrief }, setRun: async () => {}, profile: { ...emptyProfile, industry }, isDemo, href: p => p, busy: false, refresh: async () => {}, data: isDemo ? null : { projects, access: { enabled: true, remaining: 1, maxRuns: 1, expiresAt: null } } }) },
+    "@/components/demo-provider": { useDemo: () => ({ run, setRun: async () => {}, profile: { ...emptyProfile, industry }, isDemo, href: p => p, busy: false, refresh: async () => {}, data: isDemo ? null : { projects, access: { enabled: true, remaining: 1, maxRuns: 1, expiresAt: null } } }) },
     "@/components/shared": { PageHeader: ({ title }) => createElement("h1", null, title), DemoNote: () => null },
     "@/components/research-access-card": { ResearchAccessCard: () => null },
     "@/components/ui/button": { Button: pass("button") }, "@/components/ui/input": { Input: props => createElement("input", props) },
@@ -122,26 +179,50 @@ function renderForm({ projects = [], industry = "Healthcare", isDemo = false } =
   return { html: renderToStaticMarkup(createElement(ResearchConfig)), missing };
 }
 
+// The checkboxes of one multi-choice field, as [value, checked, disabled].
+const checkboxes = (html, id) => {
+  const group = html.match(new RegExp(`<div id="${id}"[^>]*>(.*?)<div id="${id}-help"`, "s"))[1];
+  return [...group.matchAll(/<input type="checkbox"([^>]*)\/?>/g)].map(([, attrs]) => [/value="([^"]*)"/.exec(attrs)[1].replace(/&amp;/g, "&"), /checked=""/.test(attrs), /disabled=""/.test(attrs)]);
+};
+
 test("the research form shows the grouped options in the interface language and submits canonical values", () => {
   const { html, missing } = renderForm();
   const select = id => html.match(new RegExp(`<select[^>]*id="${id}"[^>]*>(.*?)</select>`, "s"))[1];
   // Labels are translated; option values stay canonical English.
   assert.match(select("geography"), /<optgroup label="亞太地區"><option value="Australia &amp; New Zealand">澳洲與紐西蘭<\/option>/);
   assert.match(select("geography"), /<option value="Mainland China">中國大陸<\/option>/);
-  assert.match(select("model"), /<optgroup label="服務"><option value="Productized service">產品化服務<\/option>/);
-  assert.equal([...select("sector").matchAll(/<option /g)].length, options.researchSectors.length);
-  assert.equal([...select("model").matchAll(/<option /g)].length, options.businessModels.length);
   assert.equal([...select("geography").matchAll(/<option /g)].length, options.targetMarkets.length);
-  assert.deepEqual(missing.filter(s => options.targetMarkets.includes(s) || options.businessModels.includes(s) || options.researchSectors.includes(s)), []);
+  // Industries and business models are checkbox groups: every option once, the open option first.
+  const sectors = checkboxes(html, "sectors");
+  const models = checkboxes(html, "models");
+  assert.deepEqual(sectors.map(([v]) => v).sort(), [...options.researchSectors].sort());
+  assert.deepEqual(models.map(([v]) => v).sort(), [...options.businessModels].sort());
+  assert.equal(sectors[0][0], options.anySector);
+  assert.equal(models[0][0], options.businessModelLead);
+  assert.match(html, /aria-label="服務".*?value="Productized service"[^>]*\/?>產品化服務/s);
+  assert.deepEqual(missing.filter(s => options.targetMarkets.includes(s) || options.businessModels.includes(s) || options.researchSectors.includes(s) || /\{count\}|Choose/.test(s)), []);
   // A first brief starts from the founder's own industry when it can be researched.
-  assert.match(select("sector"), /<option value="Healthcare" selected="">/);
+  assert.deepEqual(sectors.filter(([, checked]) => checked).map(([v]) => v), ["Healthcare"]);
+  assert.deepEqual(models.filter(([, checked]) => checked).map(([v]) => v), emptyBrief.models);
+});
+
+test("at three industries the other named industries are disabled, with a message saying why", () => {
+  const run = { ...emptyBrief, sectors: ["Healthcare", "Education", "Legal & compliance"] };
+  const { html } = renderForm({ projects: [{ id: "p" }], run });
+  const sectors = checkboxes(html, "sectors");
+  for (const [value, checked, disabled] of sectors)
+    assert.equal(disabled, !checked && value !== options.anySector, value);
+  assert.match(html, /你已選擇 3 個產業/);
+  const { html: below } = renderForm({ projects: [{ id: "p" }], run: { ...run, sectors: ["Healthcare"] } });
+  assert.ok(checkboxes(below, "sectors").every(([, , disabled]) => !disabled));
+  assert.match(below, /最多可選 3 個/);
 });
 
 test("a founder's industry pre-selects only a first brief, and only when it is a research industry", () => {
-  const selected = html => /<select[^>]*id="sector"[^>]*>.*?<option value="([^"]+)" selected=""/s.exec(html)?.[1];
-  assert.equal(selected(renderForm({ industry: "Marine conservation" }).html), emptyBrief.sector, "a custom profile industry leaves the default");
-  assert.equal(selected(renderForm({ projects: [{ id: "p" }], industry: "Healthcare" }).html), emptyBrief.sector, "later briefs keep the last brief's choices");
-  assert.equal(selected(renderForm({ isDemo: true }).html), emptyBrief.sector, "the demo never reads a real profile");
+  const selected = html => checkboxes(html, "sectors").filter(([, checked]) => checked).map(([v]) => v);
+  assert.deepEqual(selected(renderForm({ industry: "Marine conservation" }).html), emptyBrief.sectors, "a custom profile industry leaves the default");
+  assert.deepEqual(selected(renderForm({ projects: [{ id: "p" }], industry: "Healthcare" }).html), emptyBrief.sectors, "later briefs keep the last brief's choices");
+  assert.deepEqual(selected(renderForm({ isDemo: true }).html), emptyBrief.sectors, "the demo never reads a real profile");
 });
 
 test("the page fetcher itself decodes a GBK page before extracting evidence", async () => {

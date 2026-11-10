@@ -50,7 +50,11 @@ test("project validates and preserves complete context", () => {
   assert.equal(project.name, "Customer workflow");
   assert.equal(project.context, "private buyer notes");
   assert.equal(
-    projectSchema.safeParse({ ...project, sector: "invalid" }).success,
+    projectSchema.safeParse({ ...project, sectors: ["invalid"] }).success,
+    false,
+  );
+  assert.equal(
+    projectSchema.safeParse({ ...project, sectors: [] }).success,
     false,
   );
   assert.equal(

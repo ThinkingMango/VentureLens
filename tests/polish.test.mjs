@@ -9,6 +9,7 @@ import { createTranslator } from "next-intl";
 import { messageKey, formatDate } from "../i18n/config.ts";
 import { parseBudgetInput, settleBudgetInput, MIN_RESEARCH_BUDGET_USD, MAX_RESEARCH_BUDGET_USD } from "../lib/provider-settings-core.ts";
 import * as researchCore from "../lib/research-core.ts";
+import * as researchOptions from "../lib/research-options.ts";
 import * as workspaceSchema from "../lib/workspace-schema.ts";
 import * as profileOptions from "../lib/profile-options.ts";
 
@@ -59,7 +60,7 @@ test("research history shows whole translated sentences for counts and dates, an
   const created = "2026-11-05T09:00:00Z";
   const runs = (id, completed) => Array.from({ length: completed }, (_, i) => ({ id: `${id}-${i}`, project_id: id, status: "completed", stage: "completed", created_at: created }));
   const data = {
-    projects: [{ id: "p1", name: "Agency research", sector: "B2B SaaS", created_at: created }, { id: "p2", name: "Clinic research", sector: "Healthcare", created_at: created }],
+    projects: [{ id: "p1", name: "Agency research", sectors: ["B2B SaaS"], created_at: created }, { id: "p2", name: "Clinic research", sectors: ["Healthcare", "Legal & compliance"], created_at: created }],
     runs: [...runs("p1", 1), ...runs("p2", 2)],
   };
   const { ResearchLibrary } = loadModule("../components/research-library.tsx", {
@@ -70,8 +71,11 @@ test("research history shows whole translated sentences for counts and dates, an
     "@/components/ui/badge": { Badge: passthrough("span") },
     "@/components/demo-provider": { useDemo: () => ({ isDemo: false, data, run: { name: "" } }) },
     "@/lib/research-core": researchCore,
+    "@/lib/research-options": researchOptions,
   });
   const html = text(renderToStaticMarkup(createElement(ResearchLibrary)));
+  // A brief with several industries lists them all, each translated on its own.
+  assert.match(html, /Healthcare \+ Legal &amp; compliance/);
   assert.match(html, /1 completed run\b/);
   assert.match(html, /2 completed runs\b/);
   assert.match(html, new RegExp(`${formatDate("en", created).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} UTC`));
