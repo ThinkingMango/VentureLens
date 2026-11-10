@@ -142,7 +142,9 @@ test("Chinese labels never replace persisted canonical enum values", () => {
     context: "Keep my text unchanged",
     discovery_mode: "market",
   };
-  assert.deepEqual(projectSchema.parse(brief), brief);
+  // WP-03: a brief saved before run focus reads as no angles and "explore something new" off.
+  assert.deepEqual(projectSchema.parse(brief), { ...brief, angles: [], explore_new: false });
+  assert.equal(projectSchema.safeParse({ ...brief, angles: ["无需融资"] }).success, false, "angles are canonical English values too");
   assert.equal(
     projectSchema.safeParse({ ...brief, sectors: ["专业服务"] }).success,
     false,

@@ -76,6 +76,20 @@ async function recordOutcome(ctx: Context, input: { candidates: Candidate[]; evi
   await saveOutcome(ctx, outcome);
   return outcome;
 }
+/** The brief as the discovery prompt shows it: run focus only when set (the angles are also spelled out by briefFocus). */
+function promptBrief(brief: z.infer<typeof researchRequestSchema>) {
+  const { angles, explore_new: _explore, ...rest } = brief;
+  return { ...rest, ...(angles?.length ? { angles } : {}) };
+}
+/**
+ * "Explore something new" (WP-03) turns the founder's prior ideas into a direction to move away from. It needs idea
+ * memory (WP-04): with no prior ideas there is nothing to invert, so it is ignored.
+ */
+function exploreNewInstruction(brief: { explore_new?: boolean }, history: HistoryEntry[]) {
+  return brief.explore_new && history.length
+    ? " Identify one assumption shared by the PRIOR IDEAS and invert it in at least half of the candidates; say which assumption was inverted in each candidate's description."
+    : "";
+}
 /**
  * Idea memory (WP-04): the founder's earlier ideas, read once when the run is set up and frozen in its setup checkpoint.
  * Their 24 most recent opportunities, plus every candidate of their last 5 runs (passed or not), after their
@@ -346,7 +360,7 @@ export async function executeResearchStage(ctx: Context, key: string): Promise<s
     return output.candidates.map(c => c.key);
   }
   if (key === "discovery") {
-    const output = await structured(ctx, key, discoveryDraftSchema, normalizeDiscovery, `Generate 8 specific, mutually distinct GenAI business opportunity hypotheses that a small team could validate. No retrieval happens in this stage, so never claim anything is verified. Keys must be c1 through c8. Keep each title under 180 characters and each other field under 800 characters. Write "query" as a web-search string in ${searchLanguage(brief.geography)} that would find independent evidence of the buyer's problem and what they already spend on it (surveys, industry reports, forum discussions, news), naming the buyer, the problem and the target geography. Do not name products or ask for tools or software. Mode=${mode}: founder starts from the founder's skills, channels, and resource advantages; market starts only from market pain and existing spending and does not infer founder fit; combined considers both. ${briefFocus(brief)} Brief=${JSON.stringify(brief)}; available founder context=${JSON.stringify(profile)}.${historyPromptBlock(history)}${profile?.exclusions ? " The founder context lists exclusions: do not propose an idea that conflicts with them." : ""}`, pricing);
+    const output = await structured(ctx, key, discoveryDraftSchema, normalizeDiscovery, `Generate 8 specific, mutually distinct GenAI business opportunity hypotheses that a small team could validate. No retrieval happens in this stage, so never claim anything is verified. Keys must be c1 through c8. Keep each title under 180 characters and each other field under 800 characters. Write "query" as a web-search string in ${searchLanguage(brief.geography)} that would find independent evidence of the buyer's problem and what they already spend on it (surveys, industry reports, forum discussions, news), naming the buyer, the problem and the target geography. Do not name products or ask for tools or software. Mode=${mode}: founder starts from the founder's skills, channels, and resource advantages; market starts only from market pain and existing spending and does not infer founder fit; combined considers both. ${briefFocus(brief)} Brief=${JSON.stringify(promptBrief(brief))}; available founder context=${JSON.stringify(profile)}.${historyPromptBlock(history)}${exploreNewInstruction(brief, history)}${profile?.exclusions ? " The founder context lists exclusions: do not propose an idea that conflicts with them." : ""}`, pricing);
     // Idea memory: drop ideas the founder has already seen. Fewer than five may remain, which is fine; none means the
     // run ends with an explained outcome instead of researching repeats.
     const { kept, skipped } = dedupeCandidates(output.candidates, history);

@@ -71,6 +71,8 @@ export function ResearchRunView({
   });
   const active = ["pending", "running"].includes(data.status);
   const verifying = data.configuration.brief.discovery_mode === "verify";
+  // Run focus (WP-03); runs started before it have none.
+  const focusAngles: string[] = data.configuration.brief.angles ?? [];
   const completed = data.status === "completed" && !!data.report;
   const ExecutionContainer = completed ? "details" : "section";
   const index = stages.indexOf(data.stage);
@@ -147,6 +149,17 @@ export function ResearchRunView({
           </span>
         )}
       </div>
+      {(focusAngles.length > 0 || data.configuration.brief.explore_new) && (
+        <div className="flex flex-wrap items-center gap-2 text-sm" aria-label={copy("Run focus")}>
+          <span className="text-muted-foreground">{copy("Run focus")}</span>
+          {focusAngles.map((angle) => (
+            <span key={angle} className="rounded-full border px-2.5 py-1">{copy(angle)}</span>
+          ))}
+          {data.configuration.brief.explore_new && (
+            <span className="rounded-full border border-primary/40 bg-primary/5 px-2.5 py-1 text-primary">{copy("Explore something new")}</span>
+          )}
+        </div>
+      )}
       {error && (
         <p role="alert" className="text-sm text-muted-foreground">
           {copy(

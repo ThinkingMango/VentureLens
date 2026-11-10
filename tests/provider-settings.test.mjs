@@ -1032,6 +1032,13 @@ test("an all-repeats outcome says nothing was searched instead of explaining the
   assert.match(html, /href="\/research\/new\?from=run-1&amp;idea=c1"[^>]*>Check this idea on its own/, "each idea can still be checked on its own");
 });
 
+test("the run page shows the run's focus, and nothing for runs started before it existed", () => {
+  const focused = runViewWithOutcome(runData({ configuration: { brief: { name: "Focused", angles: ["No paid ads to start", "Remote-only"], explore_new: true } } })).html;
+  assert.match(focused, /aria-label="Run focus"[^>]*><span[^>]*>Run focus<\/span><span[^>]*>No paid ads to start<\/span><span[^>]*>Remote-only<\/span><span[^>]*>Explore something new<\/span>/);
+  assert.doesNotMatch(runViewWithOutcome(runData()).html, /Run focus/, "a brief with no angles and the switch off");
+  assert.doesNotMatch(runViewWithOutcome(runData({ configuration: { brief: { name: "Off", angles: [], explore_new: false } } })).html, /Run focus/);
+});
+
 test("the report says how many repeats were skipped", () => {
   const source = readFileSync(new URL("../lib/research-engine.ts", import.meta.url), "utf8");
   assert.match(source, /\.\.\.\("skipped_duplicates" in discovery && discovery\.skipped_duplicates \? \{ skipped_duplicates: discovery\.skipped_duplicates \} : \{\}\)/);
@@ -1054,6 +1061,32 @@ test("the report says how many repeats were skipped", () => {
   assert.match(render(1), /We skipped 1 idea you’ve already seen\./);
   assert.doesNotMatch(render(undefined), /We skipped/, "reports saved before WP-04 are unchanged");
   assert.doesNotMatch(render(0), /We skipped/);
+});
+
+// WP-03: run focus in the discovery prompt.
+async function focusPrompt(brief, history = []) {
+  const draft = { candidates: Array.from({ length: 8 }, (_, i) => ({ key: `c${i + 1}`, title: `Fresh idea ${i + 1}`, buyer: `Buyer ${i}`, pain: `Problem ${i}.`, solution: "s", advantage: "a", query: `search for idea number ${i} evidence` })) };
+  const fixture = researchFixture({ spent: 0, settings: { primary: "qwen", autoFallback: true, qwenModel: "qwen3.8-flash", geminiModel: "gemini-3.5-flash-lite" }, generate: async () => ({ output: draft, totalUsage: { inputTokens: 300, outputTokens: 600 } }) });
+  fixture.setup.brief = { ...fixture.setup.brief, ...brief };
+  fixture.setup.history = history;
+  fixture.checkpoints.set("setup", fixture.setup);
+  await fixture.engine.executeResearchStage(fixture.context, "discovery");
+  return fixture.calls[0].prompt;
+}
+
+test("angles become constraints in the discovery prompt, and explore-new inverts prior ideas only when there are some", async () => {
+  const history = researchCore.buildHistory({ opportunities: [{ title: "Appointment reminders for clinics", buyer: "Clinic owners", pain: "No-shows", at: "2026-11-09T00:00:00Z" }], candidates: [] });
+  const focused = await focusPrompt({ angles: ["No paid ads to start", "Sells to professionals"], explore_new: true }, history);
+  assert.match(focused, /Constraints for this run: No paid ads to start; Sells to professionals\. Every hypothesis must satisfy all of them\./);
+  assert.match(focused, /Identify one assumption shared by the PRIOR IDEAS and invert it in at least half of the candidates; say which assumption was inverted in each candidate's description\./);
+  assert.match(focused, /"angles":\["No paid ads to start","Sells to professionals"\]/);
+  assert.doesNotMatch(focused, /explore_new/, "the switch is an instruction, not brief data");
+  // Without prior ideas, explore-new has nothing to invert and is ignored.
+  const noHistory = await focusPrompt({ angles: [], explore_new: true });
+  assert.doesNotMatch(noHistory, /invert|PRIOR IDEAS|Constraints for this run|"angles"/);
+  // A brief from before WP-03 (no angles, no switch) prompts exactly as before.
+  const plain = await focusPrompt({});
+  assert.doesNotMatch(plain, /Constraints for this run|invert|"angles"|explore_new/);
 });
 
 test("verify discovery makes one small call, copies the founder's idea exactly, and resumes from its checkpoint", async () => {
