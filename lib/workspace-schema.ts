@@ -183,6 +183,15 @@ export const opportunitySchema = z.object({
   // From methodology v2: the weighted rating before the review deduction, and the evidence cap that applied.
   score_before_review: z.number().min(0).max(100).optional(),
   score_cap: z.union([z.literal(70), z.literal(85)]).optional(),
+  // From methodology v3 (WP-07): claims tied to the evidence above, and the version the opportunity was made under.
+  claims: z.array(z.object({
+    text: z.string(),
+    kind: z.enum(["observed", "inference", "assumption"]),
+    section: z.enum(["buyer", "pain", "demand", "competition", "economics", "risk"]),
+    source_keys: z.array(z.string()),
+    confirm: z.string().optional(),
+  })).optional(),
+  methodology_version: z.number().int().optional(),
 });
 export type WorkspaceOpportunity = z.infer<typeof opportunitySchema>;
 export type ResearchAccess = {

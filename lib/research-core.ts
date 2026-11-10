@@ -5,7 +5,10 @@ import { reportLanguageSchema, profileV2Fields, type ReportLanguage } from "./wo
 export const RESEARCH_MODEL = "qwen3.8-flash";
 // v2: the adversarial review deducts at most 15 points and no longer deducts again for evidence gaps the evaluation
 // already priced in (v1 allowed 30), and each opportunity records its score before review and its evidence cap.
-export const methodology = "evidence-driven-v2";
+// v3 (WP-07): each opportunity carries claims tied to its sources. Scoring is unchanged from v2.
+export const methodology = "evidence-driven-v3";
+/** The methodology version stored on each new opportunity (spec §7: v1 original, v2 review cap and stance, v3 claims). */
+export const METHODOLOGY_VERSION = 3;
 /** The most the adversarial review may deduct from an opportunity's weighted rating. */
 export const REVIEW_MAX_PENALTY = 15;
 // Runs created before report language was recorded were generated in Simplified Chinese.
@@ -123,12 +126,74 @@ const classificationItemSchema = z.object({
 export const classificationSchema = z.object({ items: z.array(classificationItemSchema).max(32) });
 export type Classification = z.infer<typeof classificationSchema>["items"][number];
 const dimensionsSchema = z.object({ pain: z.number().int().min(0).max(100), demand: z.number().int().min(0).max(100), economics: z.number().int().min(0).max(100), feasibility: z.number().int().min(0).max(100), advantage: z.number().int().min(0).max(100) });
+/**
+ * Claim-level citations (WP-07). Each claim is one sentence in one section of the opportunity. "observed" states what a
+ * cited source shows and always cites at least one supporting or neutral source of the candidate; "inference" is
+ * reasoning from the evidence and may cite sources; "assumption" cites none and says what would confirm it.
+ */
+export const claimKinds = ["observed", "inference", "assumption"] as const;
+export const claimSections = ["buyer", "pain", "demand", "competition", "economics", "risk"] as const;
+export const MAX_CLAIMS = 12;
+export const MAX_CLAIM_SOURCES = 4;
+export const claimSchema = z.object({
+  text: z.string().min(1).max(400),
+  kind: z.enum(claimKinds),
+  section: z.enum(claimSections),
+  source_keys: z.array(z.string()).max(MAX_CLAIM_SOURCES),
+  /** For an assumption: what would confirm it. */
+  confirm: z.string().max(300).optional(),
+});
+export type Claim = z.infer<typeof claimSchema>;
+/** The source keys a candidate's claims may cite: its gated sources, split by stance. */
+export type CitableSources = { supporting: string[]; contradicting: string[] };
+const claimDraftSchema = z.object({
+  text: z.string().describe("One sentence, under 400 characters."),
+  kind: z.string().describe("observed, inference or assumption."),
+  section: z.string().describe("buyer, pain, demand, competition, economics or risk."),
+  source_keys: z.array(z.string()).describe("0–4 citable source_key values of this candidate."),
+  confirm: z.string().optional().describe("Only for an assumption: what would confirm it."),
+});
+/**
+ * Server-side rules for claims, whatever the model returned: unknown sections are dropped; unknown kinds become
+ * inferences; only the candidate's own citable keys are kept, at most four; a contradicting source may be cited only by
+ * a risk claim, so counter-evidence never reads as support; an "observed" claim left without a supporting or neutral
+ * source becomes an inference; assumptions cite nothing; text is clipped at a sentence boundary; at most 12 claims.
+ */
+export function normalizeClaims(claims: readonly z.infer<typeof claimDraftSchema>[], citable: CitableSources): Claim[] {
+  const supporting = new Set(citable.supporting);
+  const contradicting = new Set(citable.contradicting);
+  const out: Claim[] = [];
+  for (const claim of claims) {
+    if (out.length >= MAX_CLAIMS) break;
+    const text = clipText(String(claim.text ?? ""), 400);
+    const section = claimSections.find(value => value === String(claim.section ?? "").trim().toLowerCase());
+    if (!text || !section) continue;
+    let kind: Claim["kind"] = claimKinds.find(value => value === String(claim.kind ?? "").trim().toLowerCase()) ?? "inference";
+    const source_keys = kind === "assumption" ? [] : [...new Set((claim.source_keys ?? []).map(key => String(key).trim()))]
+      .filter(key => supporting.has(key) || (section === "risk" && contradicting.has(key)))
+      .slice(0, MAX_CLAIM_SOURCES);
+    if (kind === "observed" && !source_keys.some(key => supporting.has(key))) kind = "inference";
+    const confirm = kind === "assumption" && claim.confirm ? clipText(String(claim.confirm), 300) : "";
+    out.push({ text, kind, section, source_keys, ...(confirm ? { confirm } : {}) });
+  }
+  return out;
+}
+/** The candidate's citable sources, from the evidence gate (relevant sources only, one per URL). */
+export function citableSources(sources: readonly { source_key: string; stance: Classification["stance"] }[]): CitableSources {
+  return {
+    supporting: sources.filter(source => source.stance !== "contradicts").map(source => source.source_key),
+    contradicting: sources.filter(source => source.stance === "contradicts").map(source => source.source_key),
+  };
+}
+
 const evaluationItemSchema = z.object({
   candidate_id: z.string(), description: short, category: z.string().max(100),
   revenue: short, cost: short, risk: short, assumptions: z.array(short).min(1).max(4),
   validation: z.array(short).min(1).max(4),
   dimensions: dimensionsSchema,
   rationale: long,
+  // Methodology v3 (WP-07). Evaluations checkpointed before it have none.
+  claims: z.array(claimSchema).max(MAX_CLAIMS).optional(),
 });
 export const evaluationSchema = z.object({ items: z.array(evaluationItemSchema).min(1).max(8) });
 export type Evaluation = z.infer<typeof evaluationSchema>["items"][number];
@@ -166,6 +231,7 @@ export const evaluationDraftSchema = z.object({ items: z.array(z.object({
   assumptions: z.array(prose(800)).describe("1–4 items."), validation: z.array(prose(800)).describe("2–4 items."),
   dimensions: z.object({ pain: score(100), demand: score(100), economics: score(100), feasibility: score(100), advantage: score(100) }),
   rationale: prose(2000),
+  claims: z.array(claimDraftSchema).optional().describe("3–12 claims; see the prompt's rules."),
 })) });
 export const reviewDraftSchema = z.object({ items: z.array(z.object({
   candidate_id: z.string(), reject: z.boolean(), critique: prose(800), penalty: score(REVIEW_MAX_PENALTY), falsification: prose(800),
@@ -241,14 +307,17 @@ export function normalizeClassification(draft: z.infer<typeof classificationDraf
     claim: clipText(item.claim, 800),
   })) });
 }
-export function normalizeEvaluation(draft: z.infer<typeof evaluationDraftSchema>, candidateIds: string[], mode?: Mode): { items: Evaluation[] } {
+export function normalizeEvaluation(draft: z.infer<typeof evaluationDraftSchema>, candidateIds: string[], mode?: Mode, citable?: Record<string, CitableSources>): { items: Evaluation[] } {
   const items = matchIds(candidateIds, draft.items, item => item.candidate_id).flatMap(item => {
     const assumptions = item.assumptions.map(text => clipText(text, 800)).filter(Boolean).slice(0, 4);
     const validation = item.validation.map(text => clipText(text, 800)).filter(Boolean).slice(0, 4);
     // Without at least one stated assumption and one validation step the evaluation is unusable; leave it out.
     if (!assumptions.length || !validation.length) return [];
     const d = item.dimensions;
+    // Claims are kept only when the caller says which sources each candidate may cite.
+    const claims = citable && item.claims ? normalizeClaims(item.claims, citable[item.candidate_id] ?? { supporting: [], contradicting: [] }) : [];
     return [evaluationItemSchema.parse({
+      ...(claims.length ? { claims } : {}),
       candidate_id: item.candidate_id, description: clipText(item.description, 800), category: clipText(item.category, 100),
       revenue: clipText(item.revenue, 800), cost: clipText(item.cost, 800), risk: clipText(item.risk, 800),
       assumptions, validation, rationale: clipText(item.rationale, 2000),

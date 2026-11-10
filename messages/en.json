@@ -1660,7 +1660,16 @@
     "m1e9q28q": "Regulated market is OK",
     "m118qydg": "Uses my existing audience",
     "m15zvj7y": "Recurring revenue from day one",
-    "mnaff35": "Can launch in 30 days"
+    "mnaff35": "Can launch in 30 days",
+    "m1ucpjud": "Pain",
+    "myzk6oo": "Competition",
+    "mw04r9m": "Risk",
+    "m2lnbbe": "What the research claims",
+    "msv2kvo": "Each claim links to the sources it rests on. Inferences are the research model's reasoning; assumptions are not backed by a source yet.",
+    "m1gu58i2": "Assumption",
+    "m1ppf050": "Inference",
+    "m19ljfcn": "Source {number}: {title}",
+    "mwd43wp": "To confirm: {hint}"
   },
   "language": {
     "label": "Interface language",

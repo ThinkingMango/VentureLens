@@ -2,6 +2,73 @@
 import type { WorkspaceOpportunity } from "@/lib/workspace-schema";
 import { safeSourceUrl } from "@/lib/research-core";
 import { useCopy, useFormats } from "@/i18n/use-copy";
+import { citationNumbers, claimsBySection, sourceAnchor, type claimSectionOrder } from "@/lib/report-presentation";
+
+type Copy = ReturnType<typeof useCopy>;
+function sectionTitle(copy: Copy, section: (typeof claimSectionOrder)[number]) {
+  switch (section) {
+    case "buyer": return copy("Buyer");
+    case "pain": return copy("Pain");
+    case "demand": return copy("Demand");
+    case "competition": return copy("Competition");
+    case "economics": return copy("Economics");
+    case "risk": return copy("Risk");
+  }
+}
+/**
+ * Methodology v3 (WP-07): what the research claims, section by section, each claim with numbered chips that jump to the
+ * source cards below. Opportunities from earlier methodologies have no claims, and this renders nothing for them.
+ */
+function OpportunityClaims({ opportunity: item, numbers }: { opportunity: WorkspaceOpportunity; numbers: Map<string, number> }) {
+  const copy = useCopy();
+  const groups = claimsBySection(item.claims);
+  if (!groups.length) return null;
+  const titles = new Map((item.evidence ?? []).map((source) => [source.source_key, source.title]));
+  return (
+    <section aria-labelledby="claims-heading" className="surface flex flex-col gap-4 p-6">
+      <h2 id="claims-heading" className="text-xl font-semibold">{copy("What the research claims")}</h2>
+      <p className="text-sm leading-relaxed text-muted-foreground">
+        {copy("Each claim links to the sources it rests on. Inferences are the research model's reasoning; assumptions are not backed by a source yet.")}
+      </p>
+      {groups.map((group) => (
+        <div key={group.section} className="flex flex-col gap-2">
+          <h3 className="font-semibold">{sectionTitle(copy, group.section)}</h3>
+          <ul className="flex flex-col gap-3">
+            {group.claims.map((claim, index) => (
+              <li key={`${group.section}-${index}`} className="flex flex-col gap-1 text-sm leading-relaxed">
+                <p>
+                  {claim.kind !== "observed" && (
+                    <span className={claim.kind === "assumption" ? "mr-2 rounded bg-warm-soft px-1.5 py-0.5 text-xs font-semibold" : "mr-2 rounded bg-secondary px-1.5 py-0.5 text-xs font-semibold"}>
+                      {claim.kind === "assumption" ? copy("Assumption") : copy("Inference")}
+                    </span>
+                  )}
+                  {claim.text}
+                  {claim.source_keys.map((key) => {
+                    const number = numbers.get(key);
+                    if (!number) return null;
+                    return (
+                      <a
+                        key={key}
+                        href={`#${sourceAnchor(key)}`}
+                        className="ml-1 inline-flex min-h-6 min-w-6 items-center justify-center rounded px-1 align-baseline text-xs font-semibold text-primary underline-offset-2 hover:underline"
+                        aria-label={copy("Source {number}: {title}", { number, title: titles.get(key) ?? key })}
+                      >
+                        [{number}]
+                      </a>
+                    );
+                  })}
+                </p>
+                {claim.kind === "assumption" && claim.confirm && (
+                  <p className="text-muted-foreground">{copy("To confirm: {hint}", { hint: claim.confirm })}</p>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </section>
+  );
+}
 export function OpportunityEvidence({
   opportunity: item,
 }: {
@@ -10,8 +77,10 @@ export function OpportunityEvidence({
   const copy = useCopy();
   const format = useFormats();
   if (!item.evidence?.length) return null;
+  const numbers = citationNumbers(item.evidence);
   return (
     <>
+      <OpportunityClaims opportunity={item} numbers={numbers} />
       <section className="surface flex flex-col gap-4 p-6">
         <h2 className="text-xl font-semibold">
           {copy("Evidence and original sources")}
@@ -29,7 +98,9 @@ export function OpportunityEvidence({
           return (
             <article
               key={source.source_key}
-              className="flex flex-col gap-3 rounded-xl bg-background/70 p-4 sm:p-5"
+              id={sourceAnchor(source.source_key)}
+              tabIndex={-1}
+              className="flex scroll-mt-24 flex-col gap-3 rounded-xl bg-background/70 p-4 transition-shadow target:ring-2 target:ring-primary sm:p-5"
             >
               {source.stance === "contradicts" && (
                 // Counter-evidence is kept visible but must never read as support for the opportunity.
@@ -37,18 +108,23 @@ export function OpportunityEvidence({
                   {copy("Counter-evidence: this source contradicts the opportunity")}
                 </p>
               )}
-              {url ? (
-                <a
-                  href={url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-medium text-primary underline underline-offset-4"
-                >
-                  {source.title}
-                </a>
-              ) : (
-                <h3 className="font-medium">{source.title}</h3>
-              )}
+              <div className="flex items-baseline gap-2">
+                <span className="shrink-0 text-sm font-semibold text-muted-foreground" aria-hidden="true">
+                  [{numbers.get(source.source_key)}]
+                </span>
+                {url ? (
+                  <a
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-medium text-primary underline underline-offset-4"
+                  >
+                    {source.title}
+                  </a>
+                ) : (
+                  <h3 className="font-medium">{source.title}</h3>
+                )}
+              </div>
               <p className="break-all text-sm text-muted-foreground">
                 {source.source_key} · {source.url}
               </p>
