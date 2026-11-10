@@ -37,6 +37,15 @@ export function ResearchLibrary() {
             count: 4,
             date: copy("Sample research history"),
           },
+          {
+            id: "demo-no-result",
+            target: "/research/no-result",
+            status: "Nothing passed",
+            title: copy("Clinic tools for independent physiotherapists"),
+            sectors: ["Healthcare"] as readonly string[],
+            count: 0,
+            date: copy("Sample research history"),
+          },
         ]
       : (data?.projects ?? []).map((project) => ({
           id: project.id,

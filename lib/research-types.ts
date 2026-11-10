@@ -1,5 +1,5 @@
 import type { WorkspaceOpportunity, ResearchBrief } from "@/lib/workspace-schema";
-import type { Mode } from "@/lib/research-core";
+import type { Mode, ResearchOutcome } from "@/lib/research-core";
 export type ResearchReport = {
   methodology: string;
   language?: string;
@@ -31,6 +31,8 @@ export type ResearchDetail = {
   quota_released?: boolean;
   configuration: { brief: ResearchBrief };
   report: ResearchReport | null;
+  /** Why each candidate passed or not (WP-06). Null for runs saved before outcomes were recorded, or not yet decided. */
+  outcome?: ResearchOutcome | null;
   created_at: string;
   completed_at: string | null;
   steps: { stage_key: string; created_at: string }[];

@@ -16,7 +16,7 @@ Tracks the work packages in [`docs/PRODUCT_SPEC_V1.md`](./PRODUCT_SPEC_V1.md) §
 |---|---|---|---|---|---|---|
 | 1 | WP-00 | Baseline, CI, status document | Implemented but not verified | [#39](https://github.com/ThinkingMango/VentureLens/pull/39) (draft) | Ran locally: install, typecheck, `pnpm test` (178/178 with a Postgres 16 test database; 175 pass + 3 skipped without one), `pnpm test:sql` (3/3), `pnpm build`. Ran in CI on GitHub: [run 42793451645](https://github.com/ThinkingMango/VentureLens/actions/runs/42793451645) at `51c65e1`, green, 178/178 with 0 skipped. See [Baseline](#baseline-wp-00) | Becomes "Implemented and tested" once #39 merges and CI passes on `main` (spec acceptance). Owner: optionally make the CI check required on `main` |
 | 2 | WP-01 | Operator run inspector, quality test set, product events | Implemented but not verified | [#40](https://github.com/ThinkingMango/VentureLens/pull/40) (draft, stacked on #39) | Ran: typecheck; `pnpm test` 204/204 with a Postgres 16 database; `pnpm test:sql` 4/4; `pnpm build`; the built app against a local stand-in for Supabase (admin 200, non-admin 404, signed-out 307, no brief or profile text in any page) with screenshots at 1366 and 390 px in all three languages | Not exercised: real Supabase data, and the migration on the production project (needs owner approval). The evaluation has not been run (it costs money; D4: development project, at most $5 per session). Owner to review the privacy-policy wording. D4 and D5 decided: defaults |
-| 3 | WP-06 | "No viable opportunity" explained | Not started | — | — | Decision D3 (keep slot release for `INSUFFICIENT_EVIDENCE`) |
+| 3 | WP-06 | "No viable opportunity" explained | Implemented but not verified | [#41](https://github.com/ThinkingMango/VentureLens/pull/41) (draft, stacked on #40) | Ran: typecheck; `pnpm test` 219/219 with a Postgres 16 database; `pnpm test:sql` 4/4; `pnpm build`; the built app against a local stand-in for Supabase (run page explanation, `?from=` prefill limited to the founder's own runs, demo page and history entry), with screenshots in en, zh-Hans and zh-Hant at 1366 and 390 px | Not exercised: a real `INSUFFICIENT_EVIDENCE` run (needs a paid run). "Verify one of these ideas" is held until WP-05. D3 decided: default (slot release unchanged) |
 | 4 | WP-05 | Verify my idea | Not started | — | — | Decisions D2 (verify run uses one slot), D8 (time-expectation copy) |
 | 5 | WP-02 | Founder profile v2 + starter profiles | Not started | — | — | — |
 | 6 | WP-03 | Run focus: angles and "explore something new" | Not started | — | — | Needs WP-02; "explore new" needs WP-04 |
@@ -29,7 +29,7 @@ Tracks the work packages in [`docs/PRODUCT_SPEC_V1.md`](./PRODUCT_SPEC_V1.md) §
 | 13 | WP-11 | Report export: Markdown + print-to-PDF | Not started | — | — | Needs WP-07 |
 | 14 | WP-12 | Library: archive, undo, filters, delete | Not started | — | — | Decision D6 (usage rows on run deletion) |
 
-Owner decisions D1–D8 are listed in spec §8. Decided so far: **D4** (quality evaluation runs on a development project, at most $5 per session) and **D5** (the run inspector shows structural data only), both at their suggested defaults, on 2026-11-10.
+Owner decisions D1–D8 are listed in spec §8. Decided so far, all at their suggested defaults on 2026-11-10: **D3** (runs that fail with `INSUFFICIENT_EVIDENCE` keep releasing their slot as today), **D4** (quality evaluation runs on a development project, at most $5 per session) and **D5** (the run inspector shows structural data only).
 
 ## Baseline (WP-00)
 
