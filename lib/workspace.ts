@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import {
   emptyProfile,
+  profileColumns,
+  profileV2FromRow,
   noResearchAccess,
   opportunitySchema,
   type ResearchAccess,
@@ -75,9 +77,7 @@ export async function readWorkspace(
   ] = await Promise.all([
     supabase
       .from("founder_profiles")
-      .select(
-        "name,role,industry,skills,hours,budget,goal,onboarding_completed",
-      )
+      .select(profileColumns)
       .eq("user_id", user.id)
       .maybeSingle(),
     supabase
@@ -125,6 +125,7 @@ export async function readWorkspace(
         hours: row.hours,
         budget: row.budget,
         goal: row.goal,
+        ...profileV2FromRow(row),
       }
     : { ...emptyProfile };
   const opportunities = (opportunitiesResult.data ?? []).flatMap((item) => {

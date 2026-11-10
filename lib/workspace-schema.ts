@@ -9,6 +9,17 @@ import {
   targetMarkets,
 } from "./research-options.ts";
 
+export const revenueTargetOptions = ["Side income (<$1k/mo)", "$1–5k/mo", "$5–20k/mo", "$20k+/mo"] as const;
+export const strengthOptions = ["Technical", "Sales & marketing", "Operations", "Balanced"] as const;
+export const riskOptions = ["Low", "Medium", "High"] as const;
+// Languages a founder can work in, offered as a multi-select (up to 5). Stored as these canonical English names.
+export const profileLanguages = [
+  "English", "Mandarin Chinese", "Cantonese", "Spanish", "French", "German", "Portuguese", "Japanese", "Korean",
+  "Hindi", "Arabic", "Indonesian", "Vietnamese", "Thai", "Italian", "Dutch",
+] as const;
+// An optional single choice: one of the options, or "" for "not answered" (the database default).
+const choiceOrEmpty = <T extends readonly [string, ...string[]]>(options: T) => z.union([z.literal(""), z.enum(options)]).optional();
+
 export const profileSchema = z.object({
   name: z.string().trim().min(1, "Enter your name.").max(80),
   role: z.string().trim().min(1).max(100),
@@ -23,12 +34,46 @@ export const profileSchema = z.object({
   ]),
   budget: z.enum(["Under $1,000", "$1,000–5,000", "$5,000–15,000", "$15,000+"]),
   goal: z.string().trim().min(1).max(150),
+  // Profile v2 (WP-02). Every field is optional and has no default here: a client that sends a profile without them
+  // (an older tab, say) leaves the stored values alone instead of blanking them. The database defaults them to ''.
+  interests: z.string().trim().max(500).optional(),
+  pain_points: z.string().trim().max(500).optional(),
+  revenue_target: choiceOrEmpty(revenueTargetOptions),
+  strength: choiceOrEmpty(strengthOptions),
+  distribution: z.string().trim().max(500).optional(),
+  languages: z
+    .array(z.enum(profileLanguages))
+    .max(5, "Choose up to 5 languages.")
+    .refine((values) => new Set(values).size === values.length, "Choose each language once.")
+    .optional(),
+  exclusions: z.string().trim().max(300).optional(),
+  risk_tolerance: choiceOrEmpty(riskOptions),
 });
 export type Profile = z.infer<typeof profileSchema>;
 // The fixed answers for available hours and starting budget, read by the onboarding form so it cannot drift from
 // what the API accepts.
 export const hoursOptions = profileSchema.shape.hours.options;
 export const budgetOptions = profileSchema.shape.budget.options;
+/** The profile v2 fields, in the order the form and the research context use them. */
+export const profileV2Fields = ["interests", "pain_points", "distribution", "strength", "revenue_target", "risk_tolerance", "exclusions", "languages"] as const;
+/** The founder_profiles columns the app reads, for both the workspace and a research run's profile snapshot. */
+// A literal string, so the Supabase client can type the row it returns.
+export const profileColumns = "name,role,industry,skills,hours,budget,goal,interests,pain_points,distribution,strength,revenue_target,risk_tolerance,exclusions,languages,onboarding_completed" as const;
+/**
+ * The profile v2 answers from a stored row. A value the current options no longer accept (or a column a database
+ * without the WP-02 migration does not return) reads as "not answered", so one stale answer never blocks the profile.
+ */
+export function profileV2FromRow(row: Record<string, unknown>): Required<Pick<Profile, (typeof profileV2Fields)[number]>> {
+  const value = <K extends (typeof profileV2Fields)[number]>(key: K, empty: NonNullable<Profile[K]>) => {
+    const parsed = profileSchema.shape[key].safeParse(row[key]);
+    return (parsed.success && parsed.data !== undefined ? parsed.data : empty) as NonNullable<Profile[K]>;
+  };
+  return {
+    interests: value("interests", ""), pain_points: value("pain_points", ""), distribution: value("distribution", ""),
+    strength: value("strength", ""), revenue_target: value("revenue_target", ""), risk_tolerance: value("risk_tolerance", ""),
+    exclusions: value("exclusions", ""), languages: value("languages", []),
+  };
+}
 // A multi-choice field: distinct canonical values, and the "no preference" option only on its own.
 function choices<T extends string>(values: z.ZodEnum<{ [K in T]: K }>, open: T, max: number) {
   return z
@@ -163,6 +208,14 @@ export const emptyProfile: Profile = {
   hours: "10–20 hours",
   budget: "Under $1,000",
   goal: "Build a sustainable side business",
+  interests: "",
+  pain_points: "",
+  revenue_target: "",
+  strength: "",
+  distribution: "",
+  languages: [],
+  exclusions: "",
+  risk_tolerance: "",
 };
 export const emptyBrief: ResearchBrief = {
   name: "",

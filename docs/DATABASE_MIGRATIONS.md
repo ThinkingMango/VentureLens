@@ -43,7 +43,11 @@ After this change `supabase migration list` shows local and remote in sync, and 
 
 ## Written but not yet applied
 
-None. When a pull request adds a migration, list it here until it is applied, and apply it only with the owner's approval. If `apply_migration` assigns a different version, rename the file to that version before merging. Merging to `main` can apply a migration to production: the Supabase integration applied `20261109150000`, `20261109160000`, `20261110120000` and `20261110130000` that way.
+| Version | Name | File | Pull request | Notes |
+|---|---|---|---|---|
+| `20261110140000` | `founder_profile_v2` | `supabase/migrations/20261110140000_founder_profile_v2.sql` | WP-02 | Adds eight columns to `founder_profiles` (`interests`, `pain_points`, `revenue_target`, `strength`, `distribution`, `languages text[]`, `exclusions`, `risk_tolerance`), each `not null` with an empty default and a length check; `languages` holds at most five non-null names. Additive: existing profiles read as "not answered". RLS, policies and grants unchanged. Tested in `tests/founder-profile.sql.test.mjs`. **Merging the PR applies it to production.** |
+
+When a pull request adds a migration, list it here until it is applied, and apply it only with the owner's approval. If `apply_migration` assigns a different version, rename the file to that version before merging. Merging to `main` can apply a migration to production: the Supabase integration applied `20261109150000`, `20261109160000`, `20261110120000` and `20261110130000` that way.
 
 ## Rules going forward
 

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { getDomain } from "tldts";
-import { reportLanguageSchema, type ReportLanguage } from "./workspace-schema.ts";
+import { reportLanguageSchema, profileV2Fields, type ReportLanguage } from "./workspace-schema.ts";
 
 export const RESEARCH_MODEL = "qwen3.8-flash";
 // v2: the adversarial review deducts at most 15 points and no longer deducts again for evidence gaps the evaluation
@@ -540,4 +540,21 @@ export function errorCode(error: unknown): string {
   if (failures.some(({ status }) => [401, 402, 403].includes(status)) || /authentication|api.key|oidc/i.test(message)) return 'PROVIDER_CONFIGURATION';
   if (failures.some(({ status }) => status === 429 || status >= 500) || /timeout|abort|fetch failed/i.test(message)) return 'TRANSIENT_PROVIDER';
   return 'INVALID_OUTPUT';
+}
+
+/**
+ * The founder context a run's prompts see. Market mode sees none. Otherwise the original five fields always, and each
+ * profile v2 field (WP-02) only when the founder answered it, so a blank answer never reads as a statement.
+ * Takes the run's frozen profile snapshot, so older runs (saved before v2) build the same context as before.
+ */
+export function founderContext(profile: Record<string, unknown>, mode: Mode): Record<string, string | string[]> | null {
+  if (mode === "market") return null;
+  const context: Record<string, string | string[]> = {};
+  for (const key of ["industry", "skills", "hours", "budget", "goal"] as const) context[key] = String(profile[key] ?? "");
+  for (const key of profileV2Fields) {
+    const value = profile[key];
+    if (typeof value === "string" && value.trim()) context[key] = value.trim();
+    else if (Array.isArray(value) && value.length) context[key] = value.map(String);
+  }
+  return context;
 }

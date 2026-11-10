@@ -1,12 +1,15 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse, after, type NextRequest } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { readWorkspace } from "@/lib/workspace";
 import { profileSchema, projectSchema } from "@/lib/workspace-schema";
+import { starterProfileIds } from "@/lib/starter-profiles";
+import { track } from "@/lib/events";
 
 export const dynamic = "force-dynamic";
 const mutationSchema = z.discriminatedUnion("action", [
-  z.object({ action: z.literal("profile"), profile: profileSchema }),
+  // `starter` names the starter profile the founder began from, if any (recorded as starter_profile_used).
+  z.object({ action: z.literal("profile"), profile: profileSchema, starter: z.enum(starterProfileIds).optional() }),
   z.object({ action: z.literal("project"), project: projectSchema }),
   z.object({ action: z.literal("save"), id: z.uuid(), saved: z.boolean() }),
   z.object({
@@ -106,6 +109,8 @@ export async function POST(request: NextRequest) {
           { onConflict: "user_id" },
         );
       if (error) throw error;
+      const starter = input.starter;
+      if (starter) after(() => track("starter_profile_used", { userId: user.id, props: { id: starter } }));
     } else if (input.action === "project") {
       const { error } = await supabase
         .from("research_projects")

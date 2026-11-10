@@ -18,7 +18,8 @@ type WorkspaceState = {
   saved: string[];
   toggleSave: (id: string) => void;
   profile: Profile;
-  setProfile: (p: Profile) => Promise<void>;
+  /** Saves the profile. `starter` is the starter profile it began from, if any (recorded as starter_profile_used). */
+  setProfile: (p: Profile, starter?: string) => Promise<void>;
   run: ResearchBrief;
   setRun: (r: ResearchBrief) => Promise<void>;
   completed: string[];
@@ -41,6 +42,14 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
     hours: "10–20 hours",
     budget: "$1,000–5,000",
     goal: "Build a sustainable side business",
+    interests: "",
+    pain_points: "",
+    revenue_target: "",
+    strength: "",
+    distribution: "",
+    languages: [],
+    exclusions: "",
+    risk_tolerance: "",
   });
   const [run, setRun] = useState<ResearchBrief>({
     name: "GenAI opportunities for service businesses",
@@ -160,7 +169,7 @@ export function WorkspaceProvider({
         busy,
         refresh: () => mutate(),
         href: (path) => path,
-        setProfile: (profile) => persist({ action: "profile", profile }),
+        setProfile: (profile, starter) => persist({ action: "profile", profile, ...(starter ? { starter } : {}) }),
         setRun: (project) => persist({ action: "project", project }),
         toggleSave: (id) =>
           handleMutation({
