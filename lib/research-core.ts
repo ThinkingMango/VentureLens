@@ -285,6 +285,13 @@ export function groundedClassifications(evidence: Evidence[], items: Classificat
     return [{ ...item, quote }];
   });
 }
+/**
+ * The registrable domain of a source URL (`tldts`, private suffixes included), so subdomains of one publisher count
+ * once. Pass a URL already accepted by safeSourceUrl. The evidence gate and the quality metrics both count with this.
+ */
+export function registrableDomain(url: string): string | null {
+  return getDomain(new URL(url).hostname.replace(/\.$/, ''), { allowPrivateDomains: true }) ?? null;
+}
 export type GatedEvidence = Evidence & { stance: Classification["stance"] };
 /**
  * The evidence gate for one candidate.
@@ -307,7 +314,7 @@ export function evidenceGate(candidate: string, evidence: Evidence[], classifica
     if (e.candidate_id !== candidate || !classification?.relevant) continue;
     const url = safeSourceUrl(e.url);
     if (!url || urls.has(url)) continue;
-    const domain = getDomain(new URL(url).hostname.replace(/\.$/, ''), { allowPrivateDomains: true });
+    const domain = registrableDomain(url);
     if (!domain) continue;
     urls.add(url);
     relevant.push({ source: { ...e, stance: classification.stance }, domain });

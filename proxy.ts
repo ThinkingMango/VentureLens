@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { isAdministrator } from "@/lib/admin-access";
 
 export async function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;
@@ -40,7 +41,13 @@ export async function proxy(request: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if ((isPrivate && !user) || (isAuth && user)) {
+  if (user && /^\/admin(\/|$)/.test(path) && !isAdministrator(user)) {
+    // Operator pages answer a signed-in non-administrator with a real 404 before anything renders, so neither the
+    // status nor the page title reveals them. The pages check the claim again themselves (lib/admin-guard.ts).
+    const hidden = NextResponse.rewrite(new URL("/__not-found", request.url));
+    response.cookies.getAll().forEach((cookie) => hidden.cookies.set(cookie));
+    response = hidden;
+  } else if ((isPrivate && !user) || (isAuth && user)) {
     const target = new URL(user ? "/dashboard" : "/login", request.url);
     if (!user) target.searchParams.set("next", path + request.nextUrl.search);
     const redirect = NextResponse.redirect(target);

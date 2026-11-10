@@ -248,8 +248,11 @@ test("model pricing applies published future price changes rather than an expire
 });
 
 test("the protected page and browser bundle never trust client roles or expose provider credentials", () => {
+  // The page calls the shared operator guard, which 404s anyone without the server-managed administrator claim.
   const page = readFileSync(new URL("../app/(admin)/admin/page.tsx", import.meta.url), "utf8");
-  assert.match(page, /if \(!isAdministrator\(user\)\) notFound\(\)/);
+  assert.match(page, /const user = await requireAdministrator\(\);/);
+  const guard = readFileSync(new URL("../lib/admin-guard.ts", import.meta.url), "utf8");
+  assert.match(guard, /if \(!isAdministrator\(user\)\) notFound\(\)/);
   const client = readFileSync(new URL("../components/admin-providers.tsx", import.meta.url), "utf8");
   assert.doesNotMatch(client, /SUPABASE_SERVICE_ROLE_KEY|SUPABASE_SECRET_KEY|DASHSCOPE_API_KEY|GOOGLE_GENERATIVE_AI_API_KEY|localStorage/);
 });

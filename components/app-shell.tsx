@@ -73,7 +73,11 @@ export function AppShell({
   const title =
     path === "/admin"
       ? "AI providers"
-      : path.startsWith("/opportunities")
+      : path.startsWith("/admin/runs")
+        ? "Research runs"
+        : path.startsWith("/admin/quality")
+          ? "Research quality"
+          : path.startsWith("/opportunities")
         ? "Opportunity detail"
         : path === "/research/new"
           ? "New research"
@@ -151,7 +155,7 @@ export function AppShell({
               href="/admin"
               onClick={() => setOpen(false)}
               aria-current={path === "/admin" ? "page" : undefined}
-              className={cn("nav-link", path === "/admin" && "active")}
+              className={cn("nav-link", (path === "/admin" || path.startsWith("/admin/")) && "active")}
             >
               <ShieldCheck className="size-[18px]" aria-hidden="true" />
               {copy("Admin")}
