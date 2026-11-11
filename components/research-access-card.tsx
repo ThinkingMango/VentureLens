@@ -69,7 +69,7 @@ export function ResearchAccessCard({ compact = false }: { compact?: boolean }) {
               "You have used your free research run. Failed runs are returned automatically, within a limit per account, and paid credits are planned. Your reports and briefs stay saved.",
             )
           : copy(
-              "Every confirmed account receives one free research run. If yours is missing, sign out and back in, or contact support. You can build your profile, save briefs, and explore the full demo meanwhile.",
+              "Every confirmed account receives 10 free research runs. If yours are missing, sign out and back in, or contact support. You can build your profile, save briefs, and explore the full demo meanwhile.",
             )}
       </p>
       {!compact && (

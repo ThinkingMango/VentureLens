@@ -159,7 +159,7 @@ const faqs = [
   },
   {
     q: "Is live research available today?",
-    a: "Yes. Every confirmed account receives one free, evidence-driven research run. If a run fails before producing a report, it is returned to you automatically. Paid credits for further runs are planned, and no payments are collected yet.",
+    a: "Yes. Every confirmed account receives 10 free research runs, valid for 90 days. A run that fails on our side is always returned, and one that stops because the evidence was too thin is returned up to a per-account limit. Paid credits for further runs are planned, and no payments are collected yet.",
   },
 ];
 
@@ -310,7 +310,7 @@ export function Landing() {
               </div>
               <p className="max-w-[34rem] text-sm text-muted-foreground">
                 {copy(
-                  "The demo needs no account. Every confirmed account includes one free research run, and a full run usually takes 5–10 minutes.",
+                  "The demo needs no account. Every confirmed account includes 10 free research runs, and a full run usually takes 5–10 minutes.",
                 )}
               </p>
             </div>
