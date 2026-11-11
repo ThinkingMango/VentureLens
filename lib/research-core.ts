@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { getDomain } from "tldts";
 import { reportLanguageSchema, profileV2Fields, type ReportLanguage } from "./workspace-schema.ts";
+import { MAX_CANDIDATES, MAX_PAGES_PER_IDEA } from "./source-policy.ts";
 
 export const RESEARCH_MODEL = "qwen3.8-flash";
 // v2: the adversarial review deducts at most 15 points and no longer deducts again for evidence gaps the evaluation
@@ -123,7 +124,14 @@ const classificationItemSchema = z.object({
   stance: z.enum(["supports", "contradicts", "neutral"]),
   quote: z.string().max(500), claim: short,
 });
-export const classificationSchema = z.object({ items: z.array(classificationItemSchema).max(32) });
+/**
+ * The most sources one run can classify: every idea at the source policy's deepest setting. A verify run (one idea,
+ * twice the pages) stays well under it. This bound was once a literal 32 (8 ideas × 4 pages); after the source policy
+ * allowed 6 pages per idea, a run with more than 32 readable pages saved its classification and then could not read it
+ * back, so it failed at evaluation as INVALID_OUTPUT, and its retry failed the same way.
+ */
+export const MAX_CLASSIFIED_SOURCES = MAX_CANDIDATES * MAX_PAGES_PER_IDEA;
+export const classificationSchema = z.object({ items: z.array(classificationItemSchema).max(MAX_CLASSIFIED_SOURCES) });
 export type Classification = z.infer<typeof classificationSchema>["items"][number];
 const dimensionsSchema = z.object({ pain: z.number().int().min(0).max(100), demand: z.number().int().min(0).max(100), economics: z.number().int().min(0).max(100), feasibility: z.number().int().min(0).max(100), advantage: z.number().int().min(0).max(100) });
 /**
