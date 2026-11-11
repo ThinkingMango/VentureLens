@@ -445,7 +445,8 @@ export async function executeResearchStage(ctx: Context, key: string): Promise<s
       if (output.items.length < keys.length) log("warn", "classification omitted sources", ctx, { batch: offset / 8, expected: keys.length, received: output.items.length });
       classified.push(...output.items);
     }
-    const items = groundedClassifications(evidence, classified);
+    // Validated with the schema the next stages read it back with, so a checkpoint they cannot read is never saved.
+    const { items } = classificationSchema.parse({ items: groundedClassifications(evidence, classified) });
     for (const item of items) checked(await client.from("research_evidence").update({ classification: item }).eq("run_id", ctx.runId).eq("user_id", ctx.userId).eq("source_key", item.source_key));
     await checkpoint(ctx, key, { items });
     return [];

@@ -4,7 +4,7 @@ import * as policy from "../lib/source-policy.ts";
 import { estimateRunCost, stageCalls, defaultRunShape } from "../lib/research-budget.ts";
 import { researchSettingsSchema, providerSettingsSchema, readStoredProviderSettings, runCostEstimates, assertBudgetFits, recommendedBudget } from "../lib/provider-settings-core.ts";
 import { researchSectors, anySector } from "../lib/research-options.ts";
-import { candidateDiagnosisSchema } from "../lib/research-core.ts";
+import { candidateDiagnosisSchema, classificationSchema, MAX_CLASSIFIED_SOURCES } from "../lib/research-core.ts";
 
 const { defaultSourcePolicy, legacySourcePolicy, sourcePolicySchema, resolveSourcePolicy, searchGuidance, queryEvidence, queryGuidance, retrievalLimits, runShape, communityHint } = policy;
 const at = new Date("2026-11-06T00:00:00Z");
@@ -147,4 +147,18 @@ test("the stored research settings carry an optional source policy beside the pr
   assert.deepEqual(readStoredProviderSettings(stored), stored);
   assert.equal("sources" in readStoredProviderSettings({ ...routing, updatedAt: stored.updatedAt }), false);
   assert.throws(() => readStoredProviderSettings({ ...stored, sources: { kinds: [] } }), /PROVIDER_CONFIGURATION/);
+});
+
+// Production 2026-11-11: with 6 pages per idea, a run read 37 pages and classified 36, over the old literal cap of 32.
+// The classification was saved, then failed to parse at evaluation (INVALID_OUTPUT), and its retry failed the same way.
+test("a classification at the source policy's deepest setting can be saved and read back", () => {
+  const deepest = custom({ candidates: policy.MAX_CANDIDATES, pagesPerIdea: policy.MAX_PAGES_PER_IDEA });
+  assert.equal(sourcePolicySchema.safeParse(deepest).success, true);
+  const discovery = deepest.candidates * retrievalLimits(deepest, "combined").evidence;
+  const verify = retrievalLimits(deepest, "verify").evidence;
+  assert.ok(discovery <= MAX_CLASSIFIED_SOURCES && verify <= MAX_CLASSIFIED_SOURCES);
+  const item = (n) => ({ source_key: `c${n % 8 + 1}-s${n}`, relevant: true, kind: "pain", reliability: "secondary", stance: "supports", quote: "A quote copied from the page itself.", claim: "A claim." });
+  for (const count of [36, discovery]) {
+    assert.equal(classificationSchema.safeParse({ items: Array.from({ length: count }, (_, n) => item(n)) }).success, true, `${count} classified sources`);
+  }
 });
