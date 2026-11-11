@@ -2,7 +2,7 @@
 
 Supabase project: **VentureLens** (`ndrxywlouwigawhgrtrj`, ap-southeast-1).
 
-## Applied history (as of 2026-11-10)
+## Applied history (as of 2026-11-11)
 
 Read from `supabase_migrations.schema_migrations` on the live project:
 
@@ -23,6 +23,8 @@ Read from `supabase_migrations.schema_migrations` on the live project:
 | `20261110140000` | `founder_profile_v2` | `supabase/migrations/20261110140000_founder_profile_v2.sql` | identical (applied from the repository file after #45 merged, under the file's own version; stored one statement per element without the final semicolons; checked 2026-11-10) |
 | `20261110150000` | `idea_memory` | `supabase/migrations/20261110150000_idea_memory.sql` | identical (applied from the repository file after #47 merged, under the file's own version; stored one statement per element without the final semicolons; checked 2026-11-10) |
 | `20261110160000` | `run_focus` | `supabase/migrations/20261110160000_run_focus.sql` | identical (applied from the repository file after #49 merged, under the file's own version; stored one statement per element without the final semicolons; checked 2026-11-10) |
+| `20261110170000` | `report_feedback` | `supabase/migrations/20261110170000_report_feedback.sql` | identical (applied from the repository file after #53 merged, under the file's own version; stored one statement per element without the final semicolons; checked 2026-11-11) |
+| `20261110180000` | `run_notifications` | `supabase/migrations/20261110180000_run_notifications.sql` | identical (applied from the repository file after #55 merged, under the file's own version; stored one statement per element without the final semicolons; checked 2026-11-11) |
 
 "Identical" means the MD5 of the SQL with all whitespace removed matches between the repository file and the `statements` column of the applied migration.
 
@@ -46,12 +48,7 @@ After this change `supabase migration list` shows local and remote in sync, and 
 
 ## Written but not yet applied
 
-| Version | Name | File | Pull request | What it does |
-| --- | --- | --- | --- | --- |
-| `20261110170000` | `report_feedback` | `supabase/migrations/20261110170000_report_feedback.sql` | WP-13 | New table `report_feedback` (RLS enabled and forced; composite foreign keys to `research_runs (id, user_id)` and `opportunities (id, user_id)`; `authenticated` may select and insert its own flags only, no update or delete; `service_role` may select). One rating per report and one flag per claim or source (partial unique indexes). New function `rate_report(uuid, integer, text)`, security definer, executable by `authenticated` only. No existing table changes. |
-| `20261110180000` | `run_notifications` | `supabase/migrations/20261110180000_run_notifications.sql` | WP-08 | Adds `research_runs.notified_at timestamptz` (null; set once by the workflow with the service role when it emails about a finished run) and `founder_profiles.notify_on_complete boolean not null default true` (changed by the founder through the existing own-row update policy). No new grants, policies or functions. |
-
-When a pull request adds a migration, list it here until it is applied, and apply it only with the owner's approval. If `apply_migration` assigns a different version, rename the file to that version before merging. Merging to `main` can apply a migration to production: the Supabase integration applied `20261109150000`, `20261109160000`, `20261110120000`, `20261110130000`, `20261110140000`, `20261110150000` and `20261110160000` that way.
+None. When a pull request adds a migration, list it here until it is applied, and apply it only with the owner's approval. If `apply_migration` assigns a different version, rename the file to that version before merging. Merging to `main` can apply a migration to production: the Supabase integration applied `20261109150000`, `20261109160000`, `20261110120000`, `20261110130000`, `20261110140000`, `20261110150000`, `20261110160000`, `20261110170000` and `20261110180000` that way.
 
 ## Rules going forward
 
