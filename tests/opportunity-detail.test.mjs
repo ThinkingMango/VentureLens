@@ -11,6 +11,7 @@ import * as view from "../lib/opportunity-view.ts";
 import { opportunities, researchReports } from "../lib/demo-data.ts";
 import { messageKey, locales } from "../i18n/config.ts";
 import * as feedbackCore from "../lib/feedback-core.ts";
+import * as sprintCore from "../lib/sprint-core.ts";
 
 const require = createRequire(import.meta.url);
 const catalogs = Object.fromEntries(locales.map(l => [l, JSON.parse(readFileSync(new URL(`../messages/${l}.json`, import.meta.url), "utf8"))]));
@@ -43,6 +44,16 @@ function feedbackModule(copy, posted = []) {
     "@/components/ui/button": { Button: pass("button") }, "@/components/ui/dialog": dialog(), "@/lib/utils": { cn: (...c) => c.filter(Boolean).join(" ") },
   });
 }
+/** The validation sprint controls (WP-10), with network and toast dependencies replaced; `sent` collects requests. */
+function sprintModule(copy, sent = []) {
+  return load("../components/validation-sprint.tsx", {
+    "@/i18n/use-copy": { useCopy: () => copy, useFormats: () => ({ date: value => `date(${value})` }) }, "@/i18n/errors": { feedbackSource: code => String(code) },
+    "@/lib/api-client": { postJson: async (url, body) => { sent.push(body); return { ok: true, status: 200, body: {} }; } },
+    "@/lib/sprint-core": sprintCore, "sonner": { toast: { success() {}, info() {}, error() {} } },
+    "@/components/ui/button": { Button: pass("button") }, "@/lib/utils": { cn: (...c) => c.filter(Boolean).join(" ") },
+    "@/components/demo-provider": { useOptionalWorkspace: () => null },
+  });
+}
 /** The opportunity page with its UI dependencies replaced; `guide` renders the reading guide as if it were open. */
 function detailModule(copy, { guide = false } = {}) {
   const dependencies = {
@@ -54,6 +65,8 @@ function detailModule(copy, { guide = false } = {}) {
     "@/components/ui/badge": { Badge: pass("span") },
     "@/components/ui/dialog": dialog(guide),
     "@/components/report-feedback": feedbackModule(copy),
+    "@/components/validation-sprint": sprintModule(copy),
+    "@/lib/sprint-core": sprintCore,
     "@/lib/utils": { cn: (...c) => c.filter(Boolean).join(" ") },
     "@/i18n/demo": { useDemoContent: () => ({ opportunity: o => o, report: id => researchReports[id] }) },
     "@/lib/report-presentation": presentation,
@@ -166,7 +179,9 @@ test("the demo shows its synthetic sources and illustrative score without a scor
   assert.doesNotMatch(html, /href="http/, "synthetic sources are never linked");
   assert.doesNotMatch(page, /How this score was reached/);
   const validation = text(render("DemoOpportunityDetail", { opportunity: o, initialTab: "validation" }).html);
-  assert.match(validation, /Demo checklist · Changes reset on refresh/);
+  // The demo shows one fixed example sprint (WP-10) in place of the checklist.
+  assert.match(validation, /14-day validation sprint Day 4 of 14 · started .* 2 of 5 tasks done Example sprint · Ticks reset on refresh/);
+  assert.doesNotMatch(validation, /Demo checklist/);
   assert.ok(validation.includes(researchReports[o.id].firstTest));
   assert.deepEqual(missing, []);
 });

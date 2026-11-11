@@ -25,6 +25,7 @@ import type { WorkspaceOpportunity } from "@/lib/workspace-schema";
 import { stageLabels } from "@/lib/research-core";
 import { cn } from "@/lib/utils";
 import { ResearchAccessCard } from "@/components/research-access-card";
+import { ActiveSprintCard } from "@/components/active-sprint-card";
 
 export function WorkspaceEmpty({
   title,
@@ -155,6 +156,7 @@ export function LiveDashboard() {
           </Button>
         </div>
       </PageHeader>
+      {data.activeSprints?.[0] && <ActiveSprintCard sprint={data.activeSprints[0]} others={data.activeSprints.length - 1} />}
       <div className="grid gap-6 xl:grid-cols-[1.5fr_1fr]">
         <section
           className="surface flex flex-col gap-5 p-6"

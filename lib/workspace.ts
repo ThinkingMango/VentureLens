@@ -2,6 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { readActiveSprints } from "@/lib/sprints";
 import {
   emptyProfile,
   profileColumns,
@@ -68,6 +69,8 @@ export async function readWorkspace(
   supabase: Awaited<ReturnType<typeof createClient>>,
   user: { id: string; email?: string },
 ): Promise<WorkspaceData> {
+  // Validation sprints (WP-10) are read alongside; a database without them only shows no sprint card.
+  const activeSprints = readActiveSprints(supabase, user.id);
   let [
     notifyResult,
     memoryResult,
@@ -175,6 +178,7 @@ export async function readWorkspace(
     onboarded: row?.onboarding_completed ?? false,
     memoryResetAt: memoryResult.error ? null : (memoryResult.data?.history_reset_at ?? null),
     notifyOnComplete: notifyResult.error ? true : notifyResult.data?.notify_on_complete !== false,
+    activeSprints: await activeSprints,
     access,
     projects: projectsResult.data ?? [],
     runs: runsResult.data ?? [],

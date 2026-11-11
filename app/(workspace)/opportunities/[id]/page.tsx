@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { z } from "zod";
 import { readOpportunity, requireUser } from "@/lib/workspace";
 import { LiveOpportunityDetail } from "@/components/opportunity-detail";
+import { readOpportunitySprint } from "@/lib/sprints";
 export async function generateMetadata() {
   const copy = await getCopy();
   return {
@@ -23,5 +24,6 @@ export default async function Page({
   const { supabase, user } = await requireUser();
   const opportunity = await readOpportunity(supabase, user.id, id);
   if (!opportunity) notFound();
-  return <LiveOpportunityDetail opportunity={opportunity} initialTab={typeof tab === "string" ? tab : undefined} />;
+  const sprint = await readOpportunitySprint(supabase, user.id, id);
+  return <LiveOpportunityDetail opportunity={opportunity} initialTab={typeof tab === "string" ? tab : undefined} sprint={sprint} />;
 }

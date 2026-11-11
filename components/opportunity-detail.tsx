@@ -8,6 +8,8 @@ import type { WorkspaceOpportunity } from "@/lib/workspace-schema";
 import { useDemo } from "@/components/demo-provider";
 import { DemoNote, Confidence } from "@/components/shared";
 import { FlagButton, FlagProvider } from "@/components/report-feedback";
+import { SprintPanel, SprintStarter, useSprintActions } from "@/components/validation-sprint";
+import { demoSprint, firstSteps, type Sprint } from "@/lib/sprint-core";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -29,8 +31,8 @@ import {
 type Copy = ReturnType<typeof useCopy>;
 
 /** A live opportunity page: the user's own research, read from its stored payload. */
-export function LiveOpportunityDetail({ opportunity, initialTab }: { opportunity: WorkspaceOpportunity; initialTab?: string }) {
-  return <OpportunityDetail view={liveOpportunityView(opportunity)} initialTab={initialTab} />;
+export function LiveOpportunityDetail({ opportunity, initialTab, sprint = null }: { opportunity: WorkspaceOpportunity; initialTab?: string; sprint?: Sprint | null }) {
+  return <OpportunityDetail view={liveOpportunityView(opportunity)} initialTab={initialTab} sprint={sprint} />;
 }
 
 /** The demo opportunity page: the same component, fed by the fixed demo sample. */
@@ -38,7 +40,9 @@ export function DemoOpportunityDetail({ opportunity, initialTab }: { opportunity
   const copy = useCopy();
   const content = useDemoContent();
   const view = demoOpportunityView(content.opportunity(opportunity), content.report(opportunity.id), copy);
-  return <OpportunityDetail view={view} initialTab={initialTab} />;
+  // One fixed example sprint (WP-10): the page's first steps and the report's first test, a few days in.
+  const sprint = demoSprint(view.id, [...checklist.map((title) => copy(title)), ...(view.firstTest ? [view.firstTest] : [])], copy("Example: at least 3 of 10 owners I interview describe this problem unprompted, and 2 agree to a paid pilot."));
+  return <OpportunityDetail view={view} initialTab={initialTab} sprint={sprint} />;
 }
 
 function tabLabel(copy: Copy, tab: OpportunityTabId) {
@@ -75,15 +79,10 @@ function stanceLabel(copy: Copy, stance: NonNullable<ViewSource["stance"]>) {
   }
 }
 
-/** Fixed first steps for every opportunity. Progress is kept by index (`{id}-{i}`), so the order must not change. */
-const checklist = [
-  "Write down the riskiest assumption",
-  "Find five potential buyers",
-  "Run problem-discovery conversations",
-  "Test a small, paid manual pilot",
-] as const;
+const checklist = firstSteps;
 
-export function OpportunityDetail({ view, initialTab }: { view: OpportunityView; initialTab?: string }) {
+/** `sprint`: the opportunity's validation sprint (WP-10), null when it has none; leave it out to hide sprints. */
+export function OpportunityDetail({ view, initialTab, sprint }: { view: OpportunityView; initialTab?: string; sprint?: Sprint | null }) {
   const copy = useCopy();
   const tabs = opportunityTabs(view);
   const [tab, setTab] = useState<OpportunityTabId>(() => resolveTab(initialTab, tabs));
@@ -296,7 +295,7 @@ export function OpportunityDetail({ view, initialTab }: { view: OpportunityView;
             {tab === "overview" && <OverviewTab view={view} sources={sourcesByKey} openSource={openSource} goTo={goTo} />}
             {tab === "evidence" && <EvidenceTab view={view} sources={sourcesByKey} openSource={openSource} />}
             {tab === "economics" && <EconomicsTab view={view} />}
-            {tab === "validation" && <ValidationTab view={view} />}
+            {tab === "validation" && <ValidationTab view={view} sprint={sprint} />}
           </div>
         </div>
       </div>
@@ -580,9 +579,13 @@ function EconomicsTab({ view }: { view: OpportunityView }) {
   );
 }
 
-function ValidationTab({ view }: { view: OpportunityView }) {
+function ValidationTab({ view, sprint }: { view: OpportunityView; sprint?: Sprint | null }) {
   const copy = useCopy();
   const { completed, toggleTask, busy } = useDemo();
+  const [current, setCurrent] = useState<Sprint | null>(sprint ?? null);
+  const actions = useSprintActions(view.kind === "demo", setCurrent, current);
+  const sprints = sprint !== undefined;
+  const activeSprint = sprints && current?.status === "active" ? current : null;
   const notes = [
     copy("Start with this assumption: {buyer} experience this problem often enough to pay for a solution.", { buyer: view.buyer }),
     copy("Use your network and relevant professional communities. Ask permission before reaching out."),
@@ -593,13 +596,20 @@ function ValidationTab({ view }: { view: OpportunityView }) {
   return (
     <section className="report-section" aria-labelledby="validation-heading">
       <h2 id="validation-heading" className="text-xl font-semibold">{copy("Your first validation sprint")}</h2>
+      {sprints && !activeSprint && (
+        <SprintStarter
+          busy={actions.busy}
+          previous={current}
+          onStart={(length) => void actions.send({ action: "start", opportunity_id: view.id, length, checklist: checklist.map((title) => copy(title)) })}
+        />
+      )}
       {view.firstTest && (
         <div className="flex flex-col gap-2">
           <h3 className="font-semibold">{copy("What to test first")}</h3>
           <p className="max-w-prose leading-relaxed">{view.firstTest}</p>
         </div>
       )}
-      {view.validation.length > 1 && (
+      {!activeSprint && view.validation.length > 1 && (
         <div className="flex flex-col gap-2">
           <h3 className="font-semibold">{copy("Next validation steps")}</h3>
           <ol className="flex list-decimal flex-col gap-2 pl-5 text-sm leading-relaxed">
@@ -613,6 +623,12 @@ function ValidationTab({ view }: { view: OpportunityView }) {
           <p className="max-w-prose leading-relaxed text-muted-foreground">{view.falsification}</p>
         </div>
       )}
+      {activeSprint && (
+        <div className="border-t pt-5">
+          <SprintPanel sprint={activeSprint} send={actions.send} busy={actions.busy} demo={view.kind === "demo"} />
+        </div>
+      )}
+      {!activeSprint && (<>
       <div className="flex flex-col gap-3 border-t pt-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h3 className="font-semibold">{copy("Checklist")}</h3>
@@ -641,6 +657,7 @@ function ValidationTab({ view }: { view: OpportunityView }) {
           );
         })}
       </div>
+      </>)}
       <div className="flex flex-col gap-3 border-t pt-5">
         <h3 className="font-semibold">{copy("A better first question")}</h3>
         <blockquote className="max-w-prose text-base leading-relaxed">
