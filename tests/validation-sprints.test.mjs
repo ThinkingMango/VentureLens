@@ -134,7 +134,7 @@ test("starting a sprint calls the seeding function with the page's first steps a
 test("tasks change only in an active sprint; ticks and decisions are recorded once, without any text", async () => {
   const tick = route();
   assert.equal((await tick.post({ action: "toggle_task", task_id: ID(3), done: true })).status, 200);
-  assert.deepEqual(tick.calls.events, [{ event: "task_completed", userId: "u1", props: {} }]);
+  assert.deepEqual(tick.calls.events, [{ event: "task_completed", userId: "u1", props: { origin: "sprint" } }]);
   const again = route({ toggled: [] });
   await again.post({ action: "toggle_task", task_id: ID(3), done: true });
   assert.equal(again.calls.events.length, 0, "ticking a task that was already done records nothing");

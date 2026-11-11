@@ -114,7 +114,7 @@ export async function POST(request: NextRequest) {
         const { data: changed, error } = await (input.done ? update.is("done_at", null) : update.not("done_at", "is", null)).select("id");
         if (error) throw error;
         // Counted once per tick: ticking a task that is already done changes nothing and records nothing.
-        if (input.done && changed?.length) after(() => track("task_completed", { userId: user.id, props: {} }));
+        if (input.done && changed?.length) after(() => track("task_completed", { userId: user.id, props: { origin: "sprint" } }));
       } else {
         const { error } = await supabase.from("validation_tasks").delete().eq("id", input.task_id).eq("user_id", user.id);
         if (error) throw error;
