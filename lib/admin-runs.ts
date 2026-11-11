@@ -115,16 +115,18 @@ export async function qualityReport(user: Identity, days: MetricWindow, now = ne
   const runs = await readAll<Omit<MetricRun, "preflight_blocked">>((from, to) =>
     client.from("research_runs").select("id,status,error_code,started_at,completed_at").gte("created_at", since).order("created_at").order("id").range(from, to));
   const ids = runs.map(run => run.id);
-  const [blocks, usage, sources, opportunities] = await Promise.all([
+  const [blocks, usage, sources, opportunities, detachedUsage] = await Promise.all([
     readForRuns<{ run_id: string; kind: string | null }>(ids, (chunk, from, to) => client.from("research_stages").select("run_id,kind:output->>kind").eq("stage_key", "budget_block").in("run_id", chunk).order("run_id").range(from, to)),
     readForRuns<MetricUsage>(ids, (chunk, from, to) => client.from("research_usage").select("run_id,status,estimated_usd,reserved_usd").in("run_id", chunk).order("id").range(from, to)),
     readForRuns<MetricSource>(ids, (chunk, from, to) => client.from("research_evidence").select("reliability:classification->>reliability").in("run_id", chunk).not("classification", "is", null).order("id").range(from, to)),
     readForRuns<MetricOpportunity>(ids, (chunk, from, to) => client.from("opportunities").select("run_id,evidence:payload->evidence").in("run_id", chunk).order("id").range(from, to)),
+    // Usage of runs founders deleted in the window (WP-12, D6): no run or founder, still part of what was spent.
+    readAll<MetricUsage>((from, to) => client.from("research_usage").select("run_id,status,estimated_usd,reserved_usd").is("run_id", null).gte("created_at", since).order("id").range(from, to)),
   ]);
   const preflight = new Set(blocks.filter(block => block.kind === "estimate").map(block => block.run_id));
   return {
     days, since,
-    metrics: qualityMetrics({ runs: runs.map(run => ({ ...run, preflight_blocked: preflight.has(run.id) })), usage, sources, opportunities }),
+    metrics: qualityMetrics({ runs: runs.map(run => ({ ...run, preflight_blocked: preflight.has(run.id) })), usage, sources, opportunities, detachedUsage }),
     feedback: await feedbackReport(client, since),
   };
 }

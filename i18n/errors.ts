@@ -21,6 +21,7 @@ export const feedback: Record<string, string> = {
   SPRINT_CLOSED: "This sprint has ended.",
   SPRINT_ACTIVE: "This opportunity already has an active sprint.",
   TOO_MANY_TASKS: "A sprint can hold 50 tasks.",
+  RUN_ACTIVE: "This research is still running. You can delete it once it has finished.",
   STATUS_UNAVAILABLE:
     "Research status could not refresh. Showing the last server record.",
   NETWORK_ERROR:

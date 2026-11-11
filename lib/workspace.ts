@@ -29,15 +29,25 @@ export function workspaceOpportunity(item: WorkspaceOpportunity): WorkspaceOppor
   };
 }
 
-function parseOpportunity(row: { id: string; title: string; score: number; payload: unknown }) {
+type OpportunityRow = { id: string; title: string; score: number; payload: unknown; run_id?: string | null; archived_at?: string | null };
+function parseOpportunity(row: OpportunityRow) {
   const parsed = opportunitySchema.safeParse({
     ...(row.payload as Record<string, unknown>),
     id: row.id,
     title: row.title,
     score: row.score,
+    ...(row.run_id ? { run_id: row.run_id } : {}),
+    archived_at: row.archived_at ?? null,
   });
   return parsed.success ? parsed.data : null;
 }
+/**
+ * The opportunity columns read with the payload. Before the WP-12 migration there is no archived_at (Postgres 42703,
+ * undefined column): reading again without it keeps the workspace loading, with nothing archived.
+ */
+const opportunityColumns = "id,title,score,payload,run_id,archived_at" as const;
+const legacyOpportunityColumns = "id,title,score,payload,run_id" as const;
+const undefinedColumn = (error: { code?: string } | null) => error?.code === "42703";
 
 /** One opportunity with every field, for the opportunity page. Row-level security limits it to the owner. */
 export async function readOpportunity(
@@ -45,12 +55,14 @@ export async function readOpportunity(
   userId: string,
   id: string,
 ): Promise<WorkspaceOpportunity | null> {
-  const { data, error } = await supabase
-    .from("opportunities")
-    .select("id,title,score,payload")
-    .eq("id", id)
-    .eq("user_id", userId)
-    .maybeSingle();
+  const current = await supabase.from("opportunities").select(opportunityColumns).eq("id", id).eq("user_id", userId).maybeSingle();
+  let data = current.data as OpportunityRow | null;
+  let error = current.error;
+  if (undefinedColumn(error)) {
+    const legacy = await supabase.from("opportunities").select(legacyOpportunityColumns).eq("id", id).eq("user_id", userId).maybeSingle();
+    data = legacy.data as OpportunityRow | null;
+    error = legacy.error;
+  }
   if (error) throw new Error("We could not load this opportunity. Please try again.");
   return data ? parseOpportunity(data) : null;
 }
@@ -110,7 +122,7 @@ export async function readWorkspace(
       .order("created_at", { ascending: false }),
     supabase
       .from("opportunities")
-      .select("id,title,score,payload")
+      .select(opportunityColumns)
       .eq("user_id", user.id)
       .order("score", { ascending: false }),
     supabase
@@ -132,6 +144,13 @@ export async function readWorkspace(
       .eq("user_id", user.id)
       .order("created_at", { ascending: false });
     projectsResult = { ...legacy, data: legacy.data?.map((project) => ({ ...project, angles: [], explore_new: false })) ?? null } as typeof projectsResult;
+  }
+  if (undefinedColumn(opportunitiesResult.error)) {
+    opportunitiesResult = (await supabase
+      .from("opportunities")
+      .select(legacyOpportunityColumns)
+      .eq("user_id", user.id)
+      .order("score", { ascending: false })) as typeof opportunitiesResult;
   }
   const failed = [
     profileResult,

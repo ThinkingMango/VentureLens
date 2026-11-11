@@ -19,17 +19,23 @@ import * as workspaceSchema from "../lib/workspace-schema.ts";
 import * as fallbackCore from "../lib/research-fallback-core.ts";
 import * as budget from "../lib/research-budget.ts";
 import * as apiClient from "../lib/api-client.ts";
+import * as libraryCore from "../lib/library-core.ts";
 
 const verified = { id: "admin-test-id", email: "owner@example.org", email_confirmed_at: "2026-11-05T00:00:00.000Z", app_metadata: { role: "admin" } };
 const require = createRequire(import.meta.url);
 // Stand-in for the AI SDK error raised when a response does not parse into the requested object.
 const noObject = { isInstance: error => error?.name === "AI_NoObjectGeneratedError" };
 const unparsable = usage => Object.assign(new Error("No object generated: could not parse the response."), { name: "AI_NoObjectGeneratedError", usage });
+// Modules added by the library (WP-12), for components loaded without them in their dependency list.
+const libraryMocks = {
+  "@/components/library": { ArchiveButton: () => null, DeleteRunButton: () => null, LibraryFilterBar: () => null },
+  "@/lib/library-core": libraryCore,
+};
 function loadModule(file, dependencies, env = {}, suffix = "") {
   const source = readFileSync(new URL(file, import.meta.url), "utf8") + suffix;
   const { outputText } = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } });
   const module = { exports: {} };
-  const dependency = name => Object.hasOwn(dependencies, name) ? dependencies[name] : require(name);
+  const dependency = name => Object.hasOwn(dependencies, name) ? dependencies[name] : Object.hasOwn(libraryMocks, name) ? libraryMocks[name] : require(name);
   new Function("require", "exports", "module", "process", outputText)(dependency, module.exports, module, { env });
   return module.exports;
 }

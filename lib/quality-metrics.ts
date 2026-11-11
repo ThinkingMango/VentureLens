@@ -19,7 +19,7 @@ export type MetricRun = {
   /** Stopped before its first request because no configured model could finish within the budget (budget_block "estimate"). */
   preflight_blocked?: boolean;
 };
-export type MetricUsage = { run_id: string; status: string; estimated_usd: number | string | null; reserved_usd: number | string };
+export type MetricUsage = { run_id: string | null; status: string; estimated_usd: number | string | null; reserved_usd: number | string };
 /** One classified source: its classification's reliability. */
 export type MetricSource = { reliability: string | null | undefined };
 /** One saved opportunity: its run and the evidence list stored on its payload. */
@@ -75,7 +75,11 @@ const ratio = (part: number, whole: number) => (whole > 0 ? part / whole : null)
 
 export type QualityMetrics = ReturnType<typeof qualityMetrics>;
 
-export function qualityMetrics(input: { runs: MetricRun[]; usage: MetricUsage[]; sources: MetricSource[]; opportunities: MetricOpportunity[] }) {
+/**
+ * `detachedUsage`: usage rows of runs the founder deleted (WP-12, decision D6), kept for cost accounting with no run or
+ * founder. They count towards spend in the window; they cannot count towards any run's own figures.
+ */
+export function qualityMetrics(input: { runs: MetricRun[]; usage: MetricUsage[]; sources: MetricSource[]; opportunities: MetricOpportunity[]; detachedUsage?: MetricUsage[] }) {
   const completed = input.runs.filter(run => run.status === "completed");
   const failed = input.runs.filter(run => run.status === "failed");
   const preflight = failed.filter(run => run.preflight_blocked);
@@ -94,9 +98,11 @@ export function qualityMetrics(input: { runs: MetricRun[]; usage: MetricUsage[];
   const classified = input.sources.filter(source => typeof source.reliability === "string");
   const durations = [...completed, ...failed].map(durationMs).filter((ms): ms is number => ms !== null);
   const runIds = new Set(input.runs.map(run => run.id));
-  const usage = input.usage.filter(row => runIds.has(row.run_id));
-  const total = committedUsd(usage);
-  const completedSpend = committedUsd(usage.filter(row => completedIds.has(row.run_id)));
+  const usage = input.usage.filter(row => row.run_id !== null && runIds.has(row.run_id));
+  const detached = input.detachedUsage ?? [];
+  const deletedRunsUsd = committedUsd(detached);
+  const total = committedUsd(usage) + deletedRunsUsd;
+  const completedSpend = committedUsd(usage.filter(row => row.run_id !== null && completedIds.has(row.run_id)));
 
   return {
     runs: { total: input.runs.length, completed: completed.length, failed: failed.length, active: input.runs.length - finished, preflightBlocked: preflight.length },
@@ -119,7 +125,9 @@ export function qualityMetrics(input: { runs: MetricRun[]; usage: MetricUsage[];
       spendPerCompletedRunUsd: ratio(total, completed.length),
       /** All spend in the window per opportunity that survived the gate and the review. */
       spendPerOpportunityUsd: ratio(total, opportunities),
-      uncertainCalls: usage.filter(row => row.status !== "completed").length,
+      uncertainCalls: [...usage, ...detached].filter(row => row.status !== "completed").length,
+      /** Spend of runs deleted since (included in totalUsd). */
+      deletedRunsUsd,
     },
   };
 }

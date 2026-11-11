@@ -12,6 +12,7 @@ import { opportunities, researchReports } from "../lib/demo-data.ts";
 import { messageKey, locales } from "../i18n/config.ts";
 import * as feedbackCore from "../lib/feedback-core.ts";
 import * as sprintCore from "../lib/sprint-core.ts";
+import * as libraryCore from "../lib/library-core.ts";
 
 const require = createRequire(import.meta.url);
 const catalogs = Object.fromEntries(locales.map(l => [l, JSON.parse(readFileSync(new URL(`../messages/${l}.json`, import.meta.url), "utf8"))]));
@@ -24,11 +25,16 @@ function copyFor(locale) {
   const copy = (source, values) => { const key = messageKey(source); if (catalogs[locale].ui[key]) return t(key, values); missing.push(source); return source; };
   return { copy, missing };
 }
+// Modules added by the library (WP-12), for components loaded without them in their dependency list.
+const libraryMocks = {
+  "@/components/library": { ArchiveButton: () => null, DeleteRunButton: () => null, LibraryFilterBar: () => null },
+  "@/lib/library-core": libraryCore,
+};
 function load(file, dependencies) {
   const source = readFileSync(new URL(file, import.meta.url), "utf8");
   const { outputText } = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } });
   const module = { exports: {} };
-  new Function("require", "exports", "module", outputText)(name => Object.hasOwn(dependencies, name) ? dependencies[name] : require(name), module.exports, module);
+  new Function("require", "exports", "module", outputText)(name => Object.hasOwn(dependencies, name) ? dependencies[name] : Object.hasOwn(libraryMocks, name) ? libraryMocks[name] : require(name), module.exports, module);
   return module.exports;
 }
 const dialog = (open = false) => ({

@@ -49,7 +49,11 @@ After this change `supabase migration list` shows local and remote in sync, and 
 
 ## Written but not yet applied
 
-None. When a pull request adds a migration, list it here until it is applied, and apply it only with the owner's approval. If `apply_migration` assigns a different version, rename the file to that version before merging. Merging to `main` can apply a migration to production: the Supabase integration applied `20261109150000`, `20261109160000`, `20261110120000`, `20261110130000`, `20261110140000`, `20261110150000`, `20261110160000`, `20261110170000`, `20261110180000` and `20261111120000` that way.
+| Version | Name | File | Pull request | What it does |
+| --- | --- | --- | --- | --- |
+| `20261111130000` | `library` | `supabase/migrations/20261111130000_library.sql` | WP-12 | New column `opportunities.archived_at` (nullable). `research_usage.run_id` and `user_id` become nullable, with a check that both are set or both are null, a new `detached_at` column, a partial index on detached rows and a trigger that sets `detached_at` when a row is detached; the foreign key to `research_runs` is unchanged (still cascades, so deleting an account still deletes its usage). New functions, security definer, executable by `authenticated` only: `set_opportunity_archived(uuid, boolean)` (own opportunities only) and `delete_research_run(uuid)` (own runs only; refuses `pending` and `running`; detaches the run's usage rows (decision D6), deletes the run, which cascades to its opportunities, stages, evidence, saves, feedback and sprints, and deletes its brief if no other run uses it). No grants change: founders still cannot write `opportunities` or `research_runs` directly. |
+
+When a pull request adds a migration, list it here until it is applied, and apply it only with the owner's approval. If `apply_migration` assigns a different version, rename the file to that version before merging. Merging to `main` can apply a migration to production: the Supabase integration applied `20261109150000`, `20261109160000`, `20261110120000`, `20261110130000`, `20261110140000`, `20261110150000`, `20261110160000`, `20261110170000`, `20261110180000` and `20261111120000` that way.
 
 ## Rules going forward
 

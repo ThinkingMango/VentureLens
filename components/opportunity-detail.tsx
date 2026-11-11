@@ -9,6 +9,7 @@ import { useDemo } from "@/components/demo-provider";
 import { DemoNote, Confidence } from "@/components/shared";
 import { FlagButton, FlagProvider } from "@/components/report-feedback";
 import { SprintPanel, SprintStarter, useSprintActions } from "@/components/validation-sprint";
+import { ArchiveButton } from "@/components/library";
 import { demoSprint, firstSteps, type Sprint } from "@/lib/sprint-core";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -145,6 +146,7 @@ export function OpportunityDetail({ view, initialTab, sprint }: { view: Opportun
               <Bookmark className={isSaved ? "fill-primary/15 text-primary" : ""} />
               {isSaved ? copy("Saved opportunity") : copy("Save opportunity")}
             </Button>
+            {view.kind === "live" && <ArchiveButton opportunity={{ id: view.id, title: view.title }} />}
           </div>
         </div>
         {view.kind === "demo" && (
