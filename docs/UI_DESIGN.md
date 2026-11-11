@@ -53,3 +53,13 @@ The landing page spends its boldness in one place, the **run ledger**, and keeps
 - `--warm-ink` (#8a5a1f) is the ochre used for text (dropped reasons); `--warm` stays decorative.
 - Chinese display headings use `word-break: keep-all` so they break at punctuation, not mid-word.
 - Custom layout classes set `display` only inside media queries where a Tailwind visibility utility (`hidden`, `lg:grid`) shares the element, because unlayered CSS outranks Tailwind v4's layered utilities.
+
+## Pricing page (November 2026 redesign)
+
+Built the same way as the landing page: one Newsreader headline, quiet hairline sections, and one structured element that carries the page's real argument.
+
+- **Hero:** leads with what is true today, "Your first research run is free", and says plainly that paid credits are planned but not on sale, so nothing on the page can charge anyone.
+- **Planned packages** (`PlanTable`): one comparison instead of three feature cards. Nothing is gated by package, so the table shows only what differs: price, runs, and the price per run (derived from `price / runs`, never typed). There is no "most popular" badge and no buy button, because nothing can be bought. Phones show each package's three figures side by side, and CSS subgrid keeps the values on one line when a label wraps. `/demo/billing` reuses it with `bleed={false}` so it stays a card inside the workspace.
+- **Example credit statement:** walks through the refund rule in `release_failed_research_run`. Failures on our side (here, a provider outage) always return the credit; thin evidence returns it up to a per-account limit, stated without publishing the number. Stopped runs use the ochre `--warm-ink` as on the landing ledger; returned credits use the primary green.
+- FAQ and closing band match the landing. The stale "authorized development accounts" answer is gone.
+- `.plan-row` and `.statement-row` set columns only, never `display`, so a Tailwind `hidden md:grid` header keeps working.

@@ -166,3 +166,23 @@ test("the landing page's claims about scoring match the engine", async () => {
   const base = css.slice(0, css.indexOf("@media (min-width: 1024px)"));
   assert.doesNotMatch(base, /\.ledger-head[^{]*\{[^}]*display:/);
 });
+
+test("the pricing page states only what the product and the refund rule actually do", () => {
+  const pricing = read("components/pricing.tsx");
+  const refunds = read("supabase/migrations/20261109150000_cap_failed_run_refunds.sql");
+  // Live research is open to every confirmed account, not only "authorized development accounts".
+  assert.doesNotMatch(pricing, /Authorized development accounts/);
+  // Nothing is gated by package, so the comparison lists no per-package features.
+  assert.doesNotMatch(pricing, /Everything in |features:/);
+  // The statement's "always returned" entry is a provider outage, which the refund trigger treats as our fault,
+  // and thin evidence is returned only within the per-account allowance.
+  assert.match(refunds, /'TRANSIENT_PROVIDER'/);
+  assert.match(refunds, /runs_refunded < max_refunds/);
+  assert.match(pricing, /a search provider was unavailable/);
+  assert.match(pricing, /up to a per-account limit/);
+  // Per-run prices are derived from price and runs, never typed in.
+  assert.match(pricing, /export const perRun = .*=> plan\.price \/ plan\.runs;/);
+  assert.doesNotMatch(pricing, /perCredit/);
+  // The demo billing page reuses the same comparison, kept as a card inside the workspace.
+  assert.match(read("components/billing.tsx"), /<PlanTable bleed=\{false\} \/>/);
+});
