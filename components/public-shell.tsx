@@ -158,7 +158,7 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
             </Link>
             <p className="mt-2 text-muted-foreground">
               {copy(
-                "Every confirmed account includes one free research run. Pricing shown is planned, and no payments are collected yet.",
+                "Every confirmed account includes 10 free research runs. Pricing shown is planned, and no payments are collected yet.",
               )}
             </p>
           </div>

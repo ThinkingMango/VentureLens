@@ -36,9 +36,12 @@ test("failed-run refunds are capped per account, except for our failures and run
     psql(db, ["-f", path(`supabase/migrations/${file}`)]);
   }
 
-  // Confirming an address grants one free run (zz_grant_signup_research_run).
+  // Confirming an address grants 10 free runs (zz_grant_signup_research_run, 20261111140000).
   const user = sql(`insert into auth.users (email, email_confirmed_at) values ('founder@example.com', now()) returning id`);
   const grant = () => sql(`select runs_used || '/' || max_runs || ' refunded ' || runs_refunded || '/' || max_refunds from public.research_dev_access where user_id = '${user}'`);
+  assert.equal(grant(), "0/10 refunded 0/3");
+  // The ledger below is easiest to follow with a single run: narrow this account to one, as an operator could.
+  sql(`update public.research_dev_access set max_runs = 1 where user_id = '${user}'`);
   assert.equal(grant(), "0/1 refunded 0/3");
 
   const brief = `'{"name":"Agency research","sector":"Professional services","model":"B2B subscription","geography":"United States"}'::jsonb`;

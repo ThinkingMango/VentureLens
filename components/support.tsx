@@ -46,7 +46,7 @@ function buildTopics(disclosure: ProviderDisclosure): { title: string; questions
       questions: [
         {
           q: "My free research run is missing.",
-          a: ["Every confirmed account receives one free research run. If yours does not appear on the New research page, log out and back in. If it is still missing, email support from the address on your account."],
+          a: ["Every confirmed account receives 10 free research runs, valid for 90 days. If they do not appear on the New research page, log out and back in. If they are still missing, email support from the address on your account."],
         },
         {
           q: "My research run failed.",
