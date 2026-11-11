@@ -40,6 +40,7 @@ export function retrievalLabel(copy: Copy, retrieval: string) {
   switch (retrieval) {
     case "searched": return copy("Searched");
     case "skipped": return copy("Search found nothing readable");
+    case "failed": return copy("Search failed (provider timeout or outage); skipped");
     default: return copy("Not reached");
   }
 }

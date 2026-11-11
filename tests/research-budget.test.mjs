@@ -104,3 +104,50 @@ test('clipping prefers sentence boundaries, keeps short text and stays within th
   assert.ok(clipped.length <= 40 && clipped.endsWith('…'));
   assert.equal(clipText('一句话。'.repeat(100), 30).length <= 30, true);
 });
+
+test('a saved budget keeps headroom over the estimate, so a re-calibration cannot silently move runs to the fallback', async () => {
+  const { recommendedBudget, BUDGET_HEADROOM } = await import('../lib/provider-settings-core.ts');
+  // Production 2026-11-11: $0.55 was saved for Gemini 3.8 Flash at $0.5435; WP-07 raised the estimate to $0.5675 and
+  // the next run started on Qwen. With headroom, that budget is refused and $0.63 is asked for instead.
+  const live = { primary: 'gemini', autoFallback: true, qwenModel: 'qwen3.8-flash', geminiModel: 'gemini-3.8-flash', budgetUsd: 0.55 };
+  const required = estimateRunCost('gemini-3.8-flash', november).requiredUsd;
+  assert.equal(required, 0.5675);
+  assert.throws(() => assertBudgetFits(live, november), error => error.message === 'BUDGET_TOO_LOW' && error.requiredUsd === 0.63);
+  assert.doesNotThrow(() => assertBudgetFits({ ...live, budgetUsd: 0.63 }, november));
+  // A budget the old estimate accepted with headroom still fits the new one.
+  assert.ok(recommendedBudget(0.5435) >= required);
+  for (const model of [...qwenModelIds, ...geminiModelIds]) {
+    const { requiredUsd } = estimateRunCost(model, november);
+    const recommended = recommendedBudget(requiredUsd);
+    assert.ok(recommended >= requiredUsd * BUDGET_HEADROOM - 1e-9, model);
+    assert.equal(Math.round(recommended * 100) / 100, recommended, `${model} is asked for whole cents`);
+  }
+  assert.equal(recommendedBudget(0.5), 0.55, 'exact products are not rounded up a cent by floating point');
+});
+
+test('each retrieval step fits in the platform function duration, however long its searches run', async () => {
+  const { searchTimeout, SEARCH_TIMEOUT_MS, RETRIEVAL_STEP_BUDGET_MS, PAGE_READ_RESERVE_MS, MIN_SEARCH_MS } = await import('../lib/research-models.ts');
+  const start = 1_000_000;
+  assert.equal(searchTimeout('qwen', start, start), 150_000);
+  assert.equal(searchTimeout('gemini', start, start), 90_000);
+  // After a full-length Qwen search, its fallback gets only what is left before the page-read reserve.
+  assert.equal(searchTimeout('gemini', start, start + SEARCH_TIMEOUT_MS.qwen), RETRIEVAL_STEP_BUDGET_MS - PAGE_READ_RESERVE_MS - SEARCH_TIMEOUT_MS.qwen);
+  assert.ok(searchTimeout('qwen', start, start + 165_000) < MIN_SEARCH_MS, 'too little time left: not sent');
+  // Searches end by budget − reserve; page reads stop starting at the budget and each read times out after 15 s.
+  assert.ok(RETRIEVAL_STEP_BUDGET_MS + 15_000 < 300_000, 'stays inside the 300 s default function duration');
+  assert.ok(SEARCH_TIMEOUT_MS.qwen > 90_000, 'Qwen gets more than the 90 s that cut off run 0373ec17');
+});
+
+test('a transiently failed search is skipped only while the provider looks slow rather than down', async () => {
+  const { transientSkipAllowed } = await import('../lib/research-core.ts');
+  const T = 'TRANSIENT_PROVIDER', E = 'evidence', U = 'RETRIEVAL_UNAVAILABLE';
+  assert.equal(transientSkipAllowed([E, E, E, E, E, E, E], 0), true, 'run 0373ec17: the 8th of 8, after 7 with evidence');
+  assert.equal(transientSkipAllowed([], 7), true, 'the first candidate, with others still to search');
+  assert.equal(transientSkipAllowed([], 0), false, 'a single candidate (verify mode)');
+  assert.equal(transientSkipAllowed([E, T], 5), false, 'two in a row');
+  assert.equal(transientSkipAllowed([T, E], 5), true, 'separated by a success');
+  assert.equal(transientSkipAllowed([T, E, T, E], 3), false, 'a quarter of 8 already skipped');
+  assert.equal(transientSkipAllowed([T, E], 1), false, 'a quarter of 4 already skipped');
+  assert.equal(transientSkipAllowed([U, U], 0), false, 'last candidate and nothing found before it');
+  assert.equal(transientSkipAllowed([U, E], 0), true);
+});
