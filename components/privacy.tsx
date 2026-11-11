@@ -92,7 +92,7 @@ function buildSections(disclosure: ProviderDisclosure): Section[] {
       items: [
         ["Supabase", "Database, authentication, and sign-in emails."],
         ["Vercel", "Website hosting, background research jobs, and server logs."],
-        ["Resend", "Research notification emails: your email address, the run's name and its outcome."],
+        ["Hostinger", "Research notification emails, sent from our mailbox: your email address, the run's name and its outcome."],
         ...modelProcessors(disclosure),
       ],
       after: [

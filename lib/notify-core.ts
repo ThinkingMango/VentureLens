@@ -2,20 +2,41 @@
 // says, and how it is built. The email never carries profile, brief or report text: only the run's own name, its
 // outcome and a link back to the run.
 
-export type NotifyEnv = Partial<Record<"NOTIFY_DRY_RUN" | "NOTIFY_SEND" | "RESEND_API_KEY" | "NOTIFY_FROM" | "NOTIFY_REPLY_TO" | "VERCEL_ENV" | "SITE_URL" | "NEXT_PUBLIC_SITE_URL" | "VERCEL_PROJECT_PRODUCTION_URL", string | undefined>>;
+export type NotifyEnv = Partial<Record<
+  "NOTIFY_DRY_RUN" | "NOTIFY_SEND" | "SMTP_HOST" | "SMTP_PORT" | "SMTP_USER" | "SMTP_PASSWORD" | "NOTIFY_FROM" | "NOTIFY_REPLY_TO"
+  | "VERCEL_ENV" | "SITE_URL" | "NEXT_PUBLIC_SITE_URL" | "VERCEL_PROJECT_PRODUCTION_URL", string | undefined>>;
 export type NotifyMode = { mode: "send" | "dry-run" | "off"; reason: string };
 
-/** Decision D1 (2026-11-11): Resend, sending from notifications@smartmango.ai. Replies go to support. */
-export const DEFAULT_FROM = "VentureLens <notifications@smartmango.ai>";
+/**
+ * Decision D1 (2026-11-11, revised the same day): the Hostinger mailbox notifications@smartmango.ai, over SMTP.
+ * Hostinger only accepts mail whose From is the signed-in mailbox, so the sender defaults to SMTP_USER.
+ */
+export const DEFAULT_SENDER_NAME = "VentureLens";
 export const DEFAULT_REPLY_TO = "support@smartmango.ai";
+export type SmtpConfig = { host: string; port: number; secure: boolean; user: string; password: string; from: string; replyTo: string };
+
+/** The SMTP settings, or null when any required one is missing. Port 465 uses TLS from the start; others use STARTTLS. */
+export function smtpConfig(env: NotifyEnv): SmtpConfig | null {
+  const host = env.SMTP_HOST?.trim();
+  const user = env.SMTP_USER?.trim();
+  const password = env.SMTP_PASSWORD;
+  if (!host || !user || !password) return null;
+  const port = Number(env.SMTP_PORT || 465);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) return null;
+  return {
+    host, port, secure: port === 465, user, password,
+    from: env.NOTIFY_FROM?.trim() || `${DEFAULT_SENDER_NAME} <${user}>`,
+    replyTo: env.NOTIFY_REPLY_TO?.trim() || DEFAULT_REPLY_TO,
+  };
+}
 
 /**
- * Whether this deployment sends real email. Nothing is sent without an API key; NOTIFY_DRY_RUN=1 always only logs; and
- * outside Vercel production (development, previews, tests) email is only logged unless NOTIFY_SEND=1 says otherwise.
+ * Whether this deployment sends real email. Nothing is sent without SMTP settings; NOTIFY_DRY_RUN=1 always only logs;
+ * and outside Vercel production (development, previews, tests) email is only logged unless NOTIFY_SEND=1 says otherwise.
  */
 export function notificationMode(env: NotifyEnv): NotifyMode {
   if (env.NOTIFY_DRY_RUN === "1") return { mode: "dry-run", reason: "NOTIFY_DRY_RUN=1" };
-  if (!env.RESEND_API_KEY) return { mode: "off", reason: "RESEND_API_KEY is not set" };
+  if (!smtpConfig(env)) return { mode: "off", reason: "SMTP_HOST, SMTP_USER or SMTP_PASSWORD is not set" };
   if (env.VERCEL_ENV !== "production" && env.NOTIFY_SEND !== "1") return { mode: "dry-run", reason: "not production; set NOTIFY_SEND=1 to send" };
   return { mode: "send", reason: "production" };
 }

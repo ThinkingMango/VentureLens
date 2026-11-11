@@ -22,13 +22,17 @@ function load(file, dependencies) {
 
 test("email is sent only in production with a key; dry-run and other environments only log", () => {
   assert.deepEqual(notificationMode({}).mode, "off", "no key, nothing at all");
-  assert.equal(notificationMode({ RESEND_API_KEY: "k" }).mode, "dry-run", "development: logged, not sent");
-  assert.equal(notificationMode({ RESEND_API_KEY: "k", VERCEL_ENV: "preview" }).mode, "dry-run", "previews never email real users by accident");
-  assert.equal(notificationMode({ RESEND_API_KEY: "k", VERCEL_ENV: "preview", NOTIFY_SEND: "1" }).mode, "send", "unless explicitly configured");
-  assert.equal(notificationMode({ RESEND_API_KEY: "k", VERCEL_ENV: "production" }).mode, "send");
-  assert.equal(notificationMode({ RESEND_API_KEY: "k", VERCEL_ENV: "production", NOTIFY_DRY_RUN: "1" }).mode, "dry-run", "dry run wins");
+  const smtp = { SMTP_HOST: "smtp.hostinger.com", SMTP_USER: "notifications@smartmango.ai", SMTP_PASSWORD: "test-only" };
+  assert.equal(notificationMode(smtp).mode, "dry-run", "development: logged, not sent");
+  assert.equal(notificationMode({ ...smtp, VERCEL_ENV: "preview" }).mode, "dry-run", "previews never email real users by accident");
+  assert.equal(notificationMode({ ...smtp, VERCEL_ENV: "preview", NOTIFY_SEND: "1" }).mode, "send", "unless explicitly configured");
+  assert.equal(notificationMode({ ...smtp, VERCEL_ENV: "production" }).mode, "send");
+  assert.equal(notificationMode({ ...smtp, VERCEL_ENV: "production", NOTIFY_DRY_RUN: "1" }).mode, "dry-run", "dry run wins");
+  assert.equal(notificationMode({ ...smtp, SMTP_PASSWORD: "", VERCEL_ENV: "production" }).mode, "off", "every SMTP setting is required");
   assert.equal(notificationMode({ NOTIFY_DRY_RUN: "1" }).mode, "dry-run", "dry run works without a key");
-  assert.equal(core.DEFAULT_FROM, "VentureLens <notifications@smartmango.ai>", "decision D1");
+  // Decision D1: the Hostinger mailbox, which only sends as itself; port 465 is TLS from the start.
+  assert.deepEqual(core.smtpConfig(smtp), { host: "smtp.hostinger.com", port: 465, secure: true, user: "notifications@smartmango.ai", password: "test-only", from: "VentureLens <notifications@smartmango.ai>", replyTo: "support@smartmango.ai" });
+  assert.deepEqual([core.smtpConfig({ ...smtp, SMTP_PORT: "587" }).secure, core.smtpConfig({ ...smtp, SMTP_PORT: "nope" })], [false, null], "587 uses STARTTLS; a bad port is no config");
   assert.equal(siteOrigin({ SITE_URL: "https://venturelens.example/app/" }), "https://venturelens.example");
   assert.equal(siteOrigin({ VERCEL_PROJECT_PRODUCTION_URL: "venturelens.example" }), "https://venturelens.example");
   assert.equal(siteOrigin({ SITE_URL: "http://evil.example" }), null, "plain http only for localhost");
@@ -81,6 +85,7 @@ function loadNotify() {
   return load("../lib/notify.ts", {
     "server-only": {}, "@/lib/supabase/admin": { createAdminClient: () => { throw new Error("use deps.client"); } },
     "@/i18n/config": i18nConfig, "@/lib/notify-core": core,
+    "nodemailer": { default: { createTransport: () => { throw new Error("tests pass their own transport"); } } },
     "@/messages/en.json": { default: catalog("en") }, "@/messages/zh-Hans.json": { default: catalog("zh-Hans") }, "@/messages/zh-Hant.json": { default: catalog("zh-Hant") },
   });
 }
@@ -118,7 +123,7 @@ function fakeDb({ run = {}, profile = { notify_on_complete: true }, user = { ema
   };
   return { client, state };
 }
-const production = { RESEND_API_KEY: "k", VERCEL_ENV: "production", SITE_URL: "https://venturelens.example" };
+const production = { SMTP_HOST: "smtp.hostinger.com", SMTP_USER: "notifications@smartmango.ai", SMTP_PASSWORD: "test-only", VERCEL_ENV: "production", SITE_URL: "https://venturelens.example" };
 const ctx = { runId: "r1", userId: "u1" };
 function recorder(fail = 0) {
   const sent = [];
@@ -165,11 +170,11 @@ test("no email when the founder turned it off, the run was interrupted, or the a
   const { client, state } = fakeDb();
   assert.equal(await notifyRunFinished(ctx, { env: {}, client }), "off", "no key: nothing is read or claimed");
   assert.equal(state.selects.length, 0);
-  assert.equal(await notifyRunFinished(ctx, { env: { RESEND_API_KEY: "k", VERCEL_ENV: "production" }, client }), "no-site-url");
+  assert.equal(await notifyRunFinished(ctx, { env: { SMTP_HOST: "smtp.hostinger.com", SMTP_USER: "notifications@smartmango.ai", SMTP_PASSWORD: "test-only", VERCEL_ENV: "production" }, client }), "no-site-url");
 });
 
 test("dry run logs the subject but never the address or body; a failed send is released for the step's retry", async () => {
-  const { notifyRunFinished, dryRunProvider, resendProvider } = loadNotify();
+  const { notifyRunFinished, dryRunProvider, smtpProvider } = loadNotify();
   const logged = [];
   const { client } = fakeDb();
   assert.equal(await notifyRunFinished(ctx, { env: { NOTIFY_DRY_RUN: "1", SITE_URL: "http://localhost:3000" }, client, provider: dryRunProvider((line, details) => logged.push({ line, details })) }), "dry-run");
@@ -184,15 +189,18 @@ test("dry run logs the subject but never the address or body; a failed send is r
   assert.equal(await notifyRunFinished(ctx, { env: production, client: failing.client, provider: once.provider }), "sent", "the retry sends");
   assert.equal(once.sent.length, 1);
 
-  // Resend: the key goes in the header only, and the idempotency key makes a repeated request deliver once.
-  const calls = [];
-  await resendProvider("re_test", undefined, undefined, async (url, init) => { calls.push({ url, init }); return { ok: true }; })
+  // SMTP: TLS on 465 with the mailbox login, sent as the mailbox, replies to support, and one fixed Message-ID per run.
+  const transports = [], mails = [];
+  const config = core.smtpConfig({ SMTP_HOST: "smtp.hostinger.com", SMTP_USER: "notifications@smartmango.ai", SMTP_PASSWORD: "test-only" });
+  await smtpProvider(config, options => { transports.push(options); return { sendMail: async mail => { mails.push(mail); } }; })
     .send({ to: "a@example.com", subject: "s", html: "<p>h</p>", text: "t", idempotencyKey: "run-finished-r1" });
-  assert.equal(calls[0].url, "https://api.resend.com/emails");
-  assert.equal(calls[0].init.headers.Authorization, "Bearer re_test");
-  assert.equal(calls[0].init.headers["Idempotency-Key"], "run-finished-r1");
-  assert.deepEqual(JSON.parse(calls[0].init.body), { from: "VentureLens <notifications@smartmango.ai>", to: ["a@example.com"], reply_to: "support@smartmango.ai", subject: "s", html: "<p>h</p>", text: "t" });
-  await assert.rejects(resendProvider("k", undefined, undefined, async () => ({ ok: false, status: 422 })).send({ to: "a", subject: "", html: "", text: "", idempotencyKey: "x" }), /EMAIL_PROVIDER_422/);
+  assert.deepEqual([transports[0].host, transports[0].port, transports[0].secure, transports[0].auth], ["smtp.hostinger.com", 465, true, { user: "notifications@smartmango.ai", pass: "test-only" }]);
+  assert.ok(transports[0].connectionTimeout && transports[0].socketTimeout, "a stuck server cannot hold the step");
+  assert.deepEqual(mails[0], { from: "VentureLens <notifications@smartmango.ai>", to: "a@example.com", replyTo: "support@smartmango.ai", subject: "s", html: "<p>h</p>", text: "t", messageId: "<run-finished-r1@smartmango.ai>" });
+  // A refusal becomes a short code: the server's reply, which can echo the address, is never passed on.
+  const refusal = Object.assign(new Error("550 a@example.com: mailbox unavailable"), { responseCode: 550 });
+  await assert.rejects(smtpProvider(config, () => ({ sendMail: async () => { throw refusal; } })).send({ to: "a@example.com", subject: "", html: "", text: "", idempotencyKey: "x" }),
+    error => error.message === "EMAIL_PROVIDER_550");
 });
 
 test("the workflow emails after the run is saved, from its own step, and a failed email never fails the run", () => {

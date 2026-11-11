@@ -1,32 +1,46 @@
 import "server-only";
 import { createTranslator } from "next-intl";
+import nodemailer from "nodemailer";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isLocale, messageKey, type Locale } from "@/i18n/config";
 import en from "@/messages/en.json";
 import zhHans from "@/messages/zh-Hans.json";
 import zhHant from "@/messages/zh-Hant.json";
 import {
-  DEFAULT_FROM, DEFAULT_REPLY_TO, buildRunEmail, notificationMode, notificationOutcome, siteOrigin,
-  type EmailMessage, type NotifyEnv, type Translate,
+  buildRunEmail, notificationMode, notificationOutcome, siteOrigin, smtpConfig,
+  type EmailMessage, type NotifyEnv, type SmtpConfig, type Translate,
 } from "@/lib/notify-core";
 
-// Notifications (spec WP-08). One provider interface, so another email service can replace Resend in one place.
+// Notifications (spec WP-08). One provider interface, so another email service can replace SMTP in one place.
 export type OutgoingEmail = EmailMessage & { to: string; idempotencyKey: string };
 export interface NotificationProvider {
   send(message: OutgoingEmail): Promise<void>;
 }
 
-/** Resend's HTTP API. The key is read on the server only. The idempotency key makes a retried send deliver once. */
-export function resendProvider(apiKey: string, from = DEFAULT_FROM, replyTo = DEFAULT_REPLY_TO, fetcher: typeof fetch = fetch): NotificationProvider {
+type Transport = { sendMail(options: Record<string, unknown>): Promise<unknown> };
+/**
+ * SMTP (decision D1: the Hostinger mailbox). The password is read on the server only. SMTP has no idempotency key, so
+ * each run's email carries a fixed Message-ID: a retried send is the same message, which mail systems can recognise.
+ */
+export function smtpProvider(config: SmtpConfig, createTransport: (options: Record<string, unknown>) => Transport = (options) => nodemailer.createTransport(options)): NotificationProvider {
   return {
     async send(message) {
-      const response = await fetcher("https://api.resend.com/emails", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json", "Idempotency-Key": message.idempotencyKey },
-        body: JSON.stringify({ from, to: [message.to], reply_to: replyTo, subject: message.subject, html: message.html, text: message.text }),
-        signal: AbortSignal.timeout(15_000),
+      const transport = createTransport({
+        host: config.host, port: config.port, secure: config.secure, requireTLS: !config.secure,
+        auth: { user: config.user, pass: config.password },
+        connectionTimeout: 10_000, greetingTimeout: 10_000, socketTimeout: 20_000,
       });
-      if (!response.ok) throw new Error(`EMAIL_PROVIDER_${response.status}`);
+      const domain = config.user.split("@")[1] || "localhost";
+      try {
+        await transport.sendMail({
+          from: config.from, to: message.to, replyTo: config.replyTo, subject: message.subject, html: message.html, text: message.text,
+          messageId: `<${message.idempotencyKey}@${domain}>`,
+        });
+      } catch (error) {
+        // Never pass the provider's error on: it can echo the address or the server's reply. A short code is enough.
+        const code = error && typeof error === "object" && "responseCode" in error ? String((error as { responseCode: unknown }).responseCode) : "SEND";
+        throw new Error(`EMAIL_PROVIDER_${code.replace(/[^A-Z0-9]/gi, "").slice(0, 12) || "SEND"}`);
+      }
     },
   };
 }
@@ -60,7 +74,8 @@ export type NotifyResult = "sent" | "dry-run" | "off" | "not-final" | "opted-out
 /**
  * Emails the founder once when their run finishes. Called from the workflow's last step. The run is claimed by setting
  * notified_at from null, so a retried step never sends twice; if sending fails, the claim is released so the step's
- * retry can try again (the provider's idempotency key stops a duplicate if the first send in fact went through).
+ * retry can try again. A duplicate is possible only if the server accepted the first message but the connection failed
+ * before it said so; both copies then share one Message-ID.
  */
 export async function notifyRunFinished(ctx: Context, deps: { env?: NotifyEnv; provider?: NotificationProvider; client?: ReturnType<typeof createAdminClient> } = {}): Promise<NotifyResult> {
   const env = deps.env ?? (process.env as NotifyEnv);
@@ -90,7 +105,8 @@ export async function notifyRunFinished(ctx: Context, deps: { env?: NotifyEnv; p
 
   const lang: Locale = isLocale(run.language) ? run.language : "en";
   const email = buildRunEmail({ outcome, name: run.name ?? "", runUrl: `${origin}/research/${ctx.runId}`, profileUrl: `${origin}/profile`, lang }, translatorFor(lang));
-  const provider = deps.provider ?? (mode.mode === "send" ? resendProvider(env.RESEND_API_KEY!, env.NOTIFY_FROM || DEFAULT_FROM, env.NOTIFY_REPLY_TO || DEFAULT_REPLY_TO) : dryRunProvider());
+  const smtp = smtpConfig(env);
+  const provider = deps.provider ?? (mode.mode === "send" && smtp ? smtpProvider(smtp) : dryRunProvider());
   try {
     await provider.send({ ...email, to, idempotencyKey: `run-finished-${ctx.runId}` });
   } catch (sendError) {

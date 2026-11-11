@@ -41,13 +41,16 @@ DASHSCOPE_WORKSPACE_ID=<beijing workspace id>
 GOOGLE_GENERATIVE_AI_API_KEY=<key>
 # Optional: idempotent workflow dispatch through start hooks (dispatch works without it)
 WORKFLOW_VERCEL_EXPERIMENTAL_START_HOOK=1
-# Optional: "report ready" email (lib/notify.ts). Without a key nothing is sent.
-RESEND_API_KEY=<key>                                  # server only, never NEXT_PUBLIC_
+# Optional: "report ready" email (lib/notify.ts). Without SMTP settings nothing is sent.
 NOTIFY_DRY_RUN=1                                      # log emails instead of sending them
 SITE_URL=http://localhost:3000                        # origin for links in emails
+# SMTP_HOST=smtp.hostinger.com                        # production only (see below)
+# SMTP_PORT=465
+# SMTP_USER=notifications@smartmango.ai
+# SMTP_PASSWORD=<mailbox password>                    # server only, never NEXT_PUBLIC_
 ```
 
-Research notification emails are sent with [Resend](https://resend.com) from `VentureLens <notifications@smartmango.ai>`, with replies to `support@smartmango.ai` (decision D1). They go out only on the Vercel **production** deployment with `RESEND_API_KEY` set; development, previews and tests only log them, unless `NOTIFY_SEND=1` is set deliberately, and `NOTIFY_DRY_RUN=1` always only logs. `NOTIFY_FROM` and `NOTIFY_REPLY_TO` override the addresses. Links use `SITE_URL`, falling back to Vercel's production domain. Before turning email on, verify the sending domain in Resend (its SPF and DKIM DNS records). Each run sends at most one email (`research_runs.notified_at`), and founders can turn it off on their profile (`founder_profiles.notify_on_complete`).
+Research notification emails are sent over SMTP from the Hostinger mailbox `notifications@smartmango.ai`, as `VentureLens <notifications@smartmango.ai>`, with replies to `support@smartmango.ai` (decision D1). They go out only on the Vercel **production** deployment with `SMTP_HOST`, `SMTP_USER` and `SMTP_PASSWORD` set; development, previews and tests only log them, unless `NOTIFY_SEND=1` is set deliberately, and `NOTIFY_DRY_RUN=1` always only logs. Port 465 uses TLS from the start; any other port (587) uses STARTTLS. `NOTIFY_FROM` and `NOTIFY_REPLY_TO` override the addresses, but Hostinger only accepts a From address that is the signed-in mailbox. Links use `SITE_URL`, falling back to Vercel's production domain. Hostinger limits each mailbox to a daily number of messages (about 1,000 on Business Email, 300 on Titan); use a mailbox kept for these emails only. Each run sends at most one email (`research_runs.notified_at`), and founders can turn it off on their profile (`founder_profiles.notify_on_complete`).
 
 Apply the migrations in `supabase/migrations/` to your project, then:
 
