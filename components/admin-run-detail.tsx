@@ -61,6 +61,7 @@ export function AdminRunDetail({ inspection }: { inspection: RunInspection }) {
             [copy("Structured stages ran on"), mono(setup.active_provider)],
             [copy("Searches ran on"), mono(setup.search_provider ?? setup.active_provider)],
             [copy("Fallback allowed"), setup.fallback_allowed === undefined ? "—" : setup.fallback_allowed ? copy("Yes") : copy("No")],
+            [copy("Configured model skipped"), setup.primary_skipped ? copy("{model}: needs a budget of {required}", { model: String(setup.primary_skipped), required: typeof setup.primary_required_usd === "number" ? formats.usd(setup.primary_required_usd, 4) : "—" }) : "—"],
             [copy("Methodology"), mono(setup.methodology)],
             [copy("Account"), mono(run.user_id)],
             [copy("Workflow"), mono(run.workflow_id)],

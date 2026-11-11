@@ -2,7 +2,7 @@ import "server-only";
 import { google } from "@ai-sdk/google";
 import { generateText } from "ai";
 import { GEMINI_MODEL, parseGeminiSearch } from "@/lib/research-fallback-core";
-import { GOOGLE_API_BASE, geminiModelSchema, geminiThinkingOptions, researchModels, type GeminiModelId } from "@/lib/research-models";
+import { GOOGLE_API_BASE, geminiModelSchema, geminiThinkingOptions, researchModels, SEARCH_TIMEOUT_MS, type GeminiModelId } from "@/lib/research-models";
 
 export function geminiModel(model: GeminiModelId = GEMINI_MODEL) {
   geminiModelSchema.parse(model);
@@ -21,13 +21,14 @@ export async function verifyGeminiModel(model: GeminiModelId = GEMINI_MODEL) {
   if (!details.supportedGenerationMethods?.includes("generateContent")) throw new Error("PROVIDER_CONFIGURATION");
 }
 
-export async function searchGemini(prompt: string, model: GeminiModelId = GEMINI_MODEL) {
+/** `timeoutMs` is set by the retrieval step's time budget (searchTimeout in research-models.ts). */
+export async function searchGemini(prompt: string, model: GeminiModelId = GEMINI_MODEL, timeoutMs: number = SEARCH_TIMEOUT_MS.gemini) {
   const result = await generateText({
     model: geminiModel(model), prompt,
     tools: { google_search: google.tools.googleSearch({}) },
     // Thinking shares maxOutputTokens with the answer; search only needs the model to issue queries.
     providerOptions: geminiThinkingOptions(model, "search"),
-    maxOutputTokens: researchModels[model].searchOutputTokens, maxRetries: 0, abortSignal: AbortSignal.timeout(90000),
+    maxOutputTokens: researchModels[model].searchOutputTokens, maxRetries: 0, abortSignal: AbortSignal.timeout(timeoutMs),
   });
   return parseGeminiSearch(result);
 }

@@ -51,8 +51,8 @@
     "modelBudget": "Max and Argon use more of the same research budget and may hit the existing limit sooner. Native search context and query costs are estimates, not provider-enforced caps. Google Search requires paid-tier access.",
     "budget": "Per-run budget (USD)",
     "budgetHelp": "Hard cap on model and search spend for each new research run, between {min} and {max} USD. Existing runs keep the cap they started with.",
-    "costEstimate": "Estimated cost of a complete run: about {expected}. Every reservation fits only with a per-run budget of at least {required}.",
-    "budgetTooLow": "{model} cannot finish a run within this budget: it needs at least {required}. Raise the budget or choose a less expensive model; otherwise every run stops before its report.",
+    "costEstimate": "Estimated cost of a complete run: about {expected}. Set a per-run budget of at least {required}: every reservation fits, with 10% headroom so a change to the estimate does not move runs to another model.",
+    "budgetTooLow": "{model} cannot finish a run within this budget with headroom: it needs at least {required}. Raise the budget or choose a less expensive model; otherwise runs move to the fallback model or stop before their report.",
     "fallbackOverBudget": "{model} needs at least {required} to finish a run, so it will not be used as a fallback at this budget.",
     "budgetTooLowSaved": "This budget is too low for the selected primary model. Raise the budget or choose a less expensive model.",
     "disclosure": "Saving updates the AI-provider sections of the Privacy Policy and Support page immediately. A provider change can change where research data is processed, including mainland China; tell users before a change that materially affects them.",
@@ -1944,7 +1944,11 @@
     "m1km3ula": "Removes the report and everything made from it from your account. Use it for research you no longer need.",
     "m1elxw39": "Includes {usd} from runs founders have since deleted.",
     "m4s2zw8": "This research is still running. You can delete it once it has finished.",
-    "m1112gof": "When you delete a research run, its report, opportunities, sources and sprints are deleted. Its cost records (the model, token counts and cost of each call) are kept for our cost accounting, without any link to you or the run."
+    "m1112gof": "When you delete a research run, its report, opportunities, sources and sprints are deleted. Its cost records (the model, token counts and cost of each call) are kept for our cost accounting, without any link to you or the run.",
+    "m1km4how": "Search failed (provider timeout or outage); skipped",
+    "m1sbnw1s": "Configured model skipped",
+    "m9zdmen": "{model}: needs a budget of {required}",
+    "mg5nogz": "This run uses {model} because the configured {configured} needs a budget of at least {required} and this run's budget is {budget}."
   },
   "language": {
     "label": "Interface language",

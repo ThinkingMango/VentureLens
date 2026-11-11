@@ -622,6 +622,29 @@ export function errorCode(error: unknown): string {
   return 'INVALID_OUTPUT';
 }
 
+/** How one candidate's retrieval ended, as its checkpoint records it. */
+export type RetrievalState = "evidence" | "RETRIEVAL_UNAVAILABLE" | "TRANSIENT_PROVIDER";
+/**
+ * Whether a candidate whose search failed with a transient provider error (a timeout, 429 or 5xx) can be skipped so
+ * the run goes on with the others, as a search that found nothing already is. Otherwise the failure ends the run.
+ * Before 2026-11-11 one timed-out search ended a run that already had 28 sources for its other 7 candidates.
+ * Skipping stops being safe when the provider looks down rather than slow, so a skip is refused when:
+ * - the run has only one candidate (verify mode): there is nothing to go on with;
+ * - the previous candidate was also skipped this way: two in a row looks like an outage;
+ * - a quarter of the candidates (at least one) have already been skipped this way;
+ * - this is the last candidate and no earlier one has evidence: the run would end with no evidence at all, reported
+ *   as retrieval finding nothing instead of as the provider failure (which is retryable and always refunded).
+ * `earlier` holds the states of the candidates searched before this one, in order; `remaining` counts those after it.
+ */
+export function transientSkipAllowed(earlier: RetrievalState[], remaining: number): boolean {
+  const total = earlier.length + 1 + remaining;
+  if (total < 2) return false;
+  if (earlier.at(-1) === "TRANSIENT_PROVIDER") return false;
+  if (earlier.filter(state => state === "TRANSIENT_PROVIDER").length >= Math.max(1, Math.floor(total / 4))) return false;
+  if (remaining === 0 && !earlier.includes("evidence")) return false;
+  return true;
+}
+
 /**
  * The founder context a run's prompts see. Market mode sees none. Otherwise the original five fields always, and each
  * profile v2 field (WP-02) only when the founder answered it, so a blank answer never reads as a statement.

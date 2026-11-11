@@ -9,7 +9,7 @@ import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { researchProviderSettings } from "@/lib/provider-settings";
 import { defaultProviderSettings, providerPlan, providerSettingsSchema, resolveSourcePolicy, legacySourcePolicy, retrievalLimits, runShape, searchGuidance, queryEvidence, queryGuidance, type ProviderSettings, type SourcePolicy } from "@/lib/provider-settings-core";
-import { selectedModel, researchModelPricing, geminiThinkingOptions, qwenModelSchema, geminiModelSchema, type ResearchModelId } from "@/lib/research-models";
+import { selectedModel, researchModelPricing, geminiThinkingOptions, qwenModelSchema, geminiModelSchema, searchTimeout, MIN_SEARCH_MS, RETRIEVAL_STEP_BUDGET_MS, type ResearchModelId } from "@/lib/research-models";
 import { reservationFor, estimateRunCost } from "@/lib/research-budget";
 import { briefFocus, searchLanguage } from "@/lib/research-options";
 import { researchRequestSchema, profileSchema, opportunitySchema } from "@/lib/workspace-schema";
@@ -19,7 +19,7 @@ import {
   normalizeDiscovery, normalizeClassification, normalizeEvaluation, normalizeReview,
   groundedClassifications, eligibleEvidence, evidenceGate, weightedScore, safeSourceUrl,
   scoringWeights, scoreParts, REVIEW_MAX_PENALTY, researchErrors, errorCode, researchPolicy, reportLanguage, reportNarrative, confidenceLevel,
-  researchOutcome, founderContext, citableSources, METHODOLOGY_VERSION, buildHistory, historyPromptBlock, dedupeCandidates, duplicatesOutcome, historyEntrySchema, type HistoryEntry, type Candidate, type Classification, type Evidence, type Mode, type ResearchOutcome, type Review,
+  researchOutcome, transientSkipAllowed, type RetrievalState, founderContext, citableSources, METHODOLOGY_VERSION, buildHistory, historyPromptBlock, dedupeCandidates, duplicatesOutcome, historyEntrySchema, type HistoryEntry, type Candidate, type Classification, type Evidence, type Mode, type ResearchOutcome, type Review,
 } from "@/lib/research-core";
 
 const pricingSchema = z.object({ input: z.number().positive().max(0.00001), output: z.number().positive().max(0.00003), search: z.number().positive().max(0.05), checked_at: z.string() });
@@ -59,10 +59,19 @@ async function previous<T>(ctx: Context, key: string): Promise<T> {
   if (!row) throw new Error("WORKFLOW_INTERRUPTED");
   return row.output as T;
 }
-/** Candidate keys whose search found nothing readable: their retrieval checkpoint was saved as skipped. */
+async function retrievalCheckpoints(ctx: Context, keys: string[]) {
+  return Promise.all(keys.map(async key => checked(await db().from("research_stages").select("output").eq("run_id", ctx.runId).eq("user_id", ctx.userId).eq("stage_key", `retrieval:${key}`).maybeSingle()) as { output?: { skipped?: unknown; evidence?: unknown } } | null));
+}
+/** Candidate keys whose search was skipped (found nothing readable, or failed transiently): their retrieval checkpoint says so. */
 async function retrievalFailures(ctx: Context, keys: string[]) {
-  const rows = await Promise.all(keys.map(async key => checked(await db().from("research_stages").select("output").eq("run_id", ctx.runId).eq("user_id", ctx.userId).eq("stage_key", `retrieval:${key}`).maybeSingle()) as { output?: { skipped?: unknown } } | null));
+  const rows = await retrievalCheckpoints(ctx, keys);
   return keys.filter((_, index) => !!rows[index]?.output?.skipped);
+}
+/** How each of these candidates' retrieval ended. A missing checkpoint counts as no evidence, never as a transient skip. */
+async function retrievalStates(ctx: Context, keys: string[]): Promise<RetrievalState[]> {
+  const rows = await retrievalCheckpoints(ctx, keys);
+  return rows.map(row => row?.output?.skipped === "TRANSIENT_PROVIDER" ? "TRANSIENT_PROVIDER"
+    : Array.isArray(row?.output?.evidence) && row.output.evidence.length ? "evidence" : "RETRIEVAL_UNAVAILABLE");
 }
 /**
  * Saves the run's outcome (what was searched and why each candidate passed or not). The first outcome written is kept:
@@ -137,7 +146,7 @@ export async function initializeResearch(ctx: Context) {
   const cached = checked(await client.from("research_stages").select("output").eq("run_id", ctx.runId).eq("user_id", ctx.userId).eq("stage_key", "setup").maybeSingle());
   if (!cached) {
     const saved = await researchProviderSettings();
-    const providerSettings = providerSettingsSchema.parse({ primary: saved.primary, autoFallback: saved.autoFallback, qwenModel: saved.qwenModel, geminiModel: saved.geminiModel });
+    const providerSettings = providerSettingsSchema.parse({ primary: saved.primary, autoFallback: saved.autoFallback, qwenModel: saved.qwenModel, geminiModel: saved.geminiModel, budgetUsd: saved.budgetUsd });
     // Breadth and depth of evidence collection, frozen with the model choice so a policy change never alters a run.
     const sourcePolicy = resolveSourcePolicy(saved.sources);
     const plan = providerPlan(providerSettings);
@@ -154,7 +163,15 @@ export async function initializeResearch(ctx: Context) {
       await checkpoint(ctx, "budget_block", { stage: "setup", kind: "estimate", provider: plan.primary, model: needed.model, required_usd: needed.requiredUsd });
       throw new Error("BUDGET_EXCEEDED");
     }
-    if (order[0] !== plan.primary) log("warn", "primary provider cannot finish within the budget; using the fallback", ctx, { budget, primary: estimate(plan.primary) });
+    // Starting on the fallback keeps the founder's run going, but it is not the model the administrator chose and it
+    // leaves the run with no fallback. Record it so the run page can say so, and log it as an error: it means the saved
+    // budget no longer fits the configured model (for example after the estimate was re-calibrated).
+    let primarySkipped: { provider: string; model: ResearchModelId; required_usd: number; budget_usd: number } | undefined;
+    if (order[0] !== plan.primary) {
+      const needed = estimate(plan.primary);
+      primarySkipped = { provider: plan.primary, model: needed.model, required_usd: needed.requiredUsd, budget_usd: budget };
+      log("error", "configured primary cannot finish within the budget; this run uses the fallback with no fallback of its own", ctx, { budget, primary: needed });
+    }
     const verify = async (provider: ProviderSettings["primary"]) => {
       if (provider === "gemini") { await verifyGeminiModel(providerSettings.geminiModel); return GEMINI_PROVIDER; }
       await verifyQwenModel(providerSettings.qwenModel); return QWEN_PROVIDER;
@@ -175,6 +192,7 @@ export async function initializeResearch(ctx: Context) {
       // The fallback stays available mid-run only when it, too, can finish within the budget.
       fallback_allowed: order.length > 1 && !verifyFailure,
       model: selectedModel(active, providerSettings), provider: activeProvider, methodology,
+      ...(primarySkipped ? { primary_skipped: primarySkipped } : {}),
     });
   } else if (![QWEN_PROVIDER, GEMINI_PROVIDER].includes((cached.output as { provider?: string }).provider ?? "")) {
     throw new Error("PROVIDER_CONFIGURATION");
@@ -295,6 +313,9 @@ function searchPrompt(candidate: Candidate, query: string, alternatives: boolean
  * stage, and their results are merged and de-duplicated by URL before pages are read.
  */
 async function retrieve(ctx: Context, candidate: Candidate & { query_alt?: string }, pricing: Pricing, limits = { evidence: 4, sources: 10 }, guidance = searchGuidance(legacySourcePolicy)) {
+  // Every search and page read in this step shares one time budget, so the step finishes inside the platform's
+  // function duration even when a search and its fallback both run long (RETRIEVAL_STEP_BUDGET_MS).
+  const stepStart = Date.now();
   const queries = candidate.query_alt ? [candidate.query, candidate.query_alt] : [candidate.query];
   const lists: { url: string; title?: string }[][] = [];
   let firstFailure: unknown;
@@ -303,7 +324,10 @@ async function retrieve(ctx: Context, candidate: Candidate & { query_alt?: strin
     try {
       // Native search context and query reservations are estimates, not provider-enforced limits.
       const result = await providerCall(ctx, index === 0 ? `retrieval:${candidate.key}` : `retrieval:${candidate.key}:alt`, prompt, pricing, true, 0, async (provider, model) => {
-        const result = await (provider === GEMINI_PROVIDER ? searchGemini(prompt, geminiModelSchema.parse(model)) : searchQwen(prompt, qwenModelSchema.parse(model)));
+        const timeoutMs = searchTimeout(provider === GEMINI_PROVIDER ? "gemini" : "qwen", stepStart);
+        // Too little time left: not sent, so its reservation is released and the fallback (if any) gets the same check.
+        if (timeoutMs < MIN_SEARCH_MS) throw Object.assign(new Error("TRANSIENT_PROVIDER: no time left in this retrieval step"), { requestNotSent: true });
+        const result = await (provider === GEMINI_PROVIDER ? searchGemini(prompt, geminiModelSchema.parse(model), timeoutMs) : searchQwen(prompt, qwenModelSchema.parse(model), timeoutMs));
         return { value: result, tokens: result.tokens, searchRequests: result.searchRequests };
       });
       lists.push(result.sources);
@@ -318,7 +342,8 @@ async function retrieve(ctx: Context, candidate: Candidate & { query_alt?: strin
   const seen = new Set<string>();
   const evidence: Evidence[] = [];
   let unreadable = 0;
-  for (let index = 0; index < sources.length && evidence.length < limits.evidence; index += 2) {
+  // Pages are read two at a time (each read has its own 15 s timeout); no new pair starts once the step's budget is spent.
+  for (let index = 0; index < sources.length && evidence.length < limits.evidence && Date.now() - stepStart < RETRIEVAL_STEP_BUDGET_MS; index += 2) {
     const pages = await Promise.all(sources.slice(index, index + 2).map(async item => {
       try { return await fetchResearchSource(item.url); } catch { unreadable++; return null; }
     }));
@@ -392,9 +417,19 @@ export async function executeResearchStage(ctx: Context, key: string): Promise<s
     } catch (error) {
       // One hypothesis without readable evidence is dropped by the evidence gate anyway; it must not end the run.
       // The run still fails at classification when no hypothesis produced any evidence.
-      if (errorCode(error) !== "RETRIEVAL_UNAVAILABLE") throw error;
-      log("warn", "hypothesis skipped: no retrievable evidence", ctx, { candidate: candidate.key });
-      await checkpoint(ctx, key, { evidence: [], skipped: "RETRIEVAL_UNAVAILABLE" });
+      const code = errorCode(error);
+      if (code === "RETRIEVAL_UNAVAILABLE") {
+        log("warn", "hypothesis skipped: no retrievable evidence", ctx, { candidate: candidate.key });
+        await checkpoint(ctx, key, { evidence: [], skipped: "RETRIEVAL_UNAVAILABLE" });
+        return [];
+      }
+      // A slow or briefly unavailable provider for one hypothesis is skipped the same way, unless the provider looks
+      // down or the run would be left with no evidence (transientSkipAllowed); then the run fails as retryable.
+      const position = discovery.candidates.findIndex(c => c.key === candidate.key);
+      const earlier = code === "TRANSIENT_PROVIDER" ? await retrievalStates(ctx, discovery.candidates.slice(0, position).map(c => c.key)) : [];
+      if (code !== "TRANSIENT_PROVIDER" || !transientSkipAllowed(earlier, discovery.candidates.length - position - 1)) throw error;
+      log("warn", "hypothesis skipped: its search failed transiently", ctx, { candidate: candidate.key, ...describeFailure(error) });
+      await checkpoint(ctx, key, { evidence: [], skipped: "TRANSIENT_PROVIDER" });
     }
     return [];
   }

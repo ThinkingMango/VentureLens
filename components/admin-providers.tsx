@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldContent, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Separator } from "@/components/ui/separator";
-import { providerPlan, runCostEstimates, parseBudgetInput, settleBudgetInput, resolveSourcePolicy, sameSourcePolicy, MIN_RESEARCH_BUDGET_USD, MAX_RESEARCH_BUDGET_USD, type ResearchSettings, type ProviderSettingsResponse, type ResearchProvider } from "@/lib/provider-settings-core";
+import { providerPlan, runCostEstimates, recommendedBudget, parseBudgetInput, settleBudgetInput, resolveSourcePolicy, sameSourcePolicy, MIN_RESEARCH_BUDGET_USD, MAX_RESEARCH_BUDGET_USD, type ResearchSettings, type ProviderSettingsResponse, type ResearchProvider } from "@/lib/provider-settings-core";
 import { useFormats } from "@/i18n/use-copy";
 import { ProviderModelField } from "@/components/provider-model-field";
 import { AdminSources } from "@/components/admin-sources";
@@ -42,7 +42,9 @@ export function AdminProviders({ initialData }: { initialData: ProviderSettingsR
   const plan = providerPlan(settings);
   const configured = data.providers[plan.primary].configured && (!plan.fallback || data.providers[plan.fallback].configured);
   const estimates = runCostEstimates(settings);
-  const primaryFits = estimates.primary.requiredUsd <= settings.budgetUsd;
+  // The primary must fit with headroom (BUDGET_HEADROOM), the same rule the server applies on save.
+  const primaryBudget = recommendedBudget(estimates.primary.requiredUsd);
+  const primaryFits = primaryBudget <= settings.budgetUsd;
   const fallbackFits = !estimates.fallback || estimates.fallback.requiredUsd <= settings.budgetUsd;
 
   function change(patch: Partial<ResearchSettings>) {
@@ -139,9 +141,9 @@ export function AdminProviders({ initialData }: { initialData: ProviderSettingsR
                     {researchModels[selectedModel(plan.primary, settings)].name}
                     {plan.fallback ? <><ArrowRight className="size-4 text-muted-foreground" aria-hidden="true" />{researchModels[selectedModel(plan.fallback, settings)].name}</> : <span className="text-sm font-normal text-muted-foreground">· {t("noFallback")}</span>}
                   </p>
-                  <p className="text-sm text-muted-foreground">{t("costEstimate", { expected: formats.usd(estimates.primary.expectedUsd, 2), required: formats.usd(estimates.primary.requiredUsd, 2) })}</p>
+                  <p className="text-sm text-muted-foreground">{t("costEstimate", { expected: formats.usd(estimates.primary.expectedUsd, 2), required: formats.usd(primaryBudget, 2) })}</p>
                   <p className="text-sm text-muted-foreground">{t("verifyEstimate", { expected: formats.usd(estimates.verify.primary.expectedUsd, 2), required: formats.usd(estimates.verify.primary.requiredUsd, 2) })}</p>
-                  {!primaryFits && <p className="text-sm font-medium text-destructive">{t("budgetTooLow", { model: researchModels[estimates.primary.model].name, required: formats.usd(estimates.primary.requiredUsd, 2) })}</p>}
+                  {!primaryFits && <p className="text-sm font-medium text-destructive">{t("budgetTooLow", { model: researchModels[estimates.primary.model].name, required: formats.usd(primaryBudget, 2) })}</p>}
                   {primaryFits && !fallbackFits && estimates.fallback && <p className="text-sm text-muted-foreground">{t("fallbackOverBudget", { model: researchModels[estimates.fallback.model].name, required: formats.usd(estimates.fallback.requiredUsd, 2) })}</p>}
                   <p className="text-sm text-muted-foreground">{t("fallbackLimit")}</p>
                 </div>

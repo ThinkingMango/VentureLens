@@ -85,11 +85,24 @@ export function runCostEstimates(settings: ProviderSettings & { sources?: unknow
   };
 }
 
-// A primary model that cannot finish a run within the per-run budget makes every run fail after spending money.
-// A fallback that cannot finish is allowed; the engine simply does not use it.
+/**
+ * Margin a saved budget must keep above a model's estimated requirement. The estimate is re-calibrated as the pipeline
+ * changes (WP-07 raised Gemini 3.8 Flash from $0.5435 to $0.5675), and a run whose configured primary no longer fits
+ * is started on the fallback instead. Without this margin, a budget saved just above the estimate silently moves every
+ * later run to another model after a deploy.
+ */
+export const BUDGET_HEADROOM = 1.1;
+/** The smallest budget the admin page accepts for a model that needs `requiredUsd`: the estimate plus headroom, in cents. */
+export function recommendedBudget(requiredUsd: number) {
+  return Math.ceil(Math.round(requiredUsd * BUDGET_HEADROOM * 10_000) / 100) / 100;
+}
+
+// A primary model that cannot finish a run within the per-run budget makes every run fail after spending money, or
+// moves it to the fallback. A fallback that cannot finish is allowed; the engine simply does not use it.
 export function assertBudgetFits(settings: ProviderSettings & { sources?: unknown }, at = new Date()) {
   const { primary } = runCostEstimates(settings, at);
-  if (primary.requiredUsd > settings.budgetUsd) throw Object.assign(new Error("BUDGET_TOO_LOW"), { requiredUsd: primary.requiredUsd, model: primary.model });
+  const recommended = recommendedBudget(primary.requiredUsd);
+  if (recommended > settings.budgetUsd) throw Object.assign(new Error("BUDGET_TOO_LOW"), { requiredUsd: recommended, model: primary.model });
 }
 
 /**

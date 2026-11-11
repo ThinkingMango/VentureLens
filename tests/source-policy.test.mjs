@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import * as policy from "../lib/source-policy.ts";
 import { estimateRunCost, stageCalls, defaultRunShape } from "../lib/research-budget.ts";
-import { researchSettingsSchema, providerSettingsSchema, readStoredProviderSettings, runCostEstimates, assertBudgetFits } from "../lib/provider-settings-core.ts";
+import { researchSettingsSchema, providerSettingsSchema, readStoredProviderSettings, runCostEstimates, assertBudgetFits, recommendedBudget } from "../lib/provider-settings-core.ts";
 import { researchSectors, anySector } from "../lib/research-options.ts";
 import { candidateDiagnosisSchema } from "../lib/research-core.ts";
 
@@ -116,15 +116,24 @@ test("the cost estimate follows breadth and depth, and the default shape is unch
 });
 
 test("the admin budget check refuses a breadth the budget cannot pay for", () => {
-  const gemini = { primary: "gemini", autoFallback: false, qwenModel: "qwen3.8-flash", geminiModel: "gemini-3.5-flash-lite", budgetUsd: 0.4 };
-  assert.doesNotThrow(() => assertBudgetFits(gemini, at));
+  // Budgets are derived from the estimate plus the required headroom (recommendedBudget), not hard-coded, so this tests
+  // the rule rather than today's prices.
+  const gemini = { primary: "gemini", autoFallback: false, qwenModel: "qwen3.8-flash", geminiModel: "gemini-3.5-flash-lite" };
+  const needs = sources => recommendedBudget(runCostEstimates({ ...gemini, budgetUsd: 5, sources }, at).primary.requiredUsd);
+  const atDefault = needs(undefined);
+  assert.doesNotThrow(() => assertBudgetFits({ ...gemini, budgetUsd: atDefault }, at));
   // A second search per idea roughly doubles Google Search grounding, the largest Gemini cost.
-  assert.throws(() => assertBudgetFits({ ...gemini, sources: custom({ alternativesSearch: true }) }, at), /BUDGET_TOO_LOW/);
-  // A narrower run lets Flash-Lite finish on the $0.25 default, which the default depth cannot.
-  assert.throws(() => assertBudgetFits({ ...gemini, budgetUsd: 0.25 }, at), /BUDGET_TOO_LOW/);
-  assert.doesNotThrow(() => assertBudgetFits({ ...gemini, budgetUsd: 0.25, sources: custom({ candidates: 5, pagesPerIdea: 2 }) }, at));
-  const estimates = runCostEstimates({ ...gemini, sources: custom({ candidates: 5 }) }, at);
-  assert.ok(estimates.primary.requiredUsd < runCostEstimates(gemini, at).primary.requiredUsd);
+  const wider = custom({ alternativesSearch: true });
+  assert.ok(needs(wider) > atDefault * 1.4);
+  assert.throws(() => assertBudgetFits({ ...gemini, budgetUsd: atDefault, sources: wider }, at), /BUDGET_TOO_LOW/);
+  assert.doesNotThrow(() => assertBudgetFits({ ...gemini, budgetUsd: needs(wider), sources: wider }, at));
+  // A narrower run fits a budget the default depth cannot.
+  const narrow = custom({ candidates: 5, pagesPerIdea: 2 });
+  assert.ok(needs(narrow) < atDefault);
+  assert.throws(() => assertBudgetFits({ ...gemini, budgetUsd: needs(narrow) }, at), /BUDGET_TOO_LOW/);
+  assert.doesNotThrow(() => assertBudgetFits({ ...gemini, budgetUsd: needs(narrow), sources: narrow }, at));
+  // Sector communities change the prompt, not the cost.
+  assert.equal(needs(defaultSourcePolicy), needs(legacySourcePolicy));
 });
 
 test("the stored research settings carry an optional source policy beside the provider policy", () => {
