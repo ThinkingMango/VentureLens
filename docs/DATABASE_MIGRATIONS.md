@@ -53,6 +53,7 @@ After this change `supabase migration list` shows local and remote in sync, and 
 | Version | Name | File | Pull request | What it does |
 | --- | --- | --- | --- | --- |
 | `20261111140000` | `signup_grant_ten_runs` | `supabase/migrations/20261111140000_signup_grant_ten_runs.sql` | this branch | Replaces `grant_signup_research_run()`: a newly confirmed account gets **10** runs valid for **90 days** (was 1 run for 30 days). Who qualifies is unchanged (once per normalised email; `smartmango.ai` granted by hand). Existing grants are not touched. |
+| `20261111150000` | `cancel_research_run` | `supabase/migrations/20261111150000_cancel_research_run.sql` | this branch | Adds `cancel_research_run(p_run)`, callable by founders for their own pending or running run. It ends the run as `failed` / `CANCELLED`, so the existing triggers refund it (always when nothing was spent, otherwise against the refund allowance) and record `run_finished`; `reserve_research_usage` and `finish_research` then refuse the workflow. No table changes. |
 
 When a pull request adds a migration, list it here until it is applied, and apply it only with the owner's approval. If `apply_migration` assigns a different version, rename the file to that version before merging. Merging to `main` can apply a migration to production: the Supabase integration applied `20261109150000`, `20261109160000`, `20261110120000`, `20261110130000`, `20261110140000`, `20261110150000`, `20261110160000`, `20261110170000`, `20261110180000` and `20261111120000` that way.
 

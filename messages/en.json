@@ -1980,7 +1980,19 @@
     "m1j5nhkw": "Each idea is scored on how much your industry, experience, insider view and reach give you an edge. The three answers below are optional, but they move that score most.",
     "m8x3bco": "Costly workarounds, recurring failures or delays you have watched customers, suppliers, colleagues or an industry put up with.",
     "mgyo4og": "Buyers, networks or communities you can reach",
-    "m1b9lmnw": "For example former clients, suppliers and partners, peers in a professional body, or a newsletter. Reaching buyers directly is a real advantage."
+    "m1b9lmnw": "For example former clients, suppliers and partners, peers in a professional body, or a newsletter. Reaching buyers directly is a real advantage.",
+    "m1mr4rpu": "You stopped this research. No new search or model request was started after that, and no report was produced.",
+    "m15tekbi": "Delete {title}",
+    "mmvr64x": "Research stopped.",
+    "m3pyj86": "Stop research",
+    "m4fc1k1": "Stop this research?",
+    "m15qt6vm": "The run stops before its next search or model request, and no report is produced. Sources found so far stay on this page. A stopped run cannot be resumed: start a new one when you are ready.",
+    "m5o42jj": "If nothing has been spent yet, the research run goes back to your allowance. Otherwise it counts like any other unfinished run.",
+    "mxs6zlz": "Keep running",
+    "m132zmf1": "Stopping…",
+    "m4ndd1b": "This run used one of your research runs: it had already spent part of its budget, and your account has reached its limit of returned runs.",
+    "m12w8nf4": "Stopping returned this research run to your allowance.",
+    "mrb9hhk": "Stopped by you"
   },
   "language": {
     "label": "Interface language",

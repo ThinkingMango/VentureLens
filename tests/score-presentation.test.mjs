@@ -55,7 +55,7 @@ test("band labels and meanings are translated in all three languages", () => {
 
 // Modules added by the library (WP-12), for components loaded without them in their dependency list.
 const libraryMocks = {
-  "@/components/library": { ArchiveButton: () => null, DeleteRunButton: () => null, LibraryFilterBar: () => null },
+  "@/components/library": { ArchiveButton: () => null, CancelRunButton: () => null, DeleteRunButton: () => null, LibraryFilterBar: () => null },
   "@/lib/library-core": libraryCore,
 };
 // Modules added by report export (WP-11), for components loaded without them in their dependency list.

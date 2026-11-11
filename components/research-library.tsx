@@ -11,12 +11,15 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useDemo } from "@/components/demo-provider";
 import { stageLabels } from "@/lib/research-core";
+import { canDeleteRun } from "@/lib/library-core";
+import { DeleteRunButton } from "@/components/library";
 export function ResearchLibrary() {
   const copy = useCopy();
   const format = useFormats();
   const { run, data, isDemo } = useDemo();
   const [query, setQuery] = useState("");
-  const runs = (
+  type Row = { id: string; target: string; status: string; title: string; sectors: readonly string[]; count: number; date: string; deleteRunId?: string };
+  const runs = ((
     isDemo
       ? [
           {
@@ -56,8 +59,12 @@ export function ResearchLibrary() {
             date: copy("Sample research history"),
           },
         ]
-      : (data?.projects ?? []).map((project) => ({
+      : (data?.projects ?? []).map((project) => {
+          const latest = data?.runs.find((item) => item.project_id === project.id);
+          return {
           id: project.id,
+          // The latest run, when it has finished, can be deleted from the list (an active one is stopped on its page).
+          deleteRunId: latest && canDeleteRun(latest.status) ? latest.id : undefined,
           target: data?.runs.find((item) => item.project_id === project.id)
             ? `/research/${data.runs.find((item) => item.project_id === project.id)!.id}`
             : "/research/new",
@@ -68,7 +75,9 @@ export function ResearchLibrary() {
             return !latest
               ? "Brief saved"
               : latest.status === "failed"
-                ? "Research stopped"
+                ? latest.error_code === "CANCELLED"
+                  ? "Stopped by you"
+                  : "Research stopped"
                 : latest.status === "pending"
                   ? "Queued"
                   : (stageLabels[latest.stage] ?? latest.status);
@@ -81,8 +90,9 @@ export function ResearchLibrary() {
                 item.project_id === project.id && item.status === "completed",
             ).length ?? 0,
           date: copy("{date} UTC", { date: format.date(project.created_at) }),
-        }))
-  ).filter((r) =>
+          };
+        })
+  ) as Row[]).filter((r) =>
     `${r.title} ${choiceLabel(r.sectors, (v) => copy(v))}`
       .toLocaleLowerCase()
       .includes(query.trim().toLocaleLowerCase()),
@@ -133,10 +143,10 @@ export function ResearchLibrary() {
         </div>
         <div className="grid gap-3 p-3 md:hidden">
           {runs.map((r) => (
+            <div key={r.id} className="flex items-start rounded-xl border bg-card hover:border-primary/40 hover:bg-secondary/40">
             <Link
-              key={r.id}
               href={r.target}
-              className="flex items-start gap-3 rounded-xl border bg-card p-5 hover:border-primary/40 hover:bg-secondary/40"
+              className="flex min-w-0 flex-1 items-start gap-3 p-5"
             >
               <span className="rounded-lg bg-secondary p-2.5 text-primary">
                 <FileText className="size-5" />
@@ -158,6 +168,12 @@ export function ResearchLibrary() {
               </div>
               <ArrowUpRight className="mt-1 size-4 shrink-0 text-primary" />
             </Link>
+            {r.deleteRunId && (
+              <div className="py-2 pr-2">
+                <DeleteRunButton compact runId={r.deleteRunId} title={r.title} onDeleted={() => undefined} />
+              </div>
+            )}
+            </div>
           ))}
         </div>
         <div
@@ -205,13 +221,18 @@ export function ResearchLibrary() {
                     <Badge variant="secondary">{copy(r.status)}</Badge>
                   </td>
                   <td className="px-4 py-6">
-                    <Link
-                      href={r.target}
-                      aria-label={copy("Open {title}", { title: r.title })}
-                      className="flex size-11 items-center justify-center rounded-md hover:bg-secondary"
-                    >
-                      <ArrowUpRight className="size-5 text-muted-foreground" />
-                    </Link>
+                    <div className="flex items-center gap-1">
+                      <Link
+                        href={r.target}
+                        aria-label={copy("Open {title}", { title: r.title })}
+                        className="flex size-11 items-center justify-center rounded-md hover:bg-secondary"
+                      >
+                        <ArrowUpRight className="size-5 text-muted-foreground" />
+                      </Link>
+                      {r.deleteRunId && (
+                        <DeleteRunButton compact runId={r.deleteRunId} title={r.title} onDeleted={() => undefined} />
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

@@ -603,7 +603,27 @@ export const researchErrors: Record<string, string> = {
   PROVIDER_CONFIGURATION: "Research is unavailable. The deployment configuration needs attention.",
   WORKFLOW_INTERRUPTED: "The workflow was interrupted. You can retry once within the remaining budget.",
   DISPATCH_FAILED: "The task could not start. You can retry once.",
+  CANCELLED: "You stopped this research. No new search or model request was started after that, and no report was produced.",
 };
+
+/** How long a run may wait for its workflow before it counts as never dispatched. */
+export const DISPATCH_GRACE_MS = 5 * 60_000;
+/**
+ * The longest a run may stay active. Runs take 5–10 minutes and every stage is checkpointed, so a run still active after
+ * two hours is stuck (a lost workflow, or one whose status cannot be read) and is ended so the founder can retry.
+ */
+export const MAX_ACTIVE_MS = 2 * 60 * 60_000;
+export type ActiveRun = { status: string; workflow_id: string | null; updated_at: string; created_at: string; started_at?: string | null };
+/**
+ * Why an active run should be ended, or null while it may still finish. `workflowStatus` is the durable workflow's
+ * status, or null when it could not be read: an unreadable status never ends a run on its own, only the age limit does.
+ */
+export function interruptionFor(run: ActiveRun, workflowStatus: string | null, now = Date.now()): "WORKFLOW_INTERRUPTED" | "DISPATCH_FAILED" | null {
+  if (!["pending", "running"].includes(run.status)) return null;
+  if (!run.workflow_id) return now - new Date(run.updated_at).getTime() > DISPATCH_GRACE_MS ? "DISPATCH_FAILED" : null;
+  if (workflowStatus && ["failed", "cancelled", "completed"].includes(workflowStatus)) return "WORKFLOW_INTERRUPTED";
+  return now - new Date(run.started_at ?? run.created_at).getTime() > MAX_ACTIVE_MS ? "WORKFLOW_INTERRUPTED" : null;
+}
 export function errorCode(error: unknown): string {
   const seen = new Set<unknown>();
   const failures: { message: string; status: number }[] = [];
