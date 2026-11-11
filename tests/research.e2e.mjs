@@ -5,8 +5,8 @@ import { createClient } from "@supabase/supabase-js";
 import { createServerClient } from "@supabase/ssr";
 import { emptyBrief, emptyProfile, opportunitySchema } from "../lib/workspace-schema.ts";
 import { evidenceGate, groundedClassifications, weightedScore } from "../lib/research-core.ts";
-import { qwenModelIds, geminiModelIds } from "../lib/research-models.ts";
-const allowedModels = [...qwenModelIds, ...geminiModelIds];
+import { qwenModelIds, geminiModelIds, claudeModelIds } from "../lib/research-models.ts";
+const allowedModels = [...qwenModelIds, ...geminiModelIds, ...claudeModelIds];
 const allowedProviders = ["dashscope-beijing", "google-gemini"];
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;

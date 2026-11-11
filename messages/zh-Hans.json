@@ -1,14 +1,14 @@
 {
   "admin": {
     "title": "AI 服务商",
-    "description": "为新的研究任务选择 Qwen 或 Gemini 及备用策略。",
+    "description": "为新的研究任务选择 Qwen、Gemini 或 Claude 及备用策略。",
     "administrator": "管理员",
     "routing": "研究服务商",
     "routingHelp": "此策略适用于所有工作区的新研究任务。",
     "primary": "首选服务商",
     "primaryHelp": "所选服务商负责分析和原生网页检索。",
     "fallback": "自动切换备用服务商",
-    "fallbackHelp": "首选服务商发生配置、余额、可用性或检索错误时，尝试另一家服务商。",
+    "fallbackHelp": "首选服务商发生配置、余额、可用性或检索错误时，尝试备用服务商。",
     "nextRun": "新研究任务的调用顺序",
     "noFallback": "不使用备用服务商",
     "fallbackLimit": "仅单向切换一次。请求发送前若预算预留被拒绝，可在同一预算内尝试另一家已配置的服务商。验证失败、证据不足或请求发送后的预算错误不会触发切换。",
@@ -92,7 +92,10 @@
     "pagesOption": "{count} 个页面",
     "pagesPerIdeaHelp": "页面越多，每个想法找到独立支持的机会越大，分类费用也越高。“验证我的想法”读取两倍数量。",
     "sourcesSummary": "一次探索研究为 {ideas} 个想法最多检索 {searches} 次，每个想法从 {results} 个结果中最多读取 {pages} 个页面；“验证我的想法”最多读取 {verifyPages} 个页面。",
-    "sourcesGate": "这些设置只改变检索和读取的内容，绝不改变证据规则：一个机会仍需要至少两个独立域名的支持来源，且其中至少一个不是厂商。"
+    "sourcesGate": "这些设置只改变检索和读取的内容，绝不改变证据规则：一个机会仍需要至少两个独立域名的支持来源，且其中至少一个不是厂商。",
+    "fallbackProvider": "备用服务商",
+    "fallbackProviderHelp": "首选服务商失败时接手的服务商。每个任务最多切换一次。",
+    "claudeSearch": "原生 web_search 工具，返回来源"
   },
   "ui": {
     "m1pbhrck": "管理后台",
@@ -1992,7 +1995,16 @@
     "m132zmf1": "正在停止…",
     "m4ndd1b": "这次研究已占用一次研究额度：它已花费部分预算，而你的账户已达到可退回次数的上限。",
     "m12w8nf4": "停止后，这次研究额度已退回给你。",
-    "mrb9hhk": "已由你停止"
+    "mrb9hhk": "已由你停止",
+    "m3c65rb": "Claude（Anthropic 提供）",
+    "m1b43ymw": "新的研究任务通过 Anthropic Claude API 使用 {model}。",
+    "mhr0cvw": "若其不可用，任务可能会通过 Anthropic Claude API 切换至 {model}。",
+    "mn46hns": "研究任务目前通过 Anthropic Claude API 使用 {model}。",
+    "m1eod6qi": "研究任务会使用通过阿里云百炼提供的 Qwen（请求在中国大陆北京地域处理）、Google Gemini API 或 Anthropic Claude API，具体由管理员选择。",
+    "m18twc5e": "研究任务的首选 AI 模型（Claude）和网页检索。",
+    "mid1lns": "研究任务的备用 AI 模型（Claude）和网页检索。",
+    "mbj1zl8": "研究任务的 AI 模型（Claude）和网页检索。",
+    "m4u4lhv": "Anthropic"
   },
   "language": {
     "label": "界面语言",

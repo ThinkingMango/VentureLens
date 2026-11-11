@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { isAdministrator } from "@/lib/admin-access";
 import { QWEN_MODEL } from "@/lib/qwen-core";
 import { GEMINI_MODEL } from "@/lib/research-fallback-core";
+import { CLAUDE_MODEL } from "@/lib/claude-core";
 import {
   RESEARCH_SETTINGS_KEY,
   assertBudgetFits,
@@ -18,6 +19,7 @@ export function providerAvailability(): ProviderAvailability {
   return {
     qwen: { configured: !!process.env.DASHSCOPE_API_KEY && !!process.env.DASHSCOPE_WORKSPACE_ID, model: QWEN_MODEL },
     gemini: { configured: !!process.env.GOOGLE_GENERATIVE_AI_API_KEY, model: GEMINI_MODEL },
+    claude: { configured: !!process.env.ANTHROPIC_API_KEY, model: CLAUDE_MODEL },
   };
 }
 

@@ -137,7 +137,7 @@ test("the admin budget check refuses a breadth the budget cannot pay for", () =>
 });
 
 test("the stored research settings carry an optional source policy beside the provider policy", () => {
-  const routing = { primary: "qwen", autoFallback: true, qwenModel: "qwen3.8-flash", geminiModel: "gemini-3.5-flash-lite", budgetUsd: 0.25 };
+  const routing = { primary: "qwen", autoFallback: true, qwenModel: "qwen3.8-flash", geminiModel: "gemini-3.5-flash-lite", claudeModel: "claude-opus-5-5", budgetUsd: 0.25 };
   const sources = custom({ candidates: 6, vendorPages: 0 });
   assert.deepEqual(researchSettingsSchema.parse({ ...routing, sources }), { ...routing, sources });
   assert.deepEqual(researchSettingsSchema.parse(routing), routing, "omitting the policy adds nothing");

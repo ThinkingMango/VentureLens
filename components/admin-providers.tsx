@@ -11,15 +11,15 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldContent, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Separator } from "@/components/ui/separator";
-import { providerPlan, runCostEstimates, recommendedBudget, parseBudgetInput, settleBudgetInput, resolveSourcePolicy, sameSourcePolicy, MIN_RESEARCH_BUDGET_USD, MAX_RESEARCH_BUDGET_USD, type ResearchSettings, type ProviderSettingsResponse, type ResearchProvider } from "@/lib/provider-settings-core";
+import { providerPlan, fallbackFor, runCostEstimates, recommendedBudget, parseBudgetInput, settleBudgetInput, resolveSourcePolicy, sameSourcePolicy, MIN_RESEARCH_BUDGET_USD, MAX_RESEARCH_BUDGET_USD, type ResearchSettings, type ProviderSettingsResponse, type ResearchProvider } from "@/lib/provider-settings-core";
 import { useFormats } from "@/i18n/use-copy";
 import { ProviderModelField } from "@/components/provider-model-field";
 import { AdminSources } from "@/components/admin-sources";
-import { selectedModel, researchModels, qwenModelSchema, geminiModelSchema } from "@/lib/research-models";
+import { selectedModel, researchModels, researchProviders, qwenModelSchema, geminiModelSchema, claudeModelSchema } from "@/lib/research-models";
 
 const endpoint = "/api/admin/providers";
-const names = { qwen: "Qwen", gemini: "Gemini" };
-const providerNames = ["qwen", "gemini"] as const;
+const names: Record<ResearchProvider, string> = { qwen: "Qwen", gemini: "Gemini", claude: "Claude" };
+const providerNames = researchProviders;
 async function loadSettings(): Promise<ProviderSettingsResponse> {
   const response = await fetch(endpoint, { cache: "no-store" });
   if (!response.ok) throw new Error("SETTINGS_UNAVAILABLE");
@@ -38,7 +38,9 @@ export function AdminProviders({ initialData }: { initialData: ProviderSettingsR
   const settings = draft ?? data.settings;
   // A stored row without a source policy researches on the defaults, so it is shown and compared as the defaults.
   const sources = resolveSourcePolicy(settings.sources);
-  const changed = settings.primary !== data.settings.primary || settings.autoFallback !== data.settings.autoFallback || settings.qwenModel !== data.settings.qwenModel || settings.geminiModel !== data.settings.geminiModel || settings.budgetUsd !== data.settings.budgetUsd || !sameSourcePolicy(sources, data.settings.sources);
+  // The fallback is compared as resolved: a row saved before the choice existed has the same fallback it always had.
+  const fallbackProvider = fallbackFor(settings);
+  const changed = settings.primary !== data.settings.primary || settings.autoFallback !== data.settings.autoFallback || fallbackProvider !== fallbackFor(data.settings) || settings.qwenModel !== data.settings.qwenModel || settings.geminiModel !== data.settings.geminiModel || settings.claudeModel !== data.settings.claudeModel || settings.budgetUsd !== data.settings.budgetUsd || !sameSourcePolicy(sources, data.settings.sources);
   const plan = providerPlan(settings);
   const configured = data.providers[plan.primary].configured && (!plan.fallback || data.providers[plan.fallback].configured);
   const estimates = runCostEstimates(settings);
@@ -48,7 +50,9 @@ export function AdminProviders({ initialData }: { initialData: ProviderSettingsR
   const fallbackFits = !estimates.fallback || estimates.fallback.requiredUsd <= settings.budgetUsd;
 
   function change(patch: Partial<ResearchSettings>) {
-    setDraft({ primary: settings.primary, autoFallback: settings.autoFallback, qwenModel: settings.qwenModel, geminiModel: settings.geminiModel, budgetUsd: settings.budgetUsd, sources, ...patch });
+    const next = { primary: settings.primary, autoFallback: settings.autoFallback, fallbackProvider, qwenModel: settings.qwenModel, geminiModel: settings.geminiModel, claudeModel: settings.claudeModel, budgetUsd: settings.budgetUsd, sources, ...patch };
+    // A primary that takes the fallback's place moves the fallback to that primary's default partner.
+    setDraft({ ...next, fallbackProvider: fallbackFor(next) });
     setSaveError(null);
   }
 
@@ -60,7 +64,7 @@ export function AdminProviders({ initialData }: { initialData: ProviderSettingsR
     try {
       const response = await fetch(endpoint, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ primary: settings.primary, autoFallback: settings.autoFallback, qwenModel: settings.qwenModel, geminiModel: settings.geminiModel, budgetUsd: settings.budgetUsd, sources }),
+        body: JSON.stringify({ primary: settings.primary, autoFallback: settings.autoFallback, fallbackProvider, qwenModel: settings.qwenModel, geminiModel: settings.geminiModel, claudeModel: settings.claudeModel, budgetUsd: settings.budgetUsd, sources }),
       });
       if (!response.ok) {
         const body = await response.json().catch(() => ({}));
@@ -106,6 +110,7 @@ export function AdminProviders({ initialData }: { initialData: ProviderSettingsR
                 </Field>
                 <ProviderModelField provider="qwen" model={settings.qwenModel} disabled={saving || !!loadError} onChange={model => change({ qwenModel: qwenModelSchema.parse(model) })} />
                 <ProviderModelField provider="gemini" model={settings.geminiModel} disabled={saving || !!loadError} onChange={model => change({ geminiModel: geminiModelSchema.parse(model) })} />
+                <ProviderModelField provider="claude" model={settings.claudeModel} disabled={saving || !!loadError} onChange={model => change({ claudeModel: claudeModelSchema.parse(model) })} />
                 <p className="text-sm leading-relaxed text-muted-foreground">{t("modelBudget")}</p>
                 <Field data-disabled={saving}>
                   <FieldLabel htmlFor="research-budget">{t("budget")}</FieldLabel>
@@ -132,6 +137,20 @@ export function AdminProviders({ initialData }: { initialData: ProviderSettingsR
                     <FieldDescription id="fallback-help">{t("fallbackHelp")}</FieldDescription>
                   </FieldContent>
                 </Field>
+                {settings.autoFallback && (
+                  <Field data-disabled={saving}>
+                    <FieldLabel htmlFor="fallback-provider">{t("fallbackProvider")}</FieldLabel>
+                    <select
+                      id="fallback-provider" value={fallbackProvider} disabled={saving || !!loadError}
+                      onChange={event => change({ fallbackProvider: event.target.value as ResearchProvider })}
+                      aria-describedby="fallback-provider-help"
+                      className="h-12 w-full rounded-md border bg-card px-3 text-base text-foreground md:max-w-sm"
+                    >
+                      {providerNames.filter(provider => provider !== settings.primary).map(provider => <option key={provider} value={provider}>{names[provider]}</option>)}
+                    </select>
+                    <FieldDescription id="fallback-provider-help">{t("fallbackProviderHelp")}</FieldDescription>
+                  </Field>
+                )}
                 <Separator />
                 <AdminSources policy={sources} disabled={saving || !!loadError} onChange={policy => change({ sources: policy })} />
                 <Separator />

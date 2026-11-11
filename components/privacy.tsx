@@ -167,17 +167,19 @@ function buildSections(disclosure: ProviderDisclosure): Section[] {
 const primaryProcessing: Record<DisclosedProvider["provider"], string> = {
   qwen: "Research runs currently use {model} through Alibaba Cloud Model Studio, which processes requests in mainland China (Beijing region).",
   gemini: "Research runs currently use {model} through the Google Gemini API.",
+  claude: "Research runs currently use {model} through the Anthropic Claude API.",
 };
 const fallbackProcessing: Record<DisclosedProvider["provider"], string> = {
   qwen: "If it is unavailable, a run may fall back to {model} through Alibaba Cloud Model Studio, which processes requests in mainland China (Beijing region).",
   gemini: "If it is unavailable, a run may fall back to {model} through the Google Gemini API.",
+  claude: "If it is unavailable, a run may fall back to {model} through the Anthropic Claude API.",
 };
 
 /** The paragraphs that name the AI providers new research runs use, following the saved research policy. */
 export function modelProcessing(disclosure: ProviderDisclosure): Text[] {
   if (!disclosure.known)
   return [
-      "Research runs use Qwen through Alibaba Cloud Model Studio, which processes requests in mainland China (Beijing region), or the Google Gemini API, as chosen by an administrator.",
+      "Research runs use Qwen through Alibaba Cloud Model Studio, which processes requests in mainland China (Beijing region), the Google Gemini API, or the Anthropic Claude API, as chosen by an administrator.",
       "An administrator chooses the provider for all new runs. A run that has already started keeps the settings it started with.",
     ];
   const model = (provider: DisclosedProvider) => ({ model: provider.modelName });
@@ -200,6 +202,11 @@ const processorRoles: Record<DisclosedProvider["provider"], Record<"primary" | "
     primary: "Primary AI model (Gemini) and web search for research runs.",
     fallback: "Fallback AI model (Gemini) and web search for research runs.",
     either: "AI model (Gemini) and web search for research runs.",
+  },
+  claude: {
+    primary: "Primary AI model (Claude) and web search for research runs.",
+    fallback: "Fallback AI model (Claude) and web search for research runs.",
+    either: "AI model (Claude) and web search for research runs.",
   },
 };
 

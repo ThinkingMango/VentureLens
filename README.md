@@ -17,13 +17,13 @@ A founder describes their experience, constraints and goals; VentureLens discove
 | Framework | Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS 4, shadcn-style primitives |
 | Data & auth | Supabase (Postgres, RLS, passwordless email OTP / magic link) |
 | Research job | Vercel Workflow (`workflows/research.ts`) with checkpointed stages |
-| Models | Qwen via DashScope (primary) and Gemini (fallback) through the Vercel AI SDK; native web search on both |
+| Models | Qwen via DashScope and Gemini through the Vercel AI SDK, and Claude (Haiku / Sonnet / Opus 5.5) through the Anthropic SDK; native web search on all three. An administrator picks the primary and the fallback |
 | i18n | `next-intl`; messages keyed by a hash of the English source string (`i18n/config.ts` → `messageKey`) |
 | Tests | `node:test` unit tests, a Supabase integration test, and a research E2E test |
 
 ## Local setup
 
-Prerequisites: Node 22, pnpm 10, a Supabase project (or the Supabase CLI), and optionally DashScope / Google AI keys.
+Prerequisites: Node 22, pnpm 10, a Supabase project (or the Supabase CLI), and optionally DashScope / Google AI / Anthropic keys.
 
 ```bash
 pnpm install --frozen-lockfile
@@ -39,6 +39,7 @@ SUPABASE_SECRET_KEY=<service role / secret key>      # server only
 DASHSCOPE_API_KEY=<key>
 DASHSCOPE_WORKSPACE_ID=<beijing workspace id>
 GOOGLE_GENERATIVE_AI_API_KEY=<key>
+ANTHROPIC_API_KEY=<key>                              # Claude (server only)
 # Optional: idempotent workflow dispatch through start hooks (dispatch works without it)
 WORKFLOW_VERCEL_EXPERIMENTAL_START_HOOK=1
 # Optional: "report ready" email (lib/notify.ts). Without SMTP settings nothing is sent.
@@ -73,11 +74,11 @@ A failed run hands its slot back when the failure was on our side (dispatch, wor
 
 ## Administrators and settings
 
-Administrator access is granted only by a server-managed claim in `app_metadata`, set with the service role or in the Supabase dashboard: `app_metadata.role = "admin"` (use this one), or the legacy `app_metadata.is_admin = true`, which `lib/admin-access.ts` still accepts. Either also requires a confirmed email; no email address is special, and `user_metadata` never grants access. Administrators manage the research policy (primary provider, fallback, models, per-run budget cap) at `/admin`, which is stored in the service-role-only `public.app_settings` table under the key `research`. The same page sets the **source policy** (`sources` in that row, `lib/source-policy.ts`):
+Administrator access is granted only by a server-managed claim in `app_metadata`, set with the service role or in the Supabase dashboard: `app_metadata.role = "admin"` (use this one), or the legacy `app_metadata.is_admin = true`, which `lib/admin-access.ts` still accepts. Either also requires a confirmed email; no email address is special, and `user_metadata` never grants access. Administrators manage the research policy (primary provider among Qwen, Gemini and Claude, the fallback provider, models, per-run budget cap) at `/admin`, which is stored in the service-role-only `public.app_settings` table under the key `research`. The same page sets the **source policy** (`sources` in that row, `lib/source-policy.ts`):
 - **Breadth:** which independent source types each search prefers; steering toward the communities where the brief's buyers discuss their own work; a second search per idea for current alternatives; at most one or no vendor pages; and a preference for recent sources.
 - **Depth:** 5–8 ideas per discovery run and 2–6 pages read per idea (twice that for a verify run).
 
-Each run freezes the policy at setup, and the cost estimate and the "budget too low" refusal account for it. A row without `sources` uses the defaults: the original prompts and depth plus **sector-community steering, on by default**. A run set up before the policy existed keeps the original behaviour (`legacySourcePolicy`). The policy only steers what is searched and read; the evidence gate is unchanged at every setting. The page shows what a complete run is expected to cost and refuses a primary model that the per-run budget cannot pay for. At the $0.25 default only Qwen 3.8 Flash can finish a run; Gemini Flash-Lite needs about $0.40 because Google Search grounding is billed per query. See [`docs/GENERATION_PIPELINE_REVIEW.md`](./docs/GENERATION_PIPELINE_REVIEW.md).
+Each run freezes the policy at setup, and the cost estimate and the "budget too low" refusal account for it. A row without `sources` uses the defaults: the original prompts and depth plus **sector-community steering, on by default**. A run set up before the policy existed keeps the original behaviour (`legacySourcePolicy`). The policy only steers what is searched and read; the evidence gate is unchanged at every setting. The page shows what a complete run is expected to cost and refuses a primary model that the per-run budget cannot pay for. At the $0.25 default only Qwen 3.8 Flash can finish a run; Gemini Flash-Lite needs about $0.40 because Google Search grounding is billed per query. Claude Haiku 5.5 needs about $0.25, Sonnet 5.5 about $1.57 and Opus 5.5 about $3.39 (estimates; Claude search is not yet calibrated against real runs). Without a fallback choice, Qwen and Gemini back each other up and Claude falls back to Gemini. See [`docs/GENERATION_PIPELINE_REVIEW.md`](./docs/GENERATION_PIPELINE_REVIEW.md).
 
 ```sql
 update auth.users set raw_app_meta_data = coalesce(raw_app_meta_data, '{}'::jsonb) || '{"role": "admin"}'

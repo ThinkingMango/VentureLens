@@ -85,10 +85,12 @@ function buildTopics(disclosure: ProviderDisclosure): { title: string; questions
 const usesModel: Record<DisclosedProvider["provider"], string> = {
   qwen: "New research runs use {model} through Alibaba Cloud Model Studio, which processes requests in mainland China (Beijing region).",
   gemini: "New research runs use {model} through the Google Gemini API.",
+  claude: "New research runs use {model} through the Anthropic Claude API.",
 };
 const fallsBackTo: Record<DisclosedProvider["provider"], string> = {
   qwen: "If it is unavailable, a run may fall back to {model} through Alibaba Cloud Model Studio, which processes requests in mainland China (Beijing region).",
   gemini: "If it is unavailable, a run may fall back to {model} through the Google Gemini API.",
+  claude: "If it is unavailable, a run may fall back to {model} through the Anthropic Claude API.",
 };
 
 /** The answer to "Which AI model runs my research?", following the saved research policy. */
@@ -96,7 +98,7 @@ export function modelAnswer(disclosure: ProviderDisclosure): Answer[] {
   const closing = "Each research run shows the model it used on its progress page. The Privacy Policy explains how research data is processed.";
   if (!disclosure.known)
     return [
-      "Research runs use Qwen through Alibaba Cloud Model Studio, which processes requests in mainland China (Beijing region), or the Google Gemini API, as chosen by an administrator.",
+      "Research runs use Qwen through Alibaba Cloud Model Studio, which processes requests in mainland China (Beijing region), the Google Gemini API, or the Anthropic Claude API, as chosen by an administrator.",
       closing,
     ];
   return [

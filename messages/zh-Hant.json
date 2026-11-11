@@ -1,14 +1,14 @@
 {
   "admin": {
     "title": "AI 服務供應商",
-    "description": "為新的研究任務選擇 Qwen 或 Gemini，以及備援策略。",
+    "description": "為新的研究任務選擇 Qwen、Gemini 或 Claude，以及備援策略。",
     "administrator": "管理員",
     "routing": "研究服務供應商",
     "routingHelp": "此策略適用於所有工作區的新研究任務。",
     "primary": "主要服務供應商",
     "primaryHelp": "所選供應商負責分析與原生網頁檢索。",
     "fallback": "自動切換備援供應商",
-    "fallbackHelp": "主要供應商發生設定、餘額、可用性或檢索錯誤時，嘗試另一家供應商。",
+    "fallbackHelp": "主要供應商發生設定、餘額、可用性或檢索錯誤時，嘗試備援供應商。",
     "nextRun": "新研究任務的呼叫順序",
     "noFallback": "不使用備援供應商",
     "fallbackLimit": "僅單向切換一次。請求送出前若預算預留遭拒，可在同一預算內嘗試另一家已設定的供應商。驗證失敗、證據不足或請求送出後的預算錯誤不會觸發切換。",
@@ -92,7 +92,10 @@
     "pagesOption": "{count} 個頁面",
     "pagesPerIdeaHelp": "頁面越多，每個想法找到獨立支持的機會越大，分類費用也越高。「驗證我的想法」讀取兩倍數量。",
     "sourcesSummary": "一次探索研究為 {ideas} 個想法最多檢索 {searches} 次，每個想法從 {results} 個結果中最多讀取 {pages} 個頁面；「驗證我的想法」最多讀取 {verifyPages} 個頁面。",
-    "sourcesGate": "這些設定只改變檢索與讀取的內容，絕不改變證據規則：一個機會仍需要至少兩個獨立網域的支持來源，且其中至少一個不是廠商。"
+    "sourcesGate": "這些設定只改變檢索與讀取的內容，絕不改變證據規則：一個機會仍需要至少兩個獨立網域的支持來源，且其中至少一個不是廠商。",
+    "fallbackProvider": "備援供應商",
+    "fallbackProviderHelp": "主要供應商失敗時接手的供應商。每個任務最多切換一次。",
+    "claudeSearch": "原生 web_search 工具，回傳來源"
   },
   "ui": {
     "m1pbhrck": "管理後台",
@@ -1992,7 +1995,16 @@
     "m132zmf1": "正在停止…",
     "m4ndd1b": "這次研究已佔用一次研究額度：它已花費部分預算，而你的帳戶已達到可退回次數的上限。",
     "m12w8nf4": "停止後，這次研究額度已退回給你。",
-    "mrb9hhk": "已由你停止"
+    "mrb9hhk": "已由你停止",
+    "m3c65rb": "Claude（Anthropic 提供）",
+    "m1b43ymw": "新的研究任務透過 Anthropic Claude API 使用 {model}。",
+    "mhr0cvw": "若其無法使用，任務可能會透過 Anthropic Claude API 切換至 {model}。",
+    "mn46hns": "研究任務目前透過 Anthropic Claude API 使用 {model}。",
+    "m1eod6qi": "研究任務會使用透過阿里雲百煉提供的 Qwen（請求在中國大陸北京地域處理）、Google Gemini API 或 Anthropic Claude API，具體由管理員選擇。",
+    "m18twc5e": "研究任務的首選 AI 模型（Claude）與網頁搜尋。",
+    "mid1lns": "研究任務的備用 AI 模型（Claude）與網頁搜尋。",
+    "mbj1zl8": "研究任務的 AI 模型（Claude）與網頁搜尋。",
+    "m4u4lhv": "Anthropic"
   },
   "language": {
     "label": "介面語言",
