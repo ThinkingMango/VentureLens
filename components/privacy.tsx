@@ -68,6 +68,7 @@ function buildSections(disclosure: ProviderDisclosure): Section[] {
         ["Support and reliability", "To answer your messages and to diagnose failed runs and errors."],
         ["Improve the product", "To measure, in aggregate, how research runs perform and which features are used."],
         ["Service messages", "To send sign-in codes and essential notices about your account or this policy. We do not send marketing email."],
+        ["Research notifications", "To email you when a research run finishes or stops, if you leave this on in your profile. The email names the run and its outcome; your profile, briefs and reports are not included."],
       ],
       after: [
         "We do not sell or rent your personal information, use it for advertising, or train our own AI models on your content.",
@@ -91,6 +92,7 @@ function buildSections(disclosure: ProviderDisclosure): Section[] {
       items: [
         ["Supabase", "Database, authentication, and sign-in emails."],
         ["Vercel", "Website hosting, background research jobs, and server logs."],
+        ["Hostinger", "Research notification emails, sent from our mailbox: your email address, the run's name and its outcome."],
         ...modelProcessors(disclosure),
       ],
       after: [

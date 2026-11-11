@@ -11,6 +11,7 @@ import { ResearchReportView } from "@/components/research-report";
 import { ResearchOutcomeView } from "@/components/research-outcome";
 import { ModelTag } from "@/components/model-tag";
 import { ReportRating } from "@/components/report-feedback";
+import { pollInterval, retrievalProgress } from "@/lib/research-progress";
 import { researchErrors, stageLabels } from "@/lib/research-core";
 import type { ResearchDetail } from "@/lib/research-types";
 import { useCopy, useFormats } from "@/i18n/use-copy";
@@ -31,6 +32,9 @@ const verifyStageHints: Record<string, string> = {
   discovery: "Writing two searches for your idea: one for the problem, one for the alternatives buyers use.",
   retrieval: "Searching the web for evidence of the problem, what buyers spend, and the alternatives they use.",
   evaluation: "Estimating buyer, pricing, cost, and risk for your idea if the evidence is strong enough.",
+  classification: "Tagging every excerpt by kind, reliability, and whether it supports or contradicts your idea.",
+  scoring: "Applying the weighted scorecard and evidence caps to your idea.",
+  review: "Running an adversarial critique that can reject your idea or deduct points.",
 };
 const stages = [
   "discovery",
@@ -50,8 +54,11 @@ async function fetchRun(url: string): Promise<ResearchDetail> {
 export function ResearchRunView({
   initialData,
   rating = null,
+  emailOnFinish = false,
 }: {
   initialData: ResearchDetail;
+  /** True when this run will send its "report ready" email (WP-08): email is on for this deployment and the founder. */
+  emailOnFinish?: boolean;
   /** The founder's rating of this report (WP-13), if they gave one. */
   rating?: { rating: number; comment: string } | null;
 }) {
@@ -67,8 +74,13 @@ export function ResearchRunView({
     mutate,
   } = useSWR(`/api/research/${initialData.id}`, fetchRun, {
     fallbackData: initialData,
-    refreshInterval: (latest) =>
-      latest && ["pending", "running"].includes(latest.status) ? 3000 : 0,
+    // Fast at first, then slower for long runs (lib/research-progress.ts); stops once the run has finished. SWR asks for
+    // the interval with its cache, which is empty until the first fetch (the page starts from the server's data), so
+    // fall back to that data: otherwise polling never starts.
+    refreshInterval: (latest) => {
+      const run = latest ?? initialData;
+      return ["pending", "running"].includes(run.status) ? pollInterval(run.created_at) : 0;
+    },
     onSuccess: (latest) => {
       if (["completed", "failed"].includes(latest.status)) void refresh();
     },
@@ -80,6 +92,7 @@ export function ResearchRunView({
   const completed = data.status === "completed" && !!data.report;
   const ExecutionContainer = completed ? "details" : "section";
   const index = stages.indexOf(data.stage);
+  const retrieval = retrievalProgress(data.steps, data.progress?.candidates ?? null);
   const retryable =
     data.status === "failed" &&
     data.retry_count < 1 &&
@@ -234,10 +247,40 @@ export function ResearchRunView({
           {active && (
             <p className="max-w-prose text-sm leading-relaxed text-muted-foreground">
               {copy((verifying ? verifyStageHints[data.stage] : undefined) ?? stageHints[data.stage] ?? stageHints.queued)}{" "}
-              {verifying
-                ? copy("A check usually takes about 2–3 minutes (an estimate until enough checks have run). You can leave this page; progress is saved on the server.")
-                : copy("A full run usually takes 5–10 minutes. You can leave this page; progress is saved on the server.")}
+              {data.progress?.estimateMinutes
+                ? verifying
+                  ? copy("Checks like this usually take about {minutes} minutes.", { minutes: data.progress.estimateMinutes })
+                  : copy("Runs like this usually take about {minutes} minutes.", { minutes: data.progress.estimateMinutes })
+                : verifying
+                  ? copy("A check usually takes about 2–3 minutes (an estimate until enough checks have run).")
+                  : copy("A full run usually takes 5–10 minutes.")}{" "}
+              {emailOnFinish
+                ? copy("You can leave this page. We'll email you when it's ready.")
+                : copy("You can leave this page; progress is saved on the server.")}
             </p>
+          )}
+          {active && data.stage === "retrieval" && !verifying && retrieval.total !== null && (
+            <p className="text-sm font-medium">
+              {copy("Searching {current} of {total} candidates…", { current: Math.min(retrieval.done + 1, retrieval.total), total: retrieval.total })}
+            </p>
+          )}
+          {active && data.progress && data.progress.sources.length > 0 && (
+            <section aria-labelledby="live-sources-heading" className="flex flex-col gap-2">
+              <h3 id="live-sources-heading" className="text-sm font-semibold">
+                {copy("{count, plural, one {# source found so far} other {# sources found so far}}", { count: data.progress.sourceCount })}
+              </h3>
+              <ul className="flex flex-col gap-1.5 text-sm">
+                {data.progress.sources.map((source, i) => (
+                  <li key={`${source.domain}-${i}`} className="flex min-w-0 flex-wrap items-baseline gap-x-2">
+                    <span className="min-w-0 break-words">{source.title}</span>
+                    {source.domain && <span className="text-xs text-muted-foreground">{source.domain}</span>}
+                  </li>
+                ))}
+              </ul>
+              {data.progress.sourceCount > data.progress.sources.length && (
+                <p className="text-xs text-muted-foreground">{copy("Showing the latest {count}. Every source is listed in the report.", { count: data.progress.sources.length })}</p>
+              )}
+            </section>
           )}
           <ol className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {stages.map((stage, i) => {

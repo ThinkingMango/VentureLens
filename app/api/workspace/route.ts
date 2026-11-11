@@ -13,6 +13,8 @@ const mutationSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("project"), project: projectSchema }),
   // "Clear idea memory" (WP-04): later runs ignore ideas from before this moment.
   z.object({ action: z.literal("clear_memory") }),
+  // "Email me when my research is ready" (WP-08).
+  z.object({ action: z.literal("notify"), enabled: z.boolean() }),
   z.object({ action: z.literal("save"), id: z.uuid(), saved: z.boolean() }),
   z.object({
     action: z.literal("task"),
@@ -113,6 +115,12 @@ export async function POST(request: NextRequest) {
       if (error) throw error;
       const starter = input.starter;
       if (starter) after(() => track("starter_profile_used", { userId: user.id, props: { id: starter } }));
+    } else if (input.action === "notify") {
+      const { error } = await supabase
+        .from("founder_profiles")
+        .update({ notify_on_complete: input.enabled })
+        .eq("user_id", user.id);
+      if (error) throw error;
     } else if (input.action === "clear_memory") {
       const { error } = await supabase
         .from("founder_profiles")

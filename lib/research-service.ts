@@ -11,6 +11,7 @@ import { selectedModel } from "@/lib/research-models";
 import { QWEN_PROVIDER } from "@/lib/qwen-core";
 import { GEMINI_PROVIDER } from "@/lib/research-fallback-core";
 import { outcomeSchema } from "@/lib/research-core";
+import { PROGRESS_SOURCES, estimateMinutes, progressSource, type RunProgress } from "@/lib/research-progress";
 
 export async function dispatchResearch(id: string, userId: string) {
   const client = createAdminClient();
@@ -97,7 +98,45 @@ export async function researchDetail(supabase: Awaited<ReturnType<typeof createC
   const budget_block = run.status === "failed" && run.error_code === "BUDGET_EXCEEDED" && blocked && typeof blocked.model === "string" && Number.isFinite(blocked.required_usd)
     ? { model: blocked.model, required_usd: Number(blocked.required_usd), remaining_usd: Math.max(0, Number(run.budget_usd) - totals.committed_usd), kind: blocked.kind === "estimate" ? "estimate" as const : "reservation" as const }
     : undefined;
-  return { id: run.id, status: run.status, stage: run.stage, model, error_code: run.error_code, retry_count: run.retry_count, quota_released: run.quota_released, configuration: { brief: run.configuration.brief }, report: run.report, outcome: parsedOutcome?.success ? parsedOutcome.data : null, created_at: run.created_at, completed_at: run.completed_at, steps: steps.data ?? [], usage: { ...totals, budget_usd: Number(run.budget_usd) }, ...(budget_block ? { budget_block } : {}) };
+  const progress = ["pending", "running"].includes(run.status) ? await runProgress(supabase, userId, id, run.configuration?.brief?.discovery_mode) : undefined;
+  return { ...(progress ? { progress } : {}), id: run.id, status: run.status, stage: run.stage, model, error_code: run.error_code, retry_count: run.retry_count, quota_released: run.quota_released, configuration: { brief: run.configuration.brief }, report: run.report, outcome: parsedOutcome?.success ? parsedOutcome.data : null, created_at: run.created_at, completed_at: run.completed_at, steps: steps.data ?? [], usage: { ...totals, budget_usd: Number(run.budget_usd) }, ...(budget_block ? { budget_block } : {}) };
+}
+
+/**
+ * Live progress for a run still working (WP-08): how many candidates discovery chose, the sources saved so far (title
+ * and domain only), and a time estimate from recent runs of the same mode. Any part that cannot be read is left out;
+ * progress never stops the page from loading.
+ */
+async function runProgress(supabase: Awaited<ReturnType<typeof createClient>>, userId: string, id: string, mode: unknown): Promise<RunProgress> {
+  const [discovery, sources, minutes] = await Promise.all([
+    supabase.from("research_stages").select("candidates:output->candidates").eq("run_id", id).eq("user_id", userId).eq("stage_key", "discovery").maybeSingle(),
+    supabase.from("research_evidence").select("title,url", { count: "exact" }).eq("run_id", id).eq("user_id", userId).order("retrieved_at", { ascending: false }).limit(PROGRESS_SOURCES),
+    typicalMinutes(typeof mode === "string" ? mode : "combined"),
+  ]);
+  const candidates = (discovery.data as { candidates?: unknown } | null)?.candidates;
+  return {
+    candidates: Array.isArray(candidates) ? candidates.length : null,
+    sources: sources.error ? [] : (sources.data ?? []).map(progressSource).filter(source => source.title),
+    sourceCount: sources.error ? 0 : sources.count ?? sources.data?.length ?? 0,
+    estimateMinutes: minutes,
+  };
+}
+// Median duration of recent finished runs per mode, kept for ten minutes so polling does not repeat the query.
+const estimates = new Map<string, { at: number; minutes: number | null }>();
+async function typicalMinutes(mode: string): Promise<number | null> {
+  const cached = estimates.get(mode);
+  if (cached && Date.now() - cached.at < 600_000) return cached.minutes;
+  try {
+    const since = new Date(Date.now() - 30 * 86_400_000).toISOString();
+    const { data, error } = await createAdminClient().from("research_runs").select("started_at,completed_at")
+      .eq("status", "completed").eq("configuration->brief->>discovery_mode", mode).gte("completed_at", since)
+      .order("completed_at", { ascending: false }).limit(200);
+    const minutes = error ? null : estimateMinutes(data ?? []);
+    estimates.set(mode, { at: Date.now(), minutes });
+    return minutes;
+  } catch {
+    return null;
+  }
 }
 
 // Which model a run uses: the recorded choice once the run has initialized, otherwise the configured primary.

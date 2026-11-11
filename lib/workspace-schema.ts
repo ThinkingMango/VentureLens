@@ -214,6 +214,8 @@ export type WorkspaceData = {
   onboarded: boolean;
   /** When the founder last cleared their idea memory (WP-04); null if never. */
   memoryResetAt?: string | null;
+  /** Whether a finished run sends a "report ready" email (WP-08). True when the preference cannot be read. */
+  notifyOnComplete?: boolean;
   access: ResearchAccess;
   projects: Project[];
   runs: ResearchRun[];

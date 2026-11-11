@@ -1,3 +1,4 @@
+import type { RunProgress } from "./research-progress";
 import type { WorkspaceOpportunity, ResearchBrief } from "@/lib/workspace-schema";
 import type { Mode, ResearchOutcome } from "@/lib/research-core";
 export type ResearchReport = {
@@ -38,5 +39,7 @@ export type ResearchDetail = {
   created_at: string;
   completed_at: string | null;
   steps: { stage_key: string; created_at: string }[];
+  /** Live progress while the run is pending or running (WP-08); absent once it has finished. */
+  progress?: RunProgress;
   usage: { estimated_usd: number; committed_usd: number; uncertain_calls: number; input_tokens: number; output_tokens: number; search_requests: number; budget_usd: number };
 };
