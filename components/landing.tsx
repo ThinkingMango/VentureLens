@@ -168,7 +168,7 @@ function RunLedger() {
   const { opportunities } = useDemoContent();
   const kept = ledger.filter((row) => row.kind === "kept").length;
   return (
-    <div className="surface overflow-hidden">
+    <div className="surface ledger-surface overflow-hidden">
       <div
         aria-hidden="true"
         className="ledger-head hidden border-b bg-background/50 px-6 py-3 text-xs leading-snug text-muted-foreground lg:grid"
@@ -189,13 +189,13 @@ function RunLedger() {
           return (
             <li
               key={index}
-              className="ledger-row border-b px-5 py-4 last:border-b-0 sm:px-6"
+              className="ledger-row border-b px-5 py-5 last:border-b-0 sm:px-6 lg:py-4"
             >
               <div className="min-w-0">
                 {opportunity ? (
                   <Link
                     href={`/demo/opportunities/${opportunity.id}`}
-                    className="font-medium leading-snug text-foreground underline decoration-primary/30 underline-offset-4 hover:decoration-primary"
+                    className="-my-3 inline-block py-3 font-medium leading-snug text-foreground underline decoration-primary/30 underline-offset-4 hover:decoration-primary"
                   >
                     {title}
                   </Link>
@@ -203,7 +203,7 @@ function RunLedger() {
                   <s className="ledger-struck leading-snug">{title}</s>
                 )}
                 {/* Phones: one track of four gates and a plain-language status. */}
-                <div className="mt-3 flex flex-col gap-2 lg:hidden">
+                <div className="mt-4 flex flex-col gap-3 lg:hidden">
                   <span className="ledger-track" aria-hidden="true">
                     {gates.map((gate, gateIndex) => (
                       <span
@@ -218,20 +218,18 @@ function RunLedger() {
                       />
                     ))}
                   </span>
-                  <p className="text-sm leading-snug">
-                    {opportunity ? (
-                      <span className="text-primary">
-                        {copy("In the report with a score of {score}", { score: opportunity.score })}
+                  {opportunity ? (
+                    <p className="text-sm text-primary">
+                      {copy("In the report with a score of {score}", { score: opportunity.score })}
+                    </p>
+                  ) : (
+                    <p className="flex flex-col gap-1 text-sm leading-relaxed">
+                      <span className="text-muted-foreground">
+                        {copy("Dropped at: {gate}", { gate: copy(gates[stoppedAt]) })}
                       </span>
-                    ) : (
-                      <span className="text-warm-ink">
-                        {copy("Dropped at “{gate}”: {reason}", {
-                          gate: copy(gates[stoppedAt]),
-                          reason: reason ?? "",
-                        })}
-                      </span>
-                    )}
-                  </p>
+                      <span className="text-warm-ink">{reason}</span>
+                    </p>
+                  )}
                 </div>
               </div>
               {/* From 1024px: one column per gate. Each cell names its gate for screen readers. */}

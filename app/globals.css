@@ -589,6 +589,16 @@ main[id] {
     font-size: 2.85rem;
   }
 
+  /* On phones the two landing cards run edge to edge instead of nesting their padding inside the page gutter,
+     which gives their text about 40px more width. 1.25rem matches the page's px-5 gutter. */
+  .hero-layout > .hero-preview,
+  .ledger-surface {
+    margin-inline: -1.25rem;
+    border-inline: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
   .page-heading {
     font-size: 2.15rem;
   }

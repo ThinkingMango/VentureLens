@@ -36,7 +36,7 @@ export function EvidencePreview() {
             <span>{copy("Demo score")}</span>
           </div>
           <div
-            className="grid gap-2 p-3 sm:grid-cols-2 sm:gap-3 sm:p-4 lg:grid-cols-1"
+            className="grid gap-2.5 px-5 py-4 sm:grid-cols-2 sm:gap-3 sm:p-4 lg:grid-cols-1"
             role="group"
             aria-label={copy("Opportunities")}
           >
@@ -101,8 +101,9 @@ export function EvidencePreview() {
           </dl>
           <dl className="grid grid-cols-3 gap-4">
             {scoreLabels.slice(0, 3).map((label, i) => (
-              <div key={label}>
-                <dt className="mb-2 text-xs text-muted-foreground">
+              <div key={label} className="flex flex-col">
+                {/* flex-1 keeps the three values on one line when a label wraps on narrow phones. */}
+                <dt className="mb-2 flex-1 text-xs text-muted-foreground">
                   {copy(label)}
                 </dt>
                 <dd className="terminal-number text-lg">
