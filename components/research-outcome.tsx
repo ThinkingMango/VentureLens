@@ -5,23 +5,11 @@ import { useCopy, type Copy } from "@/i18n/use-copy";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { CandidateDiagnosis, GateReason, ResearchOutcome, SuggestionKey } from "@/lib/research-core";
+import { reasonText } from "@/lib/outcome-labels";
 
 // Why a run's candidates did or did not become opportunities (spec WP-06). Reasons and suggestions are fixed codes,
 // translated here; candidate titles and buyers are the run's own text, in the report language.
 
-function reasonText(copy: Copy, reason: GateReason) {
-  switch (reason) {
-    case "SEARCH_FAILED": return copy("The web search for this idea returned no page we could read.");
-    case "NO_SOURCES": return copy("No source we could read supported this idea.");
-    case "CONTRADICTED": return copy("The relevant sources we found argue against this idea.");
-    case "SINGLE_DOMAIN": return copy("Support came from only one publisher. The evidence rules need at least two independent ones.");
-    case "VENDOR_ONLY": return copy("Support came only from companies selling a solution, or did not show buyer pain or demand. The evidence rules need at least one independent source that does.");
-    case "REVIEW_REJECTED": return copy("It passed the evidence rules, but the adversarial review found the conclusion unsupported.");
-    case "NOT_EVALUATED": return copy("It passed the evidence rules but was not evaluated in this run.");
-    case "ALL_DUPLICATES": return copy("You have already seen this idea in an earlier run, so it was not researched again.");
-    case "PASSED": return copy("Passed the evidence rules and the review.");
-  }
-}
 function suggestionText(copy: Copy, key: SuggestionKey) {
   switch (key) {
     case "TRY_MARKET_MODE": return copy("Most ideas were backed only by vendor pages. Try market-first mode, which starts from buyer pain and spending instead of your profile.");

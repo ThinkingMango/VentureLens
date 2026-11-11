@@ -13,6 +13,9 @@ import { ModelTag } from "@/components/model-tag";
 import { ReportRating } from "@/components/report-feedback";
 import { DeleteRunButton } from "@/components/library";
 import { canDeleteRun } from "@/lib/library-core";
+import { ExportButton } from "@/components/report-export";
+import { exportFileName, reportToMarkdown } from "@/lib/report-export";
+import { useLocale } from "next-intl";
 import { pollInterval, retrievalProgress } from "@/lib/research-progress";
 import { researchErrors, stageLabels } from "@/lib/research-core";
 import type { ResearchDetail } from "@/lib/research-types";
@@ -66,6 +69,7 @@ export function ResearchRunView({
 }) {
   const copy = useCopy();
   const format = useFormats();
+  const locale = useLocale();
   const { refresh } = useDemo();
   const [retrying, setRetrying] = useState(false);
   const [executionOpen, setExecutionOpen] = useState(false);
@@ -152,12 +156,29 @@ export function ResearchRunView({
             : "Progress reflects server records. Leaving this page does not stop the workflow.",
         )}
       >
-        {completed && (
-          <Button variant="outline" asChild>
-            <a href="#execution-details" onClick={() => setExecutionOpen(true)}>
-              {copy("Execution details")}
-            </a>
-          </Button>
+        {completed && data.report && (
+          <div className="flex shrink-0 flex-wrap gap-2">
+            <Button variant="outline" asChild>
+              <a href="#execution-details" onClick={() => setExecutionOpen(true)}>
+                {copy("Execution details")}
+              </a>
+            </Button>
+            <ExportButton
+              kind="report"
+              demo={false}
+              briefOption
+              printHref={`/research/${data.id}/print`}
+              markdown={(includeBrief) => {
+                const generatedAt = new Date();
+                const report = data.report!;
+                const text = reportToMarkdown(
+                  { id: data.id, created_at: data.created_at, completed_at: data.completed_at, report, outcome: data.outcome },
+                  { copy, locale, generatedAt, includeBrief, brief: data.configuration.brief },
+                );
+                return { fileName: exportFileName(includeBrief ? data.configuration.brief.name : copy("VentureLens research report"), generatedAt), text };
+              }}
+            />
+          </div>
         )}
       </PageHeader>
       <div className="flex flex-wrap items-center gap-2">

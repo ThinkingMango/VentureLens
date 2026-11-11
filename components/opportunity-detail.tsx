@@ -1,5 +1,6 @@
 "use client";
 import { useCopy, useFormats } from "@/i18n/use-copy";
+import { useLocale } from "next-intl";
 import Link from "@/components/workspace-link";
 import { useRef, useState } from "react";
 import { ArrowLeft, ArrowRight, Bookmark, BookOpen, ChevronDown, Link2 } from "lucide-react";
@@ -10,6 +11,8 @@ import { DemoNote, Confidence } from "@/components/shared";
 import { FlagButton, FlagProvider } from "@/components/report-feedback";
 import { SprintPanel, SprintStarter, useSprintActions } from "@/components/validation-sprint";
 import { ArchiveButton } from "@/components/library";
+import { ExportButton } from "@/components/report-export";
+import { buildOpportunityExport, exportFileName, opportunityMarkdown } from "@/lib/report-export";
 import { demoSprint, firstSteps, type Sprint } from "@/lib/sprint-core";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -33,7 +36,7 @@ type Copy = ReturnType<typeof useCopy>;
 
 /** A live opportunity page: the user's own research, read from its stored payload. */
 export function LiveOpportunityDetail({ opportunity, initialTab, sprint = null }: { opportunity: WorkspaceOpportunity; initialTab?: string; sprint?: Sprint | null }) {
-  return <OpportunityDetail view={liveOpportunityView(opportunity)} initialTab={initialTab} sprint={sprint} />;
+  return <OpportunityDetail view={liveOpportunityView(opportunity)} initialTab={initialTab} sprint={sprint} source={opportunity} />;
 }
 
 /** The demo opportunity page: the same component, fed by the fixed demo sample. */
@@ -83,8 +86,10 @@ function stanceLabel(copy: Copy, stance: NonNullable<ViewSource["stance"]>) {
 const checklist = firstSteps;
 
 /** `sprint`: the opportunity's validation sprint (WP-10), null when it has none; leave it out to hide sprints. */
-export function OpportunityDetail({ view, initialTab, sprint }: { view: OpportunityView; initialTab?: string; sprint?: Sprint | null }) {
+/** `source`: the stored opportunity, for export (WP-11); the demo has none and its export only explains itself. */
+export function OpportunityDetail({ view, initialTab, sprint, source }: { view: OpportunityView; initialTab?: string; sprint?: Sprint | null; source?: WorkspaceOpportunity }) {
   const copy = useCopy();
+  const locale = useLocale();
   const tabs = opportunityTabs(view);
   const [tab, setTab] = useState<OpportunityTabId>(() => resolveTab(initialTab, tabs));
   const [guideOpen, setGuideOpen] = useState(false);
@@ -147,6 +152,16 @@ export function OpportunityDetail({ view, initialTab, sprint }: { view: Opportun
               {isSaved ? copy("Saved opportunity") : copy("Save opportunity")}
             </Button>
             {view.kind === "live" && <ArchiveButton opportunity={{ id: view.id, title: view.title }} />}
+            <ExportButton
+              kind="opportunity"
+              demo={view.kind === "demo" || !source}
+              printHref={`/opportunities/${view.id}/print`}
+              markdown={() => {
+                const generatedAt = new Date();
+                const text = opportunityMarkdown(buildOpportunityExport(source as WorkspaceOpportunity, { copy, locale, generatedAt }));
+                return { fileName: exportFileName(view.title, generatedAt), text };
+              }}
+            />
           </div>
         </div>
         {view.kind === "demo" && (
