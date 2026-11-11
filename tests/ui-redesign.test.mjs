@@ -166,3 +166,51 @@ test("the landing page's claims about scoring match the engine", async () => {
   const base = css.slice(0, css.indexOf("@media (min-width: 1024px)"));
   assert.doesNotMatch(base, /\.ledger-head[^{]*\{[^}]*display:/);
 });
+
+test("the pricing page states only what the product and the refund rule actually do", () => {
+  const pricing = read("components/pricing.tsx");
+  const refunds = read("supabase/migrations/20261109150000_cap_failed_run_refunds.sql");
+  // Live research is open to every confirmed account, not only "authorized development accounts".
+  assert.doesNotMatch(pricing, /Authorized development accounts/);
+  // Nothing is gated by package, so the comparison lists no per-package features.
+  assert.doesNotMatch(pricing, /Everything in |features:/);
+  // The statement's "always returned" entry is a provider outage, which the refund trigger treats as our fault,
+  // and thin evidence is returned only within the per-account allowance.
+  assert.match(refunds, /'TRANSIENT_PROVIDER'/);
+  assert.match(refunds, /runs_refunded < max_refunds/);
+  assert.match(pricing, /a search provider was unavailable/);
+  assert.match(pricing, /up to a per-account limit/);
+  // Per-run prices are derived from price and runs, never typed in.
+  assert.match(pricing, /export const perRun = .*=> plan\.price \/ plan\.runs;/);
+  assert.doesNotMatch(pricing, /perCredit/);
+  // The demo billing page reuses the same comparison, kept as a card inside the workspace.
+  assert.match(read("components/billing.tsx"), /<PlanTable bleed=\{false\} \/>/);
+});
+
+test("public pages keep a call to action in reach on phones and share with a proper preview", () => {
+  const shell = read("components/public-shell.tsx");
+  const css = read("app/globals.css");
+  // The phone bar takes display from Tailwind only; unlayered CSS would override "lg:hidden" on desktop.
+  assert.match(shell, /className="mobile-cta flex gap-3 lg:hidden"/);
+  assert.doesNotMatch(css.match(/\.mobile-cta \{[^}]*\}/)[0], /display:/);
+  for (const page of ["components/landing.tsx", "components/pricing.tsx"]) {
+    const source = read(page);
+    assert.match(source, /data-cta-start/, page);
+    assert.match(source, /data-cta-end/, page);
+    // The demo is synthetic, so it is never called "live".
+    assert.doesNotMatch(source, /live demo/i, page);
+  }
+  assert.doesNotMatch(shell, /"Live demo"/);
+  // The menu follows the order of the landing page's sections.
+  assert.ok(shell.indexOf('"/#how-it-works"') < shell.indexOf('"/#whats-inside"'));
+  // The landing states run time with the same figure the run page shows.
+  assert.match(read("components/research-run.tsx"), /A full run usually takes 5–10 minutes\./);
+  assert.match(read("components/landing.tsx"), /a full run usually takes 5–10 minutes\./);
+  // Link previews: a share image and Open Graph / Twitter metadata.
+  assert.ok(readFileSync(new URL("../app/opengraph-image.png", import.meta.url)).length > 10_000);
+  const layout = read("app/layout.tsx");
+  assert.match(layout, /openGraph:/);
+  assert.match(layout, /summary_large_image/);
+  const en = JSON.parse(read("messages/en.json"));
+  assert.doesNotMatch(en.metadata.description, /manage your opportunity shortlist/);
+});

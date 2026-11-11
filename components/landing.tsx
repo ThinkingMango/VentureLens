@@ -169,6 +169,13 @@ function RunLedger() {
   const kept = ledger.filter((row) => row.kind === "kept").length;
   return (
     <div className="surface ledger-surface overflow-hidden">
+      <p className="border-b px-5 py-4 font-display text-xl leading-snug sm:px-6 md:text-2xl">
+        {copy("{proposed} ideas proposed. {dropped} dropped. {kept} in the report.", {
+          proposed: ledger.length,
+          dropped: ledger.length - kept,
+          kept,
+        })}
+      </p>
       <div
         aria-hidden="true"
         className="ledger-head hidden border-b bg-background/50 px-6 py-3 text-xs leading-snug text-muted-foreground lg:grid"
@@ -268,10 +275,7 @@ function RunLedger() {
         })}
       </ol>
       <p className="border-t bg-background/50 px-5 py-4 text-sm text-muted-foreground sm:px-6">
-        {copy(
-          "{proposed} ideas proposed, {dropped} dropped, {kept} in the report. Illustrative run with synthetic data; the four that survive are the demo’s opportunities.",
-          { proposed: ledger.length, dropped: ledger.length - kept, kept },
-        )}
+        {copy("Illustrative run with synthetic data; the four that survive are the demo’s opportunities.")}
       </p>
     </div>
   );
@@ -293,10 +297,10 @@ export function Landing() {
                   "Start from your experience, or from an idea you already have. VentureLens searches the web for independent evidence, drops what it can’t support, and gives you a scored report with a plan to test what’s left.",
                 )}
               </p>
-              <div className="hero-actions flex flex-wrap gap-3">
+              <div className="hero-actions flex flex-wrap gap-3" data-cta-start>
                 <Button asChild size="lg">
                   <Link href="/demo/dashboard">
-                    {copy("Explore the live demo")}
+                    {copy("Try the demo")}
                     <ArrowRight />
                   </Link>
                 </Button>
@@ -305,7 +309,9 @@ export function Landing() {
                 </Button>
               </div>
               <p className="max-w-[34rem] text-sm text-muted-foreground">
-                {copy("The demo needs no account. Every confirmed account includes one free research run.")}
+                {copy(
+                  "The demo needs no account. Every confirmed account includes one free research run, and a full run usually takes 5–10 minutes.",
+                )}
               </p>
             </div>
             <EvidencePreview />
@@ -431,7 +437,7 @@ export function Landing() {
           </div>
         </section>
 
-        <section className="border-t bg-card">
+        <section className="border-t bg-card" data-cta-end>
           <div className="mx-auto flex max-w-7xl flex-col gap-8 px-5 py-16 md:px-8 md:py-24 lg:flex-row lg:items-end lg:justify-between">
             <div className="flex max-w-3xl flex-col gap-4">
               <h2 className="landing-heading">{copy("Your next chapter deserves a clearer lens.")}</h2>
@@ -449,7 +455,7 @@ export function Landing() {
                 </Link>
               </Button>
               <Button asChild variant="outline" size="lg">
-                <Link href="/demo/dashboard">{copy("Explore the live demo")}</Link>
+                <Link href="/demo/dashboard">{copy("Try the demo")}</Link>
               </Button>
             </div>
           </div>

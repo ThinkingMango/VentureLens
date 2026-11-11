@@ -518,6 +518,33 @@ html:lang(zh-Hant) :is(.landing-title, .landing-heading) {
   }
 }
 
+/* Pricing: the plan comparison and the example credit statement. These set columns only, never display: the rows
+   take "grid" from Tailwind, so the plan header's "hidden md:grid" keeps working. The statement header shows at every
+   size, because its numbers need their labels on phones too. */
+.statement-row {
+  grid-template-columns: minmax(0, 1fr) 3.25rem 3.25rem;
+  column-gap: 1rem;
+  align-items: start;
+}
+
+/* The phone call-to-action bar (PublicShell). Display comes from Tailwind; this only positions and slides it. */
+.mobile-cta {
+  position: fixed;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 30;
+  padding: 0.75rem 1.25rem calc(0.75rem + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--border);
+  background: color-mix(in srgb, var(--card) 94%, transparent);
+  backdrop-filter: blur(8px);
+  transform: translateY(100%);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.mobile-cta[data-visible="true"] {
+  transform: translateY(0);
+}
+
 .faq-item + .faq-item {
   border-top: 1px solid var(--border);
 }
@@ -531,6 +558,23 @@ html:lang(zh-Hant) :is(.landing-title, .landing-heading) {
 }
 
 @media (min-width: 768px) {
+  .plan-row {
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 0.9fr);
+    column-gap: 1.5rem;
+    align-items: center;
+  }
+
+  /* On phones the package name spans the row above its three figures; from 768px it is the first column. */
+  .plan-row > :first-child {
+    grid-column: auto;
+  }
+
+  .statement-row {
+    grid-template-columns: minmax(0, 1fr) 6rem 6rem;
+    column-gap: 1.5rem;
+    align-items: center;
+  }
+
   .hero-layout {
     grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
     grid-template-areas: "title title" "copy preview";
@@ -592,7 +636,8 @@ main[id] {
   /* On phones the two landing cards run edge to edge instead of nesting their padding inside the page gutter,
      which gives their text about 40px more width. 1.25rem matches the page's px-5 gutter. */
   .hero-layout > .hero-preview,
-  .ledger-surface {
+  .ledger-surface,
+  .bleed-on-phone {
     margin-inline: -1.25rem;
     border-inline: 0;
     border-radius: 0;

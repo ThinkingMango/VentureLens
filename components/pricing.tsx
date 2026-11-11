@@ -2,226 +2,307 @@
 import { useCopy, useFormats } from "@/i18n/use-copy";
 
 import Link from "next/link";
-import { Check, ArrowRight, ArrowUpRight, Sparkles, ShieldCheck } from "lucide-react";
-import { toast } from "sonner";
+import { ArrowRight, Plus } from "lucide-react";
 import { PublicShell } from "@/components/public-shell";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent,
-  CardFooter,
-} from "@/components/ui/card";
+import { cn } from "@/lib/utils";
+
+// Planned packages. Nothing is gated by package: every account gets the whole product, so the only real differences
+// are how many runs a package holds, whether it renews, and what one run costs. The per-run price is derived, never typed.
 export const plans = [
-  {
-    name: "Opportunity Sprint",
-    price: 29,
-    period: "one-time",
-    description: "For a focused first exploration.",
-    credits: "5 research credits",
-    perCredit: 5.8,
-    features: [
-      "Personalized founder profile",
-      "Structured opportunity research",
-      "Buyer, evidence & risk breakdowns",
-      "Validation planning",
-    ],
-    popular: false,
-  },
-  {
-    name: "Explorer",
-    price: 39,
-    period: "/ month",
-    description: "For founders finding their direction.",
-    credits: "10 research credits / month",
-    perCredit: 3.9,
-    features: [
-      "Everything in Opportunity Sprint",
-      "Ongoing opportunity exploration",
-      "Save and compare opportunities",
-      "Monthly credit refresh",
-    ],
-    popular: true,
-  },
-  {
-    name: "Builder",
-    price: 79,
-    period: "/ month",
-    description: "For a more active research practice.",
-    credits: "30 research credits / month",
-    perCredit: 2.63,
-    features: [
-      "Everything in Explorer",
-      "More room to explore niches",
-      "Expanded research capacity",
-      "Priority support (planned)",
-    ],
-    popular: false,
-  },
-];
-export function PricingCards() {
+  { name: "Opportunity Sprint", price: 29, runs: 5, monthly: false, description: "For a focused first exploration." },
+  { name: "Explorer", price: 39, runs: 10, monthly: true, description: "For founders finding their direction." },
+  { name: "Builder", price: 79, runs: 30, monthly: true, description: "For a more active research practice." },
+] as const;
+
+export const perRun = (plan: (typeof plans)[number]) => plan.price / plan.runs;
+
+/**
+ * The planned packages as one comparison: price, runs and price per run. Used on /pricing and the demo billing page.
+ * Each row is a definition list, so its labels are read out on every screen; the column header is visual only.
+ */
+export function PlanTable({ bleed = true }: { bleed?: boolean }) {
   const copy = useCopy();
   const format = useFormats();
+  const cheapest = Math.min(...plans.map(perRun));
   return (
-    <div className="grid gap-5 md:grid-cols-3">
-      {plans.map((p) => (
-        <Card
-          key={p.name}
-          className={
-            p.popular
-              ? "relative flex flex-col border-primary ring-2 ring-primary/15"
-              : "relative flex flex-col"
-          }
-        >
-          <CardHeader className="gap-3">
-            {p.popular && (
-              <Badge className="mb-1 w-fit rounded-md">
-                <Sparkles className="mr-1 size-3.5" />
-                {copy("Most flexible")}
-              </Badge>
-            )}
-            <CardTitle>{copy(p.name)}</CardTitle>
-            <CardDescription>{copy(p.description)}</CardDescription>
-            <p className="pt-3">
-              <strong className="text-4xl font-semibold tracking-tight">
-                {format.usd(p.price, 0)}
-              </strong>
-              <span className="ml-2 text-muted-foreground">
-                {copy(p.period)}
-              </span>
-            </p>
-            <p className="text-sm text-muted-foreground">
-              {copy("About {amount} per research run", { amount: format.usd(p.perCredit, 2) })}
-            </p>
-          </CardHeader>
-          <CardContent className="flex flex-1 flex-col gap-5">
-            <p className="font-medium text-primary">{copy(p.credits)}</p>
-            <ul className="flex flex-col gap-3">
-              {p.features.map((f) => (
-                <li
-                  key={f}
-                  className="flex items-start gap-2 text-sm text-muted-foreground"
+    // Public pages run it edge to edge on phones; inside the workspace it stays a card like its neighbours.
+    <div className={cn("surface overflow-hidden", bleed && "bleed-on-phone")}>
+      <div
+        aria-hidden="true"
+        className="plan-row hidden border-b bg-background/50 px-6 py-3 text-xs text-muted-foreground md:grid"
+      >
+        <span>{copy("Package")}</span>
+        <span>{copy("Price")}</span>
+        <span>{copy("Research runs")}</span>
+        <span className="text-right">{copy("About per run")}</span>
+      </div>
+      <ul aria-label={copy("Planned packages")}>
+        {plans.map((plan) => (
+          <li key={plan.name} className="plan-row grid grid-cols-3 gap-x-4 gap-y-5 border-b md:gap-y-0 px-5 py-6 last:border-b-0 sm:px-6">
+            <div className="col-span-3 flex flex-col gap-1">
+              <h3 className="text-lg font-semibold leading-snug">{copy(plan.name)}</h3>
+              <p className="text-sm text-muted-foreground">{copy(plan.description)}</p>
+            </div>
+            {/* Phones: each figure's label and value sit on rows shared across the three columns (subgrid), so the
+                values line up even when a label wraps. */}
+            <dl className="contents">
+              <div className="row-span-2 grid grid-rows-subgrid gap-1 md:row-span-1 md:flex md:flex-col">
+                <dt className="text-sm text-muted-foreground md:sr-only">{copy("Price")}</dt>
+                <dd>
+                  <span className="text-2xl font-semibold tabular-nums tracking-tight">{format.usd(plan.price, 0)}</span>
+                  <span className="block text-sm text-muted-foreground md:ml-1.5 md:inline">
+                    {plan.monthly ? copy("/ month") : copy("one-time")}
+                  </span>
+                </dd>
+              </div>
+              <div className="row-span-2 grid grid-rows-subgrid gap-1 md:row-span-1 md:flex md:flex-col">
+                <dt className="text-sm text-muted-foreground md:sr-only">{copy("Research runs")}</dt>
+                <dd className="tabular-nums">
+                  {plan.monthly
+                    ? copy("{count} a month", { count: plan.runs })
+                    : copy("{count} runs", { count: plan.runs })}
+                </dd>
+              </div>
+              <div className="row-span-2 grid grid-rows-subgrid gap-1 md:row-span-1 md:flex md:flex-col">
+                <dt className="text-sm text-muted-foreground md:sr-only">{copy("About per run")}</dt>
+                <dd
+                  className={cn(
+                    "terminal-number font-display text-3xl leading-none md:text-right md:text-4xl",
+                    perRun(plan) === cheapest ? "text-primary" : "text-foreground",
+                  )}
                 >
-                  <Check className="mt-0.5 size-4 shrink-0 text-primary" />
-                  {copy(f)}
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-          <CardFooter>
-            <Button
-              variant={p.popular ? "default" : "outline"}
-              className="w-full"
-              onClick={() =>
-                toast.info(copy("Planned package · Checkout opens after beta"), {
-                  description: copy(
-                    "Stripe is not connected. No purchase, subscription, or charge will be created.",
-                  ),
-                })
-              }
-            >
-              {copy("Preview {plan}", { plan: copy(p.name) })}
-              <ArrowRight />
-            </Button>
-          </CardFooter>
-        </Card>
-      ))}
+                  {format.usd(perRun(plan), 2)}
+                </dd>
+              </div>
+            </dl>
+          </li>
+        ))}
+      </ul>
+      <p className="border-t bg-background/50 px-5 py-4 text-sm text-muted-foreground sm:px-6">
+        {copy(
+          "Every package is planned to include the whole product: founder profile, finding opportunities or checking your own idea, reports with linked sources, your library and exports, and validation sprints.",
+        )}
+      </p>
     </div>
   );
 }
+
+type StatementEntry = { title: string; detail: string; change: number; kind: "added" | "report" | "stopped" | "returned" };
+
+// An example statement that walks through the refund rule in public.release_failed_research_run
+// (supabase/migrations/20261109150000_cap_failed_run_refunds.sql).
+const statement: StatementEntry[] = [
+  { title: "Opportunity Sprint added", detail: "Planned package", change: 5, kind: "added" },
+  {
+    title: "Research run: proposal tools for agencies",
+    detail: "Report saved with four opportunities.",
+    change: -1,
+    kind: "report",
+  },
+  {
+    title: "Research run: bookkeeping for freelancers",
+    detail: "Stopped: the evidence was too thin for a report.",
+    change: -1,
+    kind: "stopped",
+  },
+  {
+    title: "Credit returned",
+    detail: "Thin evidence is returned up to a per-account limit. Past it, the run keeps its credit, and retrying it is free.",
+    change: 1,
+    kind: "returned",
+  },
+  {
+    title: "Idea check: a lease-review assistant",
+    detail: "Stopped: a search provider was unavailable.",
+    change: -1,
+    kind: "stopped",
+  },
+  {
+    title: "Credit returned",
+    detail: "A failure on our side is always returned.",
+    change: 1,
+    kind: "returned",
+  },
+];
+
+function CreditStatement() {
+  const copy = useCopy();
+  let balance = 0;
+  const rows = statement.map((entry) => ({ ...entry, balance: (balance += entry.change) }));
+  return (
+    <div className="surface bleed-on-phone overflow-hidden">
+      <div
+        aria-hidden="true"
+        className="statement-row grid border-b bg-background/50 px-5 py-3 text-xs text-muted-foreground sm:px-6"
+      >
+        <span>{copy("Entry")}</span>
+        <span className="text-right">{copy("Credits")}</span>
+        <span className="text-right">{copy("Balance")}</span>
+      </div>
+      <ol aria-label={copy("An example credit statement")}>
+        {rows.map((row, index) => (
+          <li key={index} className="statement-row grid border-b px-5 py-5 last:border-b-0 sm:px-6 md:py-4">
+            <div className="flex min-w-0 flex-col gap-1">
+              <span className="font-medium leading-snug">{copy(row.title)}</span>
+              <span
+                className={cn(
+                  "text-sm leading-relaxed",
+                  row.kind === "stopped" ? "text-warm-ink" : "text-muted-foreground",
+                )}
+              >
+                {copy(row.detail)}
+              </span>
+            </div>
+            <span
+              className={cn(
+                "terminal-number text-lg md:text-right",
+                row.change > 0 ? "text-primary" : "text-muted-foreground",
+              )}
+            >
+              <span className="sr-only">{copy("Credits")}: </span>
+              {row.change > 0 ? `+${row.change}` : `−${Math.abs(row.change)}`}
+            </span>
+            <span className="terminal-number text-lg text-right">
+              <span className="sr-only">{copy("Balance")}: </span>
+              {row.balance}
+            </span>
+          </li>
+        ))}
+      </ol>
+      <p className="border-t bg-background/50 px-5 py-4 text-sm text-muted-foreground sm:px-6">
+        {copy(
+          "Example statement. Two runs stopped and both credits came back, so five credits bought one report and leave four.",
+        )}
+      </p>
+    </div>
+  );
+}
+
+const faqs = [
+  {
+    q: "What does a research credit cover?",
+    a: "One credit is one research run, whether VentureLens finds opportunities for you or checks an idea you already have. The demo does not consume credits or call a live research provider.",
+  },
+  {
+    q: "Are the opportunities verified?",
+    a: "Live reports link every claim to the web pages behind it, with the date each was read, and drop ideas without independent evidence. That is evidence to test, not proof of demand: validate findings with real buyers. The demo uses synthetic data.",
+  },
+  {
+    q: "Will these prices change?",
+    a: "These packages are the working baseline while we measure real cost per completed report. Final prices, credit rollover, and refund terms will be published before checkout opens.",
+  },
+  {
+    q: "Can I cancel a subscription?",
+    a: "Recurring packages are illustrative. Subscription creation, renewal, cancellation, invoices, and billing management will require a future Stripe integration.",
+  },
+  {
+    q: "How do I get access to live research now?",
+    a: "Create a free account and confirm your email. One research run is granted automatically and shown on the New research page; complete your founder profile and start a brief to use it.",
+  },
+];
+
 export function Pricing() {
   const copy = useCopy();
   return (
     <PublicShell>
-      <main id="main-content">
-        <section className="hero-bg">
-          <div className="mx-auto flex max-w-6xl flex-col items-center gap-5 px-5 pb-12 pt-16 text-center md:px-8 md:pt-20">
-            <Badge variant="secondary" className="gap-1.5">
-              <ShieldCheck className="size-3.5" />
-              {copy("Planned pricing · No payments collected during beta")}
-            </Badge>
-            <h1 className="text-balance text-4xl font-semibold md:text-5xl">
-              {copy("Invest in a clearer starting point.")}
-            </h1>
-            <p className="max-w-xl text-base text-muted-foreground">
-              {copy(
-                "One credit is one full research run: discovery, web retrieval, classification, scoring, adversarial review, and a saved report. Pick a focused sprint or an ongoing research habit.",
-              )}
+      <main id="main-content" tabIndex={-1}>
+        <section className="mx-auto max-w-7xl px-5 pb-16 pt-12 md:px-8 md:pb-20 md:pt-20">
+          <div className="flex flex-col gap-8 md:gap-10">
+            <h1 className="landing-title max-w-5xl">{copy("Your first research run is free.")}</h1>
+            <div className="grid gap-6 md:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] md:items-end md:gap-16">
+              <p className="max-w-[36rem] text-pretty text-lg leading-relaxed text-muted-foreground">
+                {copy(
+                  "Every confirmed account gets one full research run: discovery, web evidence, scoring, adversarial review and a saved report. Paid credits are planned but not on sale yet, so nothing on this page can charge you.",
+                )}
+              </p>
+              <div className="hero-actions flex flex-wrap gap-3 md:justify-end" data-cta-start>
+                <Button asChild size="lg">
+                  <Link href="/signup">
+                    {copy("Create a free account")}
+                    <ArrowRight />
+                  </Link>
+                </Button>
+                <Button asChild variant="outline" size="lg">
+                  <Link href="/demo/dashboard">{copy("Try the demo")}</Link>
+                </Button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="packages" className="mx-auto max-w-7xl px-5 md:px-8">
+          <div className="landing-rule flex flex-col gap-10 py-16 md:py-20">
+            <div className="grid gap-4 lg:grid-cols-[1.1fr_1fr] lg:items-end lg:gap-16">
+              <h2 className="landing-heading">{copy("Planned packages")}</h2>
+              <p className="max-w-xl text-pretty leading-relaxed text-muted-foreground">
+                {copy(
+                  "One credit is one research run. Nothing is held back for bigger packages; they differ only in how many runs you get and what each one costs.",
+                )}
+              </p>
+            </div>
+            <PlanTable />
+            <p className="-mt-4 text-sm text-muted-foreground">
+              {copy("Illustrative packages in USD. Checkout and subscriptions are not connected.")}
             </p>
           </div>
         </section>
-        <div className="mx-auto flex max-w-6xl flex-col gap-12 px-5 pb-20 md:px-8">
-          <PricingCards />
-          <section className="grid gap-5 md:grid-cols-3">
-            {[
-              {
-                title: "Failed runs are returned",
-                text: "If a run fails on our side, or stops before any paid request, your run is always returned. If retrieval fails, the model output is rejected, or the evidence is too thin to support a report, your run is also returned, up to a limit per account that prevents abuse. The same rule will apply to paid credits.",
-              },
-              {
-                title: "Your first run is free",
-                text: "Every confirmed account receives one free research run, and the complete demo workspace needs no account or card.",
-              },
-              {
-                title: "Prices may change before launch",
-                text: "These packages are the working baseline while we measure real cost per completed report. Final prices, credit rollover, and refund terms will be published before checkout opens.",
-              },
-            ].map((item) => (
-              <article key={item.title} className="surface flex flex-col gap-2 p-6">
-                <h2 className="font-semibold">{copy(item.title)}</h2>
-                <p className="text-sm leading-relaxed text-muted-foreground">{copy(item.text)}</p>
-              </article>
-            ))}
-          </section>
-          <section className="mx-auto flex w-full max-w-3xl flex-col gap-5">
-            <h2 className="text-2xl font-semibold">
-              {copy("A few things worth knowing")}
-            </h2>
-            {[
-              {
-                q: "What does a research credit cover?",
-                a: "The planned model is one credit per standard research run. The demo does not consume credits or call a live research provider.",
-              },
-              {
-                q: "Are the opportunities verified?",
-                a: "Demo reports use synthetic data. Authorized development accounts can run evidence-driven research with original links and retrieval dates. Neither mode guarantees buyer demand; validate findings with customers.",
-              },
-              {
-                q: "Can I cancel a subscription?",
-                a: "Recurring packages are illustrative. Subscription creation, renewal, cancellation, invoices, and billing management will require a future Stripe integration.",
-              },
-              {
-                q: "How do I get access to live research now?",
-                a: "Create a free account and confirm your email. One research run is granted automatically and shown on the New research page; complete your founder profile and start a brief to use it.",
-              },
-            ].map((f) => (
-              <details key={f.q} className="surface group p-5">
-                <summary className="flex cursor-pointer items-center justify-between gap-4 font-medium">
-                  {copy(f.q)}
-                  <ArrowRight className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-90" />
-                </summary>
-                <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{copy(f.a)}</p>
-              </details>
-            ))}
-          </section>
-          <div className="flex flex-wrap justify-center gap-3">
-            <Button asChild>
-              <Link href="/demo/dashboard">
-                {copy("Try the demo workspace")}
-                <ArrowRight />
-              </Link>
-            </Button>
-            <Button asChild variant="outline">
-              <Link href="/signup">
-                {copy("Create a free account")}
-                <ArrowUpRight />
-              </Link>
-            </Button>
+
+        <section id="credits" className="border-y bg-card">
+          <div className="mx-auto flex max-w-7xl flex-col gap-10 px-5 py-16 md:px-8 md:py-24">
+            <div className="grid gap-4 lg:grid-cols-[1.1fr_1fr] lg:items-end lg:gap-16">
+              <h2 className="landing-heading">{copy("You don’t pay for our failures.")}</h2>
+              <p className="max-w-xl text-pretty leading-relaxed text-muted-foreground">
+                {copy(
+                  "Failures on our side always return the credit. When the evidence is too thin for a report, the credit also returns, up to a per-account limit that prevents abuse. Your free run works this way today, and paid credits will too.",
+                )}
+              </p>
+            </div>
+            <CreditStatement />
           </div>
-        </div>
+        </section>
+
+        <section id="faq" className="mx-auto max-w-7xl px-5 md:px-8">
+          <div className="grid gap-8 py-16 md:grid-cols-[0.8fr_1.2fr] md:gap-16 md:py-24">
+            <h2 className="landing-heading">{copy("A few things worth knowing")}</h2>
+            <div className="border-y">
+              {faqs.map((faq) => (
+                <details key={faq.q} className="faq-item group">
+                  <summary className="flex min-h-11 items-center justify-between gap-4 py-4 font-medium">
+                    {copy(faq.q)}
+                    <Plus
+                      aria-hidden="true"
+                      className="size-4 shrink-0 text-primary transition-transform group-open:rotate-45"
+                    />
+                  </summary>
+                  <p className="max-w-2xl pb-5 leading-relaxed text-muted-foreground">{copy(faq.a)}</p>
+                </details>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="border-t bg-card" data-cta-end>
+          <div className="mx-auto flex max-w-7xl flex-col gap-8 px-5 py-16 md:px-8 md:py-24 lg:flex-row lg:items-end lg:justify-between">
+            <div className="flex max-w-3xl flex-col gap-4">
+              <h2 className="landing-heading">{copy("Start with the free run. Decide about credits later.")}</h2>
+              <p className="max-w-xl text-pretty text-muted-foreground">
+                {copy("No card, no subscription. The demo needs no account at all.")}
+              </p>
+            </div>
+            <div className="hero-actions flex flex-wrap gap-3 lg:shrink-0">
+              <Button asChild size="lg">
+                <Link href="/signup">
+                  {copy("Create a free account")}
+                  <ArrowRight />
+                </Link>
+              </Button>
+              <Button asChild variant="outline" size="lg">
+                <Link href="/demo/dashboard">{copy("Try the demo")}</Link>
+              </Button>
+            </div>
+          </div>
+        </section>
       </main>
     </PublicShell>
   );
