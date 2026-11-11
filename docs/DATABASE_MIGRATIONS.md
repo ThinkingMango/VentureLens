@@ -48,7 +48,11 @@ After this change `supabase migration list` shows local and remote in sync, and 
 
 ## Written but not yet applied
 
-None. When a pull request adds a migration, list it here until it is applied, and apply it only with the owner's approval. If `apply_migration` assigns a different version, rename the file to that version before merging. Merging to `main` can apply a migration to production: the Supabase integration applied `20261109150000`, `20261109160000`, `20261110120000`, `20261110130000`, `20261110140000`, `20261110150000`, `20261110160000`, `20261110170000` and `20261110180000` that way.
+| Version | Name | File | Pull request | What it does |
+| --- | --- | --- | --- | --- |
+| `20261111120000` | `validation_sprints` | `supabase/migrations/20261111120000_validation_sprints.sql` | WP-10 | New tables `validation_sprints` and `validation_tasks` (RLS enabled and forced; composite foreign keys to `opportunities (id, user_id)` and `validation_sprints (id, user_id)`, cascading on delete; select, insert and own-field updates for `authenticated`, plus task delete; nothing for `anon`). One active sprint per opportunity per founder (partial unique index); at most 50 tasks a sprint (trigger). New function `start_validation_sprint(uuid, integer, text[])`, security invoker, executable by `authenticated` only. No existing table changes; `saved_opportunities.completed_tasks` is read, never rewritten. |
+
+When a pull request adds a migration, list it here until it is applied, and apply it only with the owner's approval. If `apply_migration` assigns a different version, rename the file to that version before merging. Merging to `main` can apply a migration to production: the Supabase integration applied `20261109150000`, `20261109160000`, `20261110120000`, `20261110130000`, `20261110140000`, `20261110150000`, `20261110160000`, `20261110170000` and `20261110180000` that way.
 
 ## Rules going forward
 

@@ -22,10 +22,18 @@ import { OpportunityCard } from "@/components/opportunity-card";
 import { ScoreChart } from "@/components/score-chart";
 import { useDemoContent } from "@/i18n/demo";
 import { useDemo } from "@/components/demo-provider";
+import { ActiveSprintCard } from "@/components/active-sprint-card";
+import { demoSprint, firstSteps, summarizeSprint } from "@/lib/sprint-core";
 export function DemoDashboard() {
   const copy = useCopy();
-  const { opportunities } = useDemoContent();
+  const { opportunities, report } = useDemoContent();
   const { profile, saved, run } = useDemo();
+  // The demo's one fixed example sprint (WP-10), the same one its first opportunity page shows.
+  const first = opportunities[0];
+  const sprintSummary = summarizeSprint(
+    demoSprint(first.id, [...firstSteps.map((title) => copy(title)), report(first.id).firstTest], ""),
+    first.title,
+  );
   return (
     <>
       <PageHeader
@@ -50,6 +58,7 @@ export function DemoDashboard() {
           </Button>
         </div>
       </PageHeader>
+      <ActiveSprintCard sprint={sprintSummary} />
       <div>
         <section
           aria-label={copy("Workspace statistics")}

@@ -18,6 +18,9 @@ export const feedback: Record<string, string> = {
     "Your workspace could not be loaded. Please try again.",
   SAVE_FAILED: "Your change could not be saved. Please try again.",
   ALREADY_FLAGGED: "You already flagged this.",
+  SPRINT_CLOSED: "This sprint has ended.",
+  SPRINT_ACTIVE: "This opportunity already has an active sprint.",
+  TOO_MANY_TASKS: "A sprint can hold 50 tasks.",
   STATUS_UNAVAILABLE:
     "Research status could not refresh. Showing the last server record.",
   NETWORK_ERROR:

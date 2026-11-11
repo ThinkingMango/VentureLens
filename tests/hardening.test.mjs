@@ -46,6 +46,7 @@ function workspaceModule(rows) {
   const module = loadModule("../lib/workspace.ts", {
     "server-only": {}, "react": { cache: fn => fn }, "next/navigation": { redirect: () => { throw new Error("redirect"); } },
     "@/lib/supabase/server": { createClient: async () => ({ from }) }, "@/lib/workspace-schema": workspaceSchema,
+    "@/lib/sprints": { readActiveSprints: async () => [] },
   });
   return { module, supabase: { from } };
 }
