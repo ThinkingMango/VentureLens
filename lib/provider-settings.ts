@@ -8,7 +8,7 @@ import {
   RESEARCH_SETTINGS_KEY,
   assertBudgetFits,
   assertProvidersConfigured,
-  providerSettingsSchema,
+  researchSettingsSchema,
   readStoredProviderSettings,
   type ProviderAvailability,
   type ProviderSettingsResponse,
@@ -38,12 +38,15 @@ export async function administratorSettings(user: User): Promise<ProviderSetting
 }
 
 export async function saveProviderSettings(actorId: string, input: unknown): Promise<ProviderSettingsResponse> {
-  const settings = providerSettingsSchema.parse(input);
+  const parsed = researchSettingsSchema.parse(input);
   const client = createAdminClient();
   // Re-check the actor against the auth server; the session cookie alone is not trusted for writes.
   const current = await client.auth.admin.getUserById(actorId);
   if (current.error) throw new Error("SETTINGS_UNAVAILABLE");
   if (!isAdministrator(current.data.user)) throw new Error("ADMIN_REQUIRED");
+  // A save without a source policy (an API caller that predates it) keeps the stored one rather than resetting it.
+  const sources = parsed.sources ?? await researchProviderSettings().then(saved => saved.sources, () => undefined);
+  const settings = { ...parsed, ...(sources ? { sources } : {}) };
   const providers = providerAvailability();
   assertProvidersConfigured(settings, providers);
   assertBudgetFits(settings);
