@@ -85,7 +85,7 @@ export function DemoDashboard() {
             },
             {
               label: "Top opportunity score",
-              value: "87",
+              value: String(Math.max(...opportunities.map((o) => o.score))),
               detail: "Out of 100 · illustrative",
               icon: Target,
             },

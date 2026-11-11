@@ -211,7 +211,7 @@ test("demo narratives are translated while IDs, scores, and source counts remain
   );
   assert.deepEqual(
     opportunities.map((item) => item.score),
-    [87, 83, 79, 76],
+    [84, 83, 79, 76],
   );
   for (const locale of locales) {
     const t = createTranslator({

@@ -22,7 +22,7 @@ export const opportunities: Opportunity[] = [
     description:
       "Turn discovery calls and past work into client-ready proposals for boutique agencies.",
     buyer: "Agency owners · 5–25 employees",
-    score: 87,
+    score: 84,
     confidence: "Higher",
     revenue: "$149–299",
     cost: "$35–70",
