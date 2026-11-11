@@ -51,7 +51,7 @@ const steps = [
   },
   {
     title: "Your unfair advantage",
-    description: "The experience that makes you different.",
+    description: "What you know, what you’ve seen and who you can reach that a newcomer can’t.",
     icon: BriefcaseBusiness,
     optional: false,
   },
@@ -69,7 +69,7 @@ const steps = [
   },
   {
     title: "Make it personal",
-    description: "Optional. What you care about and who you can reach, so ideas fit you better.",
+    description: "Optional. What you would enjoy working on for years, so ideas fit you better.",
     icon: Sparkles,
     optional: true,
   },
@@ -397,7 +397,7 @@ export function Onboarding({ editing = false }: { editing?: boolean }) {
                 />
                 <Field data-invalid={invalidField === "skills"}>
                   <FieldLabel htmlFor="skills">
-                    {copy("What skills or experiences can you build on?")}
+                    {copy("What experience can you build on?")}
                   </FieldLabel>
                   <textarea
                     id="skills"
@@ -416,7 +416,7 @@ export function Onboarding({ editing = false }: { editing?: boolean }) {
                   />
                   <p id="skills-help" className="text-sm text-muted-foreground">
                     {copy(
-                      "Think domain expertise, technical abilities, and access to potential buyers.",
+                      "Be specific: your role and seniority, the regions or markets you know, the decisions you have owned and the specialist know-how a newcomer would lack.",
                     )}
                   </p>
                 </Field>
@@ -453,6 +453,14 @@ export function Onboarding({ editing = false }: { editing?: boolean }) {
                     </div>
                   </div>
                 </MobileDisclosure>
+                <p className="text-sm text-muted-foreground">
+                  {copy(
+                    "Each idea is scored on how much your industry, experience, insider view and reach give you an edge. The three answers below are optional, but they move that score most.",
+                  )}
+                </p>
+                {textarea("pain_points", "Problems you’ve seen up close", "Costly workarounds, recurring failures or delays you have watched customers, suppliers, colleagues or an industry put up with.", 500)}
+                {textarea("distribution", "Buyers, networks or communities you can reach", "For example former clients, suppliers and partners, peers in a professional body, or a newsletter. Reaching buyers directly is a real advantage.", 500)}
+                {optionalSelect("strength", "Your main strength", strengthOptions)}
               </>
             )}
             {step === 2 && (
@@ -523,9 +531,6 @@ export function Onboarding({ editing = false }: { editing?: boolean }) {
                     );
                   })}
                 </div>
-                {textarea("pain_points", "Problems you’ve seen up close", "Frustrations you have watched customers, colleagues or an industry put up with.", 500)}
-                {textarea("distribution", "Audiences, networks or communities you can reach", "For example a newsletter, former clients, or a professional community. Reaching buyers directly is a real advantage.", 500)}
-                {optionalSelect("strength", "Your main strength", strengthOptions)}
               </>
             )}
             {step === 5 && (

@@ -124,6 +124,7 @@ export const sectorCommunityHints: Record<string, string> = {
   "Travel & hospitality": "hotelier, host and hospitality-operator forums and hospitality trade press",
   "Manufacturing & engineering": "plant, quality and operations engineer forums and manufacturing trade press",
   "Logistics & transportation": "dispatcher, fleet-operator and freight forums and logistics trade press",
+  "Supply chain & procurement": "procurement, sourcing and supply-chain planning practitioner communities, professional bodies and supply-chain trade press",
   "Food & agriculture": "farmer, grower and food-business forums and agricultural extension material",
   "Energy & sustainability": "installer, energy-manager and sustainability practitioner communities",
   "Legal & compliance": "lawyer, paralegal and compliance-officer forums and legal trade press",

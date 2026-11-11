@@ -20,6 +20,7 @@ export const researchSectors = [
   "Travel & hospitality",
   "Manufacturing & engineering",
   "Logistics & transportation",
+  "Supply chain & procurement",
   "Food & agriculture",
   "Energy & sustainability",
   "Legal & compliance",
