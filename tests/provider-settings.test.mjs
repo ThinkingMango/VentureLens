@@ -1403,7 +1403,8 @@ test("setup freezes the source policy, and a run set up without one researches o
   legacy.setup.profile = fixture.setup.profile;
   legacy.checkpoints.delete("setup");
   await legacy.engine.initializeResearch(legacy.context);
-  assert.deepEqual(legacy.checkpoints.get("setup").source_policy, settingsCore.defaultSourcePolicy);
+  assert.deepEqual(legacy.checkpoints.get("setup").source_policy, settingsCore.defaultSourcePolicy, "with no saved policy, a new run freezes the default");
+  assert.equal(legacy.checkpoints.get("setup").source_policy.sectorCommunities, true);
 });
 function sourceRetrievalFixture(sourcePolicy, sectors = ["Healthcare"]) {
   const checkpoints = new Map();
@@ -1417,12 +1418,21 @@ function sourceRetrievalFixture(sourcePolicy, sectors = ["Healthcare"]) {
   fixture.checkpoints.set("setup", fixture.setup);
   return { fixture, prompts, fetched, checkpoints };
 }
-test("retrieval follows the frozen policy's breadth and depth, and defaults to the original search", async () => {
+test("retrieval follows the frozen policy's breadth and depth; a run set up without one keeps the original search", async () => {
+  // Set up by earlier code: no policy in the checkpoint, so the legacy policy, not today's default.
   const legacy = sourceRetrievalFixture(undefined);
   await legacy.fixture.engine.executeResearchStage(legacy.fixture.context, "retrieval:c1");
   assert.equal(legacy.prompts.length, 1, "one search per idea by default");
   assert.match(legacy.prompts[0], /surveys and research, news and analyst coverage, government or regulatory pages, and job postings\. Include at most one vendor product page\. Objective:/);
+  assert.doesNotMatch(legacy.prompts[0], /Look first where these buyers discuss/);
   assert.equal(legacy.checkpoints.get("retrieval:c1").evidence.length, 4, "four pages per idea by default");
+
+  // A new run on the default policy: the original guidance plus the community hint, same depth.
+  const current = sourceRetrievalFixture(settingsCore.defaultSourcePolicy);
+  await current.fixture.engine.executeResearchStage(current.fixture.context, "retrieval:c1");
+  assert.equal(current.prompts.length, 1);
+  assert.match(current.prompts[0], /Include at most one vendor product page\. Look first where these buyers discuss their own work: clinician and practice-manager forums[^.]*\. Objective:/);
+  assert.equal(current.checkpoints.get("retrieval:c1").evidence.length, 4);
 
   const custom = sourceRetrievalFixture(fullSources);
   await custom.fixture.engine.executeResearchStage(custom.fixture.context, "retrieval:c1");
@@ -1459,7 +1469,7 @@ test("discovery asks for the policy's number of ideas and keeps no more than tha
 test("the source policy never touches the evidence gate", () => {
   const engine = readFileSync(new URL("../lib/research-engine.ts", import.meta.url), "utf8");
   assert.match(engine, /source_policy: sourcePolicy/);
-  assert.match(engine, /resolveSourcePolicy\(setup\.source_policy\)/);
+  assert.match(engine, /resolveSourcePolicy\(setup\.source_policy, legacySourcePolicy\)/, "older runs fall back to the legacy policy, not today's default");
   const policySource = readFileSync(new URL("../lib/source-policy.ts", import.meta.url), "utf8");
   assert.doesNotMatch(policySource, /^import .*research-core/m, "the policy module cannot reach how evidence is counted");
   assert.deepEqual([...policySource.matchAll(/^import .* from "([^"]+)"/gm)].map(match => match[1]), ["zod"], "it depends on nothing but zod");

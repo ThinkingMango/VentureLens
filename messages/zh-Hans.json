@@ -71,7 +71,7 @@
     "sourceKind_government": "政府与监管机构",
     "sourceKind_jobs": "招聘信息",
     "sectorCommunities": "到买家讨论自身工作的地方寻找",
-    "sectorCommunitiesHelp": "把检索词和检索引向简报所选行业的从业者论坛、专业团体和行业媒体。当检索结果被厂商页面占据时建议开启。",
+    "sectorCommunitiesHelp": "把检索词和检索引向简报所选行业的从业者论坛、专业团体和行业媒体，买家的一手痛点大多发布在这些地方。默认开启；关闭后按原有方式检索。",
     "alternativesSearch": "针对现有替代方案的第二次检索",
     "alternativesSearchHelp": "每个想法还会检索买家目前已在使用或付费的方案，与“验证我的想法”相同。会让一次探索研究的检索次数翻倍。",
     "vendorPages": "厂商产品页面",

@@ -8,7 +8,7 @@ import { fetchResearchSource } from "@/lib/research-source";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { researchProviderSettings } from "@/lib/provider-settings";
-import { defaultProviderSettings, providerPlan, providerSettingsSchema, resolveSourcePolicy, retrievalLimits, runShape, searchGuidance, queryEvidence, queryGuidance, type ProviderSettings, type SourcePolicy } from "@/lib/provider-settings-core";
+import { defaultProviderSettings, providerPlan, providerSettingsSchema, resolveSourcePolicy, legacySourcePolicy, retrievalLimits, runShape, searchGuidance, queryEvidence, queryGuidance, type ProviderSettings, type SourcePolicy } from "@/lib/provider-settings-core";
 import { selectedModel, researchModelPricing, geminiThinkingOptions, qwenModelSchema, geminiModelSchema, type ResearchModelId } from "@/lib/research-models";
 import { reservationFor, estimateRunCost } from "@/lib/research-budget";
 import { briefFocus, searchLanguage } from "@/lib/research-options";
@@ -294,7 +294,7 @@ function searchPrompt(candidate: Candidate, query: string, alternatives: boolean
  * (`query_alt`, the alternatives buyers use): each search is its own budgeted call, a failure of one does not fail the
  * stage, and their results are merged and de-duplicated by URL before pages are read.
  */
-async function retrieve(ctx: Context, candidate: Candidate & { query_alt?: string }, pricing: Pricing, limits = { evidence: 4, sources: 10 }, guidance = searchGuidance(resolveSourcePolicy(undefined))) {
+async function retrieve(ctx: Context, candidate: Candidate & { query_alt?: string }, pricing: Pricing, limits = { evidence: 4, sources: 10 }, guidance = searchGuidance(legacySourcePolicy)) {
   const queries = candidate.query_alt ? [candidate.query, candidate.query_alt] : [candidate.query];
   const lists: { url: string; title?: string }[][] = [];
   let firstFailure: unknown;
@@ -351,8 +351,9 @@ export async function executeResearchStage(ctx: Context, key: string): Promise<s
   // Runs set up before WP-04 have no history.
   const history = z.array(historyEntrySchema).catch([]).parse(setup.history ?? []);
   const { brief, pricing } = setup;
-  // Runs set up before the source policy existed research on its defaults, which match their original behaviour.
-  const sources: SourcePolicy = resolveSourcePolicy(setup.source_policy);
+  // A run set up before the source policy existed keeps the original behaviour (the legacy policy), not today's default,
+  // so a deploy never changes the rules of a run already under way.
+  const sources: SourcePolicy = resolveSourcePolicy(setup.source_policy, legacySourcePolicy);
   const mode: Mode = brief.discovery_mode ?? "combined";
   const language = reportLanguage(brief.language);
   const profile = founderContext(setup.profile, mode);

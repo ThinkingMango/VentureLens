@@ -6,7 +6,7 @@ import { sourcePolicySchema, resolveSourcePolicy, runShape } from "./source-poli
 // The source policy (breadth and depth of evidence collection) is stored with the provider policy; the engine and the
 // admin page read it from here so the research engine's test harnesses need no extra module.
 export {
-  sourceKinds, recencyOptions, sourcePolicySchema, defaultSourcePolicy, resolveSourcePolicy, sameSourcePolicy, retrievalLimits,
+  sourceKinds, recencyOptions, sourcePolicySchema, defaultSourcePolicy, legacySourcePolicy, resolveSourcePolicy, sameSourcePolicy, retrievalLimits,
   runShape, searchGuidance, queryEvidence, queryGuidance, communityHint, sectorCommunityHints,
   MIN_CANDIDATES, MAX_CANDIDATES, MIN_PAGES_PER_IDEA, MAX_PAGES_PER_IDEA,
   type SourcePolicy, type SourceKind, type Recency,

@@ -9,8 +9,12 @@ import { z } from "zod";
  * research-core): every source still has to be classified, quoted verbatim and counted by registrable domain. The vendor
  * option can only tighten the search ("at most one" or "none"); there is no setting that admits more vendor pages.
  *
- * Defaults reproduce the engine's behaviour before this policy existed, prompt text included, so runs set up without a
- * policy and runs on the default policy research exactly as before.
+ * Two baselines:
+ * - `defaultSourcePolicy` is what new runs use when no policy has been saved. It steers searches toward the communities
+ *   where the brief's buyers discuss their own work (sector communities), which the November 2026 source review found is
+ *   where first-hand buyer pain is published, rather than in vendor pages.
+ * - `legacySourcePolicy` reproduces the engine's behaviour before this policy existed, prompt text included. A run whose
+ *   setup checkpoint has no policy (set up by earlier code) keeps it, so a deploy never changes a run already under way.
  */
 
 /** Independent source types a search is told to prefer, in the order the search prompt lists them. */
@@ -65,7 +69,8 @@ export const sourcePolicySchema = z.strictObject({
 });
 export type SourcePolicy = z.infer<typeof sourcePolicySchema>;
 
-export const defaultSourcePolicy: SourcePolicy = Object.freeze({
+/** The engine's behaviour before the source policy existed: for runs set up without one. */
+export const legacySourcePolicy: SourcePolicy = Object.freeze({
   kinds: [...sourceKinds],
   sectorCommunities: false,
   alternativesSearch: false,
@@ -75,10 +80,16 @@ export const defaultSourcePolicy: SourcePolicy = Object.freeze({
   pagesPerIdea: 4,
 }) as SourcePolicy;
 
-/** The policy in force: a stored or checkpointed value when it is valid, otherwise the defaults. Never throws. */
-export function resolveSourcePolicy(value: unknown): SourcePolicy {
+/** New runs when no policy has been saved: the legacy policy with sector communities on. */
+export const defaultSourcePolicy: SourcePolicy = Object.freeze({ ...legacySourcePolicy, sectorCommunities: true }) as SourcePolicy;
+
+/**
+ * The policy in force: a stored or checkpointed value when it is valid, otherwise `fallback` (the defaults for new runs;
+ * the engine passes `legacySourcePolicy` for runs set up without one). Always a fresh copy. Never throws.
+ */
+export function resolveSourcePolicy(value: unknown, fallback: SourcePolicy = defaultSourcePolicy): SourcePolicy {
   const parsed = sourcePolicySchema.safeParse(value);
-  return parsed.success ? parsed.data : { ...defaultSourcePolicy, kinds: [...defaultSourcePolicy.kinds] };
+  return parsed.success ? parsed.data : { ...fallback, kinds: [...fallback.kinds] };
 }
 
 export function sameSourcePolicy(a: unknown, b: unknown) {
@@ -135,7 +146,7 @@ function list(items: string[]) {
 }
 
 /**
- * The source guidance in each search prompt. On the default policy this is exactly the sentence the engine used before
+ * The source guidance in each search prompt. On the legacy policy this is exactly the sentence the engine used before
  * the policy existed.
  */
 export function searchGuidance(policy: SourcePolicy, sectors: readonly string[] = []) {
@@ -149,8 +160,8 @@ export function searchGuidance(policy: SourcePolicy, sectors: readonly string[] 
 }
 
 /**
- * The evidence named when discovery writes a search query. On the default policy this is exactly the original list,
- * "surveys, industry reports, forum discussions, news".
+ * The evidence named when discovery writes a search query. With every source type selected this is exactly the original
+ * list, "surveys, industry reports, forum discussions, news".
  */
 export function queryEvidence(policy: SourcePolicy) {
   // All types selected is the default policy: keep the original wording, which names only the first three.
@@ -158,7 +169,7 @@ export function queryEvidence(policy: SourcePolicy) {
   return kinds.map(kind => queryPhrases[kind]).join(", ");
 }
 
-/** Extra query-writing guidance for discovery; empty on the default policy. */
+/** Extra query-writing guidance for discovery; empty unless sector communities are on. */
 export function queryGuidance(policy: SourcePolicy, sectors: readonly string[] = []) {
   return policy.sectorCommunities
     ? ` Phrase each query the way these buyers describe the problem in their own communities (${communityHint(sectors)}).`

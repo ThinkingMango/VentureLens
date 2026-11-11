@@ -71,7 +71,7 @@
     "sourceKind_government": "Government and regulators",
     "sourceKind_jobs": "Job postings",
     "sectorCommunities": "Look where buyers discuss their own work",
-    "sectorCommunitiesHelp": "Steers queries and searches toward the practitioner forums, professional bodies and trade press of the brief's industries. Recommended when search results are dominated by vendor pages.",
+    "sectorCommunitiesHelp": "Steers queries and searches toward the practitioner forums, professional bodies and trade press of the brief's industries, where first-hand buyer pain is mostly published. On by default; turn it off to search as before.",
     "alternativesSearch": "Second search for current alternatives",
     "alternativesSearchHelp": "Every idea also gets a search for what buyers already use or pay for today, as Verify my idea does. Doubles the searches in a discovery run.",
     "vendorPages": "Vendor product pages",

@@ -6,21 +6,31 @@ import { researchSettingsSchema, providerSettingsSchema, readStoredProviderSetti
 import { researchSectors, anySector } from "../lib/research-options.ts";
 import { candidateDiagnosisSchema } from "../lib/research-core.ts";
 
-const { defaultSourcePolicy, sourcePolicySchema, resolveSourcePolicy, searchGuidance, queryEvidence, queryGuidance, retrievalLimits, runShape, communityHint } = policy;
+const { defaultSourcePolicy, legacySourcePolicy, sourcePolicySchema, resolveSourcePolicy, searchGuidance, queryEvidence, queryGuidance, retrievalLimits, runShape, communityHint } = policy;
 const at = new Date("2026-11-06T00:00:00Z");
 const custom = (patch) => ({ ...defaultSourcePolicy, kinds: [...defaultSourcePolicy.kinds], ...patch });
 
-test("the default source policy reproduces the engine's original prompts and depth exactly", () => {
-  assert.equal(
-    searchGuidance(defaultSourcePolicy),
-    "Prefer sources that are not selling a product in this space: buyer forums and communities, industry associations, surveys and research, news and analyst coverage, government or regulatory pages, and job postings. Include at most one vendor product page.",
-  );
-  assert.equal(queryEvidence(defaultSourcePolicy), "surveys, industry reports, forum discussions, news");
-  assert.equal(queryGuidance(defaultSourcePolicy, ["Healthcare"]), "");
-  assert.deepEqual(retrievalLimits(defaultSourcePolicy, "combined"), { evidence: 4, sources: 10 });
-  assert.deepEqual(retrievalLimits(defaultSourcePolicy, "verify"), { evidence: 8, sources: 16 });
-  assert.deepEqual(runShape(defaultSourcePolicy), defaultRunShape);
-  assert.equal(defaultSourcePolicy.candidates, 8);
+const original = "Prefer sources that are not selling a product in this space: buyer forums and communities, industry associations, surveys and research, news and analyst coverage, government or regulatory pages, and job postings. Include at most one vendor product page.";
+test("the legacy source policy reproduces the engine's original prompts and depth exactly", () => {
+  assert.equal(searchGuidance(legacySourcePolicy), original);
+  assert.equal(queryEvidence(legacySourcePolicy), "surveys, industry reports, forum discussions, news");
+  assert.equal(queryGuidance(legacySourcePolicy, ["Healthcare"]), "");
+  assert.deepEqual(retrievalLimits(legacySourcePolicy, "combined"), { evidence: 4, sources: 10 });
+  assert.deepEqual(retrievalLimits(legacySourcePolicy, "verify"), { evidence: 8, sources: 16 });
+  assert.deepEqual(runShape(legacySourcePolicy), defaultRunShape);
+});
+
+test("new runs default to sector communities, and differ from the legacy policy in nothing else", () => {
+  assert.equal(defaultSourcePolicy.sectorCommunities, true);
+  assert.deepEqual({ ...defaultSourcePolicy, sectorCommunities: false }, legacySourcePolicy);
+  const guidance = searchGuidance(defaultSourcePolicy, ["Healthcare"]);
+  assert.ok(guidance.startsWith(original), "the original guidance is kept; the community hint is added after it");
+  assert.match(guidance, /Look first where these buyers discuss their own work: clinician and practice-manager forums/);
+  assert.match(queryGuidance(defaultSourcePolicy, ["Healthcare"]), /Phrase each query the way these buyers describe the problem/);
+  // Same depth and searches, so the same cost.
+  assert.deepEqual(runShape(defaultSourcePolicy), runShape(legacySourcePolicy));
+  assert.deepEqual(resolveSourcePolicy(undefined), defaultSourcePolicy, "a row with no saved policy uses the new default");
+  assert.deepEqual(resolveSourcePolicy(undefined, legacySourcePolicy), legacySourcePolicy, "the engine's fallback for older runs");
 });
 
 test("source policies are validated strictly and source types are kept in canonical order", () => {
@@ -42,6 +52,8 @@ test("an invalid or missing policy resolves to fresh defaults and never throws",
   const resolved = resolveSourcePolicy(undefined);
   resolved.kinds.push("jobs");
   assert.equal(defaultSourcePolicy.kinds.length, policy.sourceKinds.length, "callers cannot mutate the defaults");
+  resolveSourcePolicy(null, legacySourcePolicy).kinds.push("jobs");
+  assert.equal(legacySourcePolicy.kinds.length, policy.sourceKinds.length);
   assert.ok(policy.sameSourcePolicy(undefined, defaultSourcePolicy));
   assert.ok(!policy.sameSourcePolicy(custom({ candidates: 6 }), undefined));
 });
