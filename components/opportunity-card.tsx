@@ -15,6 +15,7 @@ import { Confidence } from "@/components/shared";
 import { type WorkspaceOpportunity } from "@/lib/workspace-schema";
 import { reportEvidenceCount, scoreBand } from "@/lib/report-presentation";
 import { useDemo } from "@/components/demo-provider";
+import { ArchiveButton } from "@/components/library";
 import { cn } from "@/lib/utils";
 import { useCopy } from "@/i18n/use-copy";
 
@@ -48,27 +49,33 @@ export function OpportunityCard({
             {/* What the number means; scores are strict, so a raw 55 alone reads as worse than it is. */}
             <span className="text-sm font-medium text-muted-foreground">{copy(scoreBand(o.score).label)}</span>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="-mr-2 -mt-2 shrink-0"
-            aria-label={
-              isSaved
-                ? copy("Unsave {title}", { title: o.title })
-                : copy("Save {title}", { title: o.title })
-            }
-            aria-pressed={isSaved}
-            disabled={busy}
-            onClick={() => toggleSave(o.id)}
-          >
-            <Bookmark
-              className={cn(
-                "text-muted-foreground",
-                isSaved && "fill-primary/15 text-primary",
-              )}
-            />
-          </Button>
+          <div className="flex shrink-0 items-start gap-1">
+            <ArchiveButton opportunity={o} compact />
+            <Button
+              variant="ghost"
+              size="icon"
+              className="-mr-2 -mt-2 shrink-0"
+              aria-label={
+                isSaved
+                  ? copy("Unsave {title}", { title: o.title })
+                  : copy("Save {title}", { title: o.title })
+              }
+              aria-pressed={isSaved}
+              disabled={busy}
+              onClick={() => toggleSave(o.id)}
+            >
+              <Bookmark
+                className={cn(
+                  "text-muted-foreground",
+                  isSaved && "fill-primary/15 text-primary",
+                )}
+              />
+            </Button>
+          </div>
         </div>
+        {o.archived_at && (
+          <p className="w-fit rounded-md bg-secondary px-2 py-0.5 text-xs font-medium text-muted-foreground">{copy("Archived")}</p>
+        )}
         <div className="flex flex-col gap-2">
           {!["combined", "founder", "market"].includes(
             o.category.toLowerCase().trim(),

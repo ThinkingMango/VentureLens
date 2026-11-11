@@ -8,11 +8,17 @@ import { renderToStaticMarkup } from "react-dom/server";
 import * as core from "../lib/notify-core.ts";
 import * as progress from "../lib/research-progress.ts";
 import * as i18nConfig from "../i18n/config.ts";
+import * as libraryCore from "../lib/library-core.ts";
 import * as outcomeLabels from "../lib/outcome-labels.ts";
 
 const require = createRequire(import.meta.url);
 const { notificationMode, siteOrigin, notificationOutcome, buildRunEmail, runLabel } = core;
 const catalog = locale => JSON.parse(readFileSync(new URL(`../messages/${locale}.json`, import.meta.url), "utf8"));
+// Modules added by the library (WP-12), for components loaded without them in their dependency list.
+const libraryMocks = {
+  "@/components/library": { ArchiveButton: () => null, DeleteRunButton: () => null, LibraryFilterBar: () => null },
+  "@/lib/library-core": libraryCore,
+};
 // Modules added by report export (WP-11), for components loaded without them in their dependency list.
 const exportMocks = {
   "@/components/report-export": { ExportButton: () => null, PrintButton: () => null },
@@ -25,7 +31,7 @@ function load(file, dependencies) {
   const source = readFileSync(new URL(file, import.meta.url), "utf8");
   const { outputText } = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } });
   const module = { exports: {} };
-  new Function("require", "exports", "module", "process", outputText)(name => Object.hasOwn(dependencies, name) ? dependencies[name] : Object.hasOwn(exportMocks, name) ? exportMocks[name] : require(name), module.exports, module, { env: {} });
+  new Function("require", "exports", "module", "process", outputText)(name => Object.hasOwn(dependencies, name) ? dependencies[name] : Object.hasOwn(exportMocks, name) ? exportMocks[name] : Object.hasOwn(libraryMocks, name) ? libraryMocks[name] : require(name), module.exports, module, { env: {} });
   return module.exports;
 }
 

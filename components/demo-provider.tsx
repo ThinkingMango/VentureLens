@@ -26,6 +26,8 @@ type WorkspaceState = {
   clearMemory: () => Promise<void>;
   /** Turns the "report ready" email on or off (WP-08). Not available in the demo. */
   setNotify: (enabled: boolean) => Promise<void>;
+  /** Archives or restores an opportunity (WP-12), shown at once and rolled back if it cannot be saved. Not in the demo. */
+  setArchived: (id: string, archived: boolean) => Promise<void>;
   completed: string[];
   toggleTask: (id: string) => void;
   href: (path: string) => string;
@@ -87,6 +89,7 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
         },
         clearMemory: async () => undefined,
         setNotify: async () => undefined,
+        setArchived: async () => undefined,
         setRun: async (r) => {
           setRunEdited(true);
           setRun(r);
@@ -181,6 +184,17 @@ export function WorkspaceProvider({
         setRun: (project) => persist({ action: "project", project }),
         clearMemory: () => persist({ action: "clear_memory" }),
         setNotify: (enabled) => persist({ action: "notify", enabled }),
+        setArchived: async (id, archived) => {
+          const previous = data;
+          const archived_at = archived ? new Date().toISOString() : null;
+          await mutate({ ...data, opportunities: data.opportunities.map((item) => (item.id === id ? { ...item, archived_at } : item)) }, { revalidate: false });
+          try {
+            await persist({ action: "archive", id, archived });
+          } catch (error) {
+            await mutate(previous, { revalidate: false });
+            throw error;
+          }
+        },
         toggleSave: (id) =>
           handleMutation({
             action: "save",

@@ -126,6 +126,7 @@ function buildSections(disclosure: ProviderDisclosure): Section[] {
         "We keep your account, profile, briefs, research, and saved items while your account is active, so you can return to your research history.",
         "When your account is deleted, your profile, briefs, research runs, evidence, usage records, and saved items are deleted with it. Copies in provider backups and logs expire on those providers' schedules.",
         "Product usage events are kept to measure the product over time. When your account is deleted, they are kept without any link to you.",
+        "When you delete a research run, its report, opportunities, sources and sprints are deleted. Its cost records (the model, token counts and cost of each call) are kept for our cost accounting, without any link to you or the run.",
         "We keep support emails only as long as needed to resolve your request and keep a reasonable record of it.",
       ],
     },

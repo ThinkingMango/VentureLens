@@ -10,6 +10,7 @@ import { useDemo } from "@/components/demo-provider";
 import { DemoNote, Confidence } from "@/components/shared";
 import { FlagButton, FlagProvider } from "@/components/report-feedback";
 import { SprintPanel, SprintStarter, useSprintActions } from "@/components/validation-sprint";
+import { ArchiveButton } from "@/components/library";
 import { ExportButton } from "@/components/report-export";
 import { buildOpportunityExport, exportFileName, opportunityMarkdown } from "@/lib/report-export";
 import { demoSprint, firstSteps, type Sprint } from "@/lib/sprint-core";
@@ -150,6 +151,7 @@ export function OpportunityDetail({ view, initialTab, sprint, source }: { view: 
               <Bookmark className={isSaved ? "fill-primary/15 text-primary" : ""} />
               {isSaved ? copy("Saved opportunity") : copy("Save opportunity")}
             </Button>
+            {view.kind === "live" && <ArchiveButton opportunity={{ id: view.id, title: view.title }} />}
             <ExportButton
               kind="opportunity"
               demo={view.kind === "demo" || !source}

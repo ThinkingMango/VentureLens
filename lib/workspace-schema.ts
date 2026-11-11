@@ -193,6 +193,9 @@ export const opportunitySchema = z.object({
     confirm: z.string().optional(),
   })).optional(),
   methodology_version: z.number().int().optional(),
+  // Row columns, not payload (WP-12): the run that produced it, and when the founder archived it (null when not).
+  run_id: z.string().optional(),
+  archived_at: z.string().nullable().optional(),
 });
 export type WorkspaceOpportunity = z.infer<typeof opportunitySchema>;
 export type ResearchAccess = {

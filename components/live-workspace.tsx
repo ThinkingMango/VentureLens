@@ -1,4 +1,6 @@
 "use client";
+import { LibraryFilterBar } from "@/components/library";
+import { activeFilterCount, defaultFilters, filterOpportunities, isArchived, runInfo, runOptions, unarchived, type LibraryFilters } from "@/lib/library-core";
 import { MobileDisclosure } from "@/components/mobile-disclosure";
 import { choiceLabel } from "@/lib/research-options";
 import { useCopy } from "@/i18n/use-copy";
@@ -20,7 +22,6 @@ import { useDemo } from "@/components/demo-provider";
 import { PageHeader, SectionTitle } from "@/components/shared";
 import { Button } from "@/components/ui/button";
 import { OpportunityCard } from "@/components/opportunity-card";
-import { Input } from "@/components/ui/input";
 import type { WorkspaceOpportunity } from "@/lib/workspace-schema";
 import { stageLabels } from "@/lib/research-core";
 import { cn } from "@/lib/utils";
@@ -288,14 +289,14 @@ export function LiveDashboard() {
           </Button>
         </section>
       )}
-      {data.opportunities.length > 0 && (
+      {unarchived(data.opportunities).length > 0 && (
         <section className="flex flex-col gap-5">
           <SectionTitle
             title={copy("Your opportunities")}
             href="/research/results"
           />
           <div className="grid gap-5 md:grid-cols-2">
-            {data.opportunities.map((opportunity, index) => (
+            {unarchived(data.opportunities).map((opportunity, index) => (
               <div
                 key={opportunity.id}
                 className={index > 1 ? "hidden md:block" : ""}
@@ -345,14 +346,15 @@ export function LiveResearchResults({
 }) {
   const copy = useCopy();
   const { data, saved } = useDemo();
-  const [query, setQuery] = useState("");
-  const list = (data?.opportunities ?? []).filter(
-    (item) =>
-      (!savedOnly || saved.includes(item.id)) &&
-      `${item.title} ${item.category} ${item.buyer}`
-        .toLowerCase()
-        .includes(query.toLowerCase()),
-  );
+  const [filters, setFilters] = useState<LibraryFilters>({ ...defaultFilters });
+  const all = data?.opportunities ?? [];
+  const runs = runInfo(data?.runs ?? [], data?.projects ?? []);
+  // Counts and run options follow the list the page is about: the founder's saves on /saved, everything otherwise.
+  const scope = savedOnly ? all.filter((item) => saved.includes(item.id)) : all;
+  const list = filterOpportunities(all, filters, { saved, savedOnly, runs });
+  const query = filters.query || activeFilterCount(filters) > 0;
+  // Nothing filtered, but every opportunity in this list is archived: offer to show them rather than "no results".
+  const onlyArchived = !query && scope.length > 0 && scope.every(isArchived);
   return (
     <>
       <PageHeader
@@ -367,13 +369,16 @@ export function LiveResearchResults({
             : copy("Only completed research from your account appears here.")
         }
       />
-      <Input
-        type="search"
-        aria-label={copy("Search opportunities")}
-        placeholder={copy("Search by idea, buyer, or industry")}
-        value={query}
-        onChange={(event) => setQuery(event.target.value)}
-      />
+      {scope.length > 0 && (
+        <LibraryFilterBar
+          filters={filters}
+          onChange={setFilters}
+          runs={runOptions(scope, runs)}
+          archivedCount={scope.filter(isArchived).length}
+          shown={list.length}
+          total={scope.length}
+        />
+      )}
       {list.length ? (
         <div className="grid gap-5 md:grid-cols-2">
           {list.map((item) => (
@@ -384,30 +389,42 @@ export function LiveResearchResults({
         <WorkspaceEmpty
           actionHref={savedOnly ? "/research/results" : "/research"}
           actionLabel={
-            query
-              ? "Clear search"
-              : savedOnly
-                ? "Browse research results"
-                : "Open research history"
+            onlyArchived
+              ? "Show archived"
+              : query
+                ? "Clear filters"
+                : savedOnly
+                  ? "Browse research results"
+                  : "Open research history"
           }
-          onAction={query ? () => setQuery("") : undefined}
+          onAction={
+            onlyArchived
+              ? () => setFilters({ ...filters, showArchived: true })
+              : query
+                ? () => setFilters({ ...defaultFilters })
+                : undefined
+          }
           title={
-            query
-              ? copy("No matching opportunities")
-              : savedOnly
-                ? copy("Your shortlist starts here.")
-                : copy("No research results yet.")
+            onlyArchived
+              ? copy("Everything here is archived.")
+              : query
+                ? copy("No matching opportunities")
+                : savedOnly
+                  ? copy("Your shortlist starts here.")
+                  : copy("No research results yet.")
           }
           description={
-            query
-              ? copy("Try another search term.")
-              : savedOnly
-                ? copy(
-                    "Save an opportunity from your completed research to add it here. Demonstration opportunities remain in the demo and are never copied into your account.",
-                  )
-                : copy(
-                    "No evidence-verified reports yet. Open research history for progress or failure details. Unavailable retrieval or insufficient evidence never produces fabricated results.",
-                  )
+            onlyArchived
+              ? copy("Archived opportunities are hidden. Show them to restore one.")
+              : query
+                ? copy("Try another search term or clear the filters.")
+                : savedOnly
+                  ? copy(
+                      "Save an opportunity from your completed research to add it here. Demonstration opportunities remain in the demo and are never copied into your account.",
+                    )
+                  : copy(
+                      "No evidence-verified reports yet. Open research history for progress or failure details. Unavailable retrieval or insufficient evidence never produces fabricated results.",
+                    )
           }
         />
       )}

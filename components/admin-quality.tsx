@@ -85,7 +85,10 @@ export function AdminQuality({ report }: { report: QualityReport }) {
         <Card>
           <CardHeader>
             <CardTitle>{copy("Failures by error code")}</CardTitle>
-            <CardDescription>{copy("Total committed spend in the window: {usd}. Calls with unknown cost, counted at their reservation: {n}.", { usd: formats.usd(m.cost.totalUsd, 3), n: m.cost.uncertainCalls })}</CardDescription>
+            <CardDescription>
+              {copy("Total committed spend in the window: {usd}. Calls with unknown cost, counted at their reservation: {n}.", { usd: formats.usd(m.cost.totalUsd, 3), n: m.cost.uncertainCalls })}
+              {m.cost.deletedRunsUsd > 0 && <> {copy("Includes {usd} from runs founders have since deleted.", { usd: formats.usd(m.cost.deletedRunsUsd, 3) })}</>}
+            </CardDescription>
           </CardHeader>
           <CardContent>
             {errors.length === 0 ? <p className="text-sm text-muted-foreground">{copy("No failed runs in this window.")}</p> : (

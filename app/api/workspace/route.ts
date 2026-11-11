@@ -16,6 +16,8 @@ const mutationSchema = z.discriminatedUnion("action", [
   // "Email me when my research is ready" (WP-08).
   z.object({ action: z.literal("notify"), enabled: z.boolean() }),
   z.object({ action: z.literal("save"), id: z.uuid(), saved: z.boolean() }),
+  // Archive or restore an opportunity (WP-12), through set_opportunity_archived: founders cannot update opportunities.
+  z.object({ action: z.literal("archive"), id: z.uuid(), archived: z.boolean() }),
   z.object({
     action: z.literal("task"),
     id: z.uuid(),
@@ -126,6 +128,10 @@ export async function POST(request: NextRequest) {
         .from("founder_profiles")
         .update({ history_reset_at: new Date().toISOString() })
         .eq("user_id", user.id);
+      if (error) throw error;
+    } else if (input.action === "archive") {
+      const { error } = await supabase.rpc("set_opportunity_archived", { p_id: input.id, p_archived: input.archived });
+      if (error?.code === "P0002") return json({ code: "NOT_FOUND", error: "Opportunity not found." }, 404);
       if (error) throw error;
     } else if (input.action === "project") {
       const { error } = await supabase

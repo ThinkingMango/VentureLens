@@ -11,6 +11,8 @@ import { ResearchReportView } from "@/components/research-report";
 import { ResearchOutcomeView } from "@/components/research-outcome";
 import { ModelTag } from "@/components/model-tag";
 import { ReportRating } from "@/components/report-feedback";
+import { DeleteRunButton } from "@/components/library";
+import { canDeleteRun } from "@/lib/library-core";
 import { ExportButton } from "@/components/report-export";
 import { exportFileName, reportToMarkdown } from "@/lib/report-export";
 import { useLocale } from "next-intl";
@@ -428,6 +430,17 @@ export function ResearchRunView({
           </p>
         </div>
       </ExecutionContainer>
+      {canDeleteRun(data.status) && (
+        <section aria-labelledby="delete-run-heading" className="flex flex-col gap-3 border-t pt-6 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-1">
+            <h2 id="delete-run-heading" className="font-semibold">{copy("Delete this research")}</h2>
+            <p className="max-w-prose text-sm text-muted-foreground">
+              {copy("Removes the report and everything made from it from your account. Use it for research you no longer need.")}
+            </p>
+          </div>
+          <DeleteRunButton runId={data.id} />
+        </section>
+      )}
     </>
   );
 }
