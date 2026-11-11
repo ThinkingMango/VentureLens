@@ -1,6 +1,7 @@
 import type { WorkspaceOpportunity } from "./workspace-schema.ts";
 import type { DemoReport, Opportunity } from "./demo-data.ts";
 import { citationNumbers, scoreBreakdown, type ScoreBreakdown } from "./report-presentation.ts";
+import { claimKey } from "./feedback-core.ts";
 
 /**
  * One opportunity, ready to display (WP-09). The live and demo opportunity pages render the same component from this,
@@ -10,6 +11,8 @@ import { citationNumbers, scoreBreakdown, type ScoreBreakdown } from "./report-p
 export const opportunityTabIds = ["overview", "evidence", "economics", "validation"] as const;
 export type OpportunityTabId = (typeof opportunityTabIds)[number];
 export type Claim = NonNullable<WorkspaceOpportunity["claims"]>[number];
+/** A claim with its feedback key (WP-13), which stays its position in the stored claims whatever order it is shown in. */
+export type ViewClaim = Claim & { key: string };
 export type ViewSource = {
   key: string;
   /** Citation number: the order sources are listed, starting at 1. */
@@ -44,7 +47,7 @@ export type OpportunityView = {
   breakdown: ScoreBreakdown | null;
   /** 1: original; 2: review cap and stance; 3: claims (WP-07). The demo is not a methodology version. */
   methodologyVersion: 1 | 2 | 3 | null;
-  claims: Claim[];
+  claims: ViewClaim[];
   sources: ViewSource[];
   revenue: string;
   cost: string;
@@ -95,7 +98,7 @@ function liveSources(evidence: WorkspaceOpportunity["evidence"], numbers: Map<st
 }
 export function liveOpportunityView(item: WorkspaceOpportunity): OpportunityView {
   const numbers = citationNumbers(item.evidence);
-  const claims = item.claims ?? [];
+  const claims = (item.claims ?? []).map((claim, index) => ({ ...claim, key: claimKey(index) }));
   return {
     kind: "live",
     id: item.id,
@@ -182,7 +185,7 @@ export function opportunityTabs(view: Pick<OpportunityView, "sources" | "claims"
 }
 
 /** The claims shown on the Overview: observed first, then inferences, then assumptions, each kind in its own order. */
-export function topClaims(claims: Claim[], count = 3): Claim[] {
+export function topClaims<C extends Claim>(claims: C[], count = 3): C[] {
   const rank = { observed: 0, inference: 1, assumption: 2 } as const;
   return claims
     .map((claim, index) => ({ claim, index }))

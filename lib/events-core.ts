@@ -21,7 +21,8 @@ export const eventSchemas = {
   sprint_created: z.strictObject({ length: z.union([z.literal(7), z.literal(14), z.literal(30)]) }),
   task_completed: z.strictObject({}),
   sprint_decided: z.strictObject({ decision: z.enum(["keep", "park", "kill"]) }),
-  claim_flagged: z.strictObject({ reason: z.enum(["wrong", "outdated", "irrelevant", "broken_link", "other"]) }),
+  // Source flags (WP-13) are recorded under the same event, with the target that was flagged.
+  claim_flagged: z.strictObject({ reason: z.enum(["wrong", "outdated", "irrelevant", "broken_link", "other"]), target: z.enum(["claim", "source"]).optional() }),
   report_rated: z.strictObject({ rating: z.number().int().min(1).max(5) }),
   starter_profile_used: z.strictObject({ id: z.string().regex(/^[a-z][a-z0-9-]{0,39}$/) }),
 } as const;

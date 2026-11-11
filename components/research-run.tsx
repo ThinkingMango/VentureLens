@@ -10,6 +10,7 @@ import { useDemo } from "@/components/demo-provider";
 import { ResearchReportView } from "@/components/research-report";
 import { ResearchOutcomeView } from "@/components/research-outcome";
 import { ModelTag } from "@/components/model-tag";
+import { ReportRating } from "@/components/report-feedback";
 import { researchErrors, stageLabels } from "@/lib/research-core";
 import type { ResearchDetail } from "@/lib/research-types";
 import { useCopy, useFormats } from "@/i18n/use-copy";
@@ -48,8 +49,11 @@ async function fetchRun(url: string): Promise<ResearchDetail> {
 }
 export function ResearchRunView({
   initialData,
+  rating = null,
 }: {
   initialData: ResearchDetail;
+  /** The founder's rating of this report (WP-13), if they gave one. */
+  rating?: { rating: number; comment: string } | null;
 }) {
   const copy = useCopy();
   const format = useFormats();
@@ -177,6 +181,9 @@ export function ResearchRunView({
       {completed && data.outcome && <ResearchOutcomeView outcome={data.outcome} variant="completed" runId={data.id} />}
       {data.status === "failed" && data.error_code === "INSUFFICIENT_EVIDENCE" && data.outcome && (
         <ResearchOutcomeView outcome={data.outcome} variant="failed" runId={data.id} />
+      )}
+      {(completed || (data.status === "failed" && data.error_code === "INSUFFICIENT_EVIDENCE" && !!data.outcome)) && (
+        <ReportRating runId={data.id} initial={rating} />
       )}
       <ExecutionContainer
         id="execution-details"

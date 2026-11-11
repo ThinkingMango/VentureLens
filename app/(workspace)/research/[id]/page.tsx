@@ -30,5 +30,15 @@ export default async function Page({
     for (const candidate of outcome.candidates) reasonCounts[candidate.reason] = (reasonCounts[candidate.reason] ?? 0) + 1;
     after(() => track("outcome_viewed", { userId: user.id, props: { reasonCounts } }));
   }
-  return <ResearchRunView initialData={detail} />;
+  return <ResearchRunView initialData={detail} rating={await reportRating(supabase, user.id, id)} />;
+}
+
+/** The founder's own rating of this report (WP-13). A read failure only hides the saved rating; the page still loads. */
+async function reportRating(supabase: Awaited<ReturnType<typeof requireUser>>["supabase"], userId: string, runId: string) {
+  try {
+    const { data, error } = await supabase.from("report_feedback").select("rating,comment").eq("run_id", runId).eq("user_id", userId).eq("target", "report").maybeSingle();
+    return !error && data && typeof data.rating === "number" ? { rating: data.rating, comment: typeof data.comment === "string" ? data.comment : "" } : null;
+  } catch {
+    return null;
+  }
 }

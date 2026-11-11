@@ -94,7 +94,7 @@ export function sourceAnchor(sourceKey: string) {
   return `source-${sourceKey.replace(/[^A-Za-z0-9_-]/g, "-")}`;
 }
 /** Claims grouped by section in a fixed reading order (buyer to risk), keeping each section's own order; empty sections are left out. */
-export function claimsBySection(claims: Claims | undefined) {
+export function claimsBySection<C extends Claims[number]>(claims: C[] | undefined) {
   return claimSectionOrder
     .map((section) => ({ section, claims: (claims ?? []).filter((claim) => claim.section === section) }))
     .filter((group) => group.claims.length > 0);

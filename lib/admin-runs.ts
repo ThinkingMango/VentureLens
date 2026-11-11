@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { isAdministrator } from "@/lib/admin-access";
 import { classificationSchema, type Evidence } from "@/lib/research-core";
 import { qualityMetrics, type MetricOpportunity, type MetricRun, type MetricSource, type MetricUsage, type MetricWindow } from "@/lib/quality-metrics";
+import { feedbackMetrics, runModel, type FeedbackMetrics } from "@/lib/feedback-core";
 import {
   RUNS_PAGE_SIZE, candidateDiagnostics, filterRange, providerSwitches, runListRow, stageTimeline,
   structuralBudgetBlock, structuralFailure, structuralSetup, usageStage, type RunFilters,
@@ -121,6 +122,40 @@ export async function qualityReport(user: Identity, days: MetricWindow, now = ne
     readForRuns<MetricOpportunity>(ids, (chunk, from, to) => client.from("opportunities").select("run_id,evidence:payload->evidence").in("run_id", chunk).order("id").range(from, to)),
   ]);
   const preflight = new Set(blocks.filter(block => block.kind === "estimate").map(block => block.run_id));
-  return { days, since, metrics: qualityMetrics({ runs: runs.map(run => ({ ...run, preflight_blocked: preflight.has(run.id) })), usage, sources, opportunities }) };
+  return {
+    days, since,
+    metrics: qualityMetrics({ runs: runs.map(run => ({ ...run, preflight_blocked: preflight.has(run.id) })), usage, sources, opportunities }),
+    feedback: await feedbackReport(client, since),
+  };
+}
+
+/**
+ * Report feedback left in the window (WP-13): flags by reason, the domains of flagged sources, and ratings by discovery
+ * mode and by the model that wrote most of the run. Null when feedback cannot be read (for example before the
+ * report_feedback migration is applied), so the rest of the page still loads.
+ */
+async function feedbackReport(client: ReturnType<typeof createAdminClient>, since: string): Promise<FeedbackMetrics | null> {
+  try {
+    const rows = await readAll<{ run_id: string; opportunity_id: string | null; target: string; target_key: string; reason: string | null; rating: number | null }>((from, to) =>
+      client.from("report_feedback").select("run_id,opportunity_id,target,target_key,reason,rating").gte("created_at", since).order("created_at").order("id").range(from, to));
+    const flags = rows.filter(row => row.target !== "report");
+    const ratings = rows.filter(row => row.target === "report" && typeof row.rating === "number");
+    const flaggedOpportunities = [...new Set(flags.filter(row => row.target === "source" && row.opportunity_id).map(row => row.opportunity_id as string))];
+    const ratedRuns = [...new Set(ratings.map(row => row.run_id))];
+    const [evidence, runs, usage] = await Promise.all([
+      readForRuns<{ id: string; evidence: unknown }>(flaggedOpportunities, (chunk, from, to) => client.from("opportunities").select("id,evidence:payload->evidence").in("id", chunk).order("id").range(from, to)),
+      readForRuns<{ id: string; mode: string | null }>(ratedRuns, (chunk, from, to) => client.from("research_runs").select("id,mode:configuration->brief->>discovery_mode").in("id", chunk).order("id").range(from, to)),
+      readForRuns<{ run_id: string; provider: string; model: string; status: string; output_tokens: number }>(ratedRuns, (chunk, from, to) =>
+        client.from("research_usage").select("run_id,provider,model,status,output_tokens").in("run_id", chunk).order("id").range(from, to)),
+    ]);
+    const evidenceOf = new Map(evidence.map(row => [row.id, row.evidence]));
+    const modeOf = new Map(runs.map(row => [row.id, row.mode]));
+    return feedbackMetrics({
+      flags: flags.map(row => ({ target: row.target, target_key: row.target_key, reason: row.reason, evidence: row.opportunity_id ? evidenceOf.get(row.opportunity_id) : undefined })),
+      ratings: ratings.map(row => ({ rating: row.rating as number, mode: modeOf.get(row.run_id) ?? null, model: runModel(usage.filter(u => u.run_id === row.run_id)) })),
+    });
+  } catch {
+    return null;
+  }
 }
 export type QualityReport = Awaited<ReturnType<typeof qualityReport>>;

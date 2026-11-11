@@ -46,7 +46,11 @@ After this change `supabase migration list` shows local and remote in sync, and 
 
 ## Written but not yet applied
 
-None. When a pull request adds a migration, list it here until it is applied, and apply it only with the owner's approval. If `apply_migration` assigns a different version, rename the file to that version before merging. Merging to `main` can apply a migration to production: the Supabase integration applied `20261109150000`, `20261109160000`, `20261110120000`, `20261110130000`, `20261110140000`, `20261110150000` and `20261110160000` that way.
+| Version | Name | File | Pull request | What it does |
+| --- | --- | --- | --- | --- |
+| `20261110170000` | `report_feedback` | `supabase/migrations/20261110170000_report_feedback.sql` | WP-13 | New table `report_feedback` (RLS enabled and forced; composite foreign keys to `research_runs (id, user_id)` and `opportunities (id, user_id)`; `authenticated` may select and insert its own flags only, no update or delete; `service_role` may select). One rating per report and one flag per claim or source (partial unique indexes). New function `rate_report(uuid, integer, text)`, security definer, executable by `authenticated` only. No existing table changes. |
+
+When a pull request adds a migration, list it here until it is applied, and apply it only with the owner's approval. If `apply_migration` assigns a different version, rename the file to that version before merging. Merging to `main` can apply a migration to production: the Supabase integration applied `20261109150000`, `20261109160000`, `20261110120000`, `20261110130000`, `20261110140000`, `20261110150000` and `20261110160000` that way.
 
 ## Rules going forward
 
