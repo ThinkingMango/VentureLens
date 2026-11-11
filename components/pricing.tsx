@@ -198,7 +198,7 @@ const faqs = [
   },
   {
     q: "How do I get access to live research now?",
-    a: "Create a free account and confirm your email. One research run is granted automatically and shown on the New research page; complete your founder profile and start a brief to use it.",
+    a: "Create a free account and confirm your email. Ten research runs, valid for 90 days, are granted automatically and shown on the New research page; complete your founder profile and start a brief to use them.",
   },
 ];
 
@@ -209,11 +209,11 @@ export function Pricing() {
       <main id="main-content" tabIndex={-1}>
         <section className="mx-auto max-w-7xl px-5 pb-16 pt-12 md:px-8 md:pb-20 md:pt-20">
           <div className="flex flex-col gap-8 md:gap-10">
-            <h1 className="landing-title max-w-5xl">{copy("Your first research run is free.")}</h1>
+            <h1 className="landing-title max-w-5xl">{copy("Your first 10 research runs are free.")}</h1>
             <div className="grid gap-6 md:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] md:items-end md:gap-16">
               <p className="max-w-[36rem] text-pretty text-lg leading-relaxed text-muted-foreground">
                 {copy(
-                  "Every confirmed account gets one full research run: discovery, web evidence, scoring, adversarial review and a saved report. Paid credits are planned but not on sale yet, so nothing on this page can charge you.",
+                  "Every confirmed account gets 10 full research runs, valid for 90 days: discovery, web evidence, scoring, adversarial review and a saved report each time. Paid credits are planned but not on sale yet, so nothing on this page can charge you.",
                 )}
               </p>
               <div className="hero-actions flex flex-wrap gap-3 md:justify-end" data-cta-start>
@@ -254,7 +254,7 @@ export function Pricing() {
               <h2 className="landing-heading">{copy("You don’t pay for our failures.")}</h2>
               <p className="max-w-xl text-pretty leading-relaxed text-muted-foreground">
                 {copy(
-                  "Failures on our side always return the credit. When the evidence is too thin for a report, the credit also returns, up to a per-account limit that prevents abuse. Your free run works this way today, and paid credits will too.",
+                  "Failures on our side always return the credit. When the evidence is too thin for a report, the credit also returns, up to a per-account limit that prevents abuse. Your free runs work this way today, and paid credits will too.",
                 )}
               </p>
             </div>
@@ -285,7 +285,7 @@ export function Pricing() {
         <section className="border-t bg-card" data-cta-end>
           <div className="mx-auto flex max-w-7xl flex-col gap-8 px-5 py-16 md:px-8 md:py-24 lg:flex-row lg:items-end lg:justify-between">
             <div className="flex max-w-3xl flex-col gap-4">
-              <h2 className="landing-heading">{copy("Start with the free run. Decide about credits later.")}</h2>
+              <h2 className="landing-heading">{copy("Start with your free runs. Decide about credits later.")}</h2>
               <p className="max-w-xl text-pretty text-muted-foreground">
                 {copy("No card, no subscription. The demo needs no account at all.")}
               </p>

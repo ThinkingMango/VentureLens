@@ -214,3 +214,16 @@ test("public pages keep a call to action in reach on phones and share with a pro
   const en = JSON.parse(read("messages/en.json"));
   assert.doesNotMatch(en.metadata.description, /manage your opportunity shortlist/);
 });
+
+test("every public promise of free runs matches the signup grant: 10 runs for 90 days", () => {
+  const grant = read("supabase/migrations/20261111140000_signup_grant_ten_runs.sql");
+  assert.match(grant, /now\(\) \+ interval '90 days', 10, 'signup'/);
+  for (const file of ["landing", "pricing", "public-shell", "auth-screen", "research-access-card", "support"]) {
+    const source = read(`components/${file}.tsx`);
+    assert.doesNotMatch(source, /one free research run|one full research run|One research run is granted|first research run is free/i, file);
+    assert.match(source, /10 free research runs|10 full research runs|Ten research runs|first 10 research runs/, file);
+  }
+  for (const page of ["components/pricing.tsx", "components/support.tsx", "components/landing.tsx"])
+    if (/valid for/.test(read(page))) assert.match(read(page), /valid for 90 days/, page);
+  assert.match(JSON.parse(read("messages/en.json")).metadata.description, /first 10 runs are free/);
+});

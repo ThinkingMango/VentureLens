@@ -8,7 +8,7 @@ A founder describes their experience, constraints and goals; VentureLens discove
 - **Contact:** product help at `support@smartmango.ai`, privacy and data requests at `privacy@smartmango.ai` (`lib/contact.ts`). The Privacy Policy (`components/privacy.tsx`) describes the real data flows. Its AI-provider paragraphs, processor list and international-transfer clause, and the Support page's "Which AI model runs my research?" answer, are generated on every request from the research policy in `public.app_settings` (`lib/provider-disclosure.ts`), so saving a change at `/admin` updates them immediately; if the policy cannot be read they disclose every provider. Update the static text and `privacyUpdatedAt` whenever a cookie, stored field, or non-AI processor changes.
 - **Synthetic demo:** everything under `/demo/*` runs on fixed fixtures with no account and no AI calls.
 - **Languages:** English, Simplified Chinese, Traditional Chinese (interface). Source excerpts are kept in their original language.
-- **Status:** beta. Every confirmed account receives one free research run (`research_dev_access`, granted by a database trigger); failed runs are returned automatically (failures on our side and runs that spent nothing always; other failed runs up to `max_refunds` per account, default 3); payments are not connected. See [`plan.md`](./plan.md) for the roadmap and [`docs/REVIEW.md`](./docs/REVIEW.md) for the November 2026 holistic review (a historical snapshot; §8 there records what has since been fixed).
+- **Status:** beta. Every confirmed account receives 10 free research runs, valid for 90 days (`research_dev_access`, granted by a database trigger, `20261111140000`); failed runs are returned automatically (failures on our side and runs that spent nothing always; other failed runs up to `max_refunds` per account, default 3); payments are not connected. See [`plan.md`](./plan.md) for the roadmap and [`docs/REVIEW.md`](./docs/REVIEW.md) for the November 2026 holistic review (a historical snapshot; §8 there records what has since been fixed).
 
 ## Stack
 
@@ -62,7 +62,7 @@ Migration versions match the live project's history; see [`docs/DATABASE_MIGRATI
 
 Email templates for the passwordless flow live in `supabase/templates/` with setup notes in that folder's README.
 
-Every confirmed account receives one free research run automatically. To give an account more during the beta, raise its grant (`max_runs` is bounded 1–100):
+Every confirmed account receives 10 free research runs automatically, valid for 90 days. To give an account more during the beta, raise its grant (`max_runs` is bounded 1–100):
 
 ```sql
 update public.research_dev_access set max_runs = 20, expires_at = now() + interval '30 days'
