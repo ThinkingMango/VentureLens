@@ -69,7 +69,8 @@ export type NotificationOutcome =
  */
 export function notificationOutcome(run: RunForNotification): NotificationOutcome | null {
   if (run.status === "completed") return run.mode === "verify" ? { kind: "verified" } : { kind: "ready", count: run.opportunities };
-  if (run.status !== "failed" || run.error_code === "WORKFLOW_INTERRUPTED") return null;
+  // No email for an interruption (the run page offers the retry) or for a run the founder stopped themselves.
+  if (run.status !== "failed" || run.error_code === "WORKFLOW_INTERRUPTED" || run.error_code === "CANCELLED") return null;
   if (run.error_code === "INSUFFICIENT_EVIDENCE") return { kind: "nothing_passed" };
   return { kind: "failed", returned: run.quota_released === true };
 }

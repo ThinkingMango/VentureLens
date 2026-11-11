@@ -11,7 +11,7 @@ import { ResearchReportView } from "@/components/research-report";
 import { ResearchOutcomeView } from "@/components/research-outcome";
 import { ModelTag } from "@/components/model-tag";
 import { ReportRating } from "@/components/report-feedback";
-import { DeleteRunButton } from "@/components/library";
+import { CancelRunButton, DeleteRunButton } from "@/components/library";
 import { canDeleteRun } from "@/lib/library-core";
 import { ExportButton } from "@/components/report-export";
 import { exportFileName, reportToMarkdown } from "@/lib/report-export";
@@ -272,7 +272,9 @@ export function ResearchRunView({
             <h2 className="text-lg font-semibold">
               {copy(
                 data.status === "failed"
-                  ? "Research incomplete"
+                  ? data.error_code === "CANCELLED"
+                    ? "Research stopped"
+                    : "Research incomplete"
                   : (stageLabels[data.stage] ?? "Queued"),
               )}
             </h2>
@@ -291,6 +293,15 @@ export function ResearchRunView({
                 ? copy("You can leave this page. We'll email you when it's ready.")
                 : copy("You can leave this page; progress is saved on the server.")}
             </p>
+          )}
+          {active && (
+            <CancelRunButton
+              runId={data.id}
+              onCancelled={async () => {
+                await mutate().catch(() => undefined);
+                void refresh();
+              }}
+            />
           )}
           {active && data.stage === "retrieval" && !verifying && retrieval.total !== null && (
             <p className="text-sm font-medium">
@@ -360,9 +371,13 @@ export function ResearchRunView({
                 )}
               </p>
               <p className="text-sm text-muted-foreground">
-                {data.quota_released === false
-                  ? copy("This run used one of your research runs because your account has reached its limit of returned failed runs. Retrying this run, where offered, does not use another one.")
-                  : copy("This run did not use up a research run: your allowance was restored. A retry takes the slot again until it completes.")}
+                {data.error_code === "CANCELLED"
+                  ? data.quota_released === false
+                    ? copy("This run used one of your research runs: it had already spent part of its budget, and your account has reached its limit of returned runs.")
+                    : copy("Stopping returned this research run to your allowance.")
+                  : data.quota_released === false
+                    ? copy("This run used one of your research runs because your account has reached its limit of returned failed runs. Retrying this run, where offered, does not use another one.")
+                    : copy("This run did not use up a research run: your allowance was restored. A retry takes the slot again until it completes.")}
               </p>
               {data.error_code === "BUDGET_EXCEEDED" && (
                 <p className="max-w-prose text-sm leading-relaxed text-muted-foreground">

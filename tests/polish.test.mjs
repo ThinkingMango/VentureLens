@@ -73,8 +73,13 @@ test("research history shows whole translated sentences for counts and dates, an
     "@/components/demo-provider": { useDemo: () => ({ isDemo: false, data, run: { name: "" } }) },
     "@/lib/research-core": researchCore,
     "@/lib/research-options": researchOptions,
+    "@/lib/library-core": { canDeleteRun: status => !["pending", "running"].includes(status) },
+    "@/components/library": { DeleteRunButton: ({ runId, title }) => createElement("button", { "data-delete": runId }, `Delete ${title}`) },
   });
-  const html = text(renderToStaticMarkup(createElement(ResearchLibrary)));
+  const markup = renderToStaticMarkup(createElement(ResearchLibrary));
+  // Each brief's latest finished run can be deleted from the list (mobile card and table row both offer it).
+  assert.deepEqual([...new Set([...markup.matchAll(/data-delete="([^"]+)"/g)].map(m => m[1]))].sort(), ["p1-0", "p2-0"]);
+  const html = text(markup);
   // A brief with several industries lists them all, each translated on its own.
   assert.match(html, /Healthcare \+ Legal &amp; compliance/);
   assert.match(html, /1 completed run\b/);

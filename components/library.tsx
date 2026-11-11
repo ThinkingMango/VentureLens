@@ -1,7 +1,7 @@
 "use client";
 import { useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Archive, ArchiveRestore, Trash2 } from "lucide-react";
+import { Archive, ArchiveRestore, CircleStop, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -167,7 +167,15 @@ export function LibraryFilterBar({
  * "Delete this research" on a finished run's page: a dialog that asks the founder to type DELETE. Everything made from
  * the run goes with it; a run that is still working cannot be deleted.
  */
-export function DeleteRunButton({ runId }: { runId: string }) {
+export function DeleteRunButton({ runId, title, compact = false, onDeleted }: {
+  runId: string;
+  /** The research's name, for the compact button's accessible label in a list. */
+  title?: string;
+  /** An icon-only button for list rows. */
+  compact?: boolean;
+  /** Called after deleting instead of leaving the page (the research list stays where it is). */
+  onDeleted?: () => void;
+}) {
   const copy = useCopy();
   const router = useRouter();
   const { refresh } = useDemo();
@@ -195,7 +203,8 @@ export function DeleteRunButton({ runId }: { runId: string }) {
       toast.success(copy("Research deleted."));
       setOpen(false);
       await refresh().catch(() => undefined);
-      router.replace("/research");
+      if (onDeleted) onDeleted();
+      else router.replace("/research");
     } catch (error) {
       toast.error(copy(error instanceof Error ? error.message : "Your change could not be saved."));
       setDeleting(false);
@@ -203,10 +212,24 @@ export function DeleteRunButton({ runId }: { runId: string }) {
   }
   return (
     <>
-      <Button ref={trigger} type="button" variant="outline" className="text-destructive hover:text-destructive" onClick={() => { setTyped(""); setOpen(true); }}>
-        <Trash2 data-icon="inline-start" />
-        {copy("Delete research")}
-      </Button>
+      {compact ? (
+        <Button
+          ref={trigger}
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="size-11 text-muted-foreground hover:text-destructive"
+          aria-label={title ? copy("Delete {title}", { title }) : copy("Delete research")}
+          onClick={() => { setTyped(""); setOpen(true); }}
+        >
+          <Trash2 />
+        </Button>
+      ) : (
+        <Button ref={trigger} type="button" variant="outline" className="text-destructive hover:text-destructive" onClick={() => { setTyped(""); setOpen(true); }}>
+          <Trash2 data-icon="inline-start" />
+          {copy("Delete research")}
+        </Button>
+      )}
       <Dialog open={open} onOpenChange={(value) => !deleting && setOpen(value)}>
         <DialogContent
           className="max-h-[90dvh] overflow-y-auto"
@@ -240,6 +263,74 @@ export function DeleteRunButton({ runId }: { runId: string }) {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+/**
+ * "Stop research" on a run that is still working: a confirmation dialog, then the run ends as cancelled. Its saved
+ * sources and costs stay on the page, and it can be deleted afterwards like any finished run.
+ */
+export function CancelRunButton({ runId, onCancelled }: { runId: string; onCancelled: () => Promise<unknown> | void }) {
+  const copy = useCopy();
+  const [open, setOpen] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const trigger = useRef<HTMLButtonElement>(null);
+  async function stop() {
+    if (cancelling) return;
+    setCancelling(true);
+    try {
+      const response = await fetch("/api/research", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "cancel", id: runId }),
+        cache: "no-store",
+      });
+      const body = await response.json().catch(() => ({}));
+      // 409: the run finished on its own while the dialog was open; the refreshed page shows how it ended.
+      if (!response.ok && response.status !== 409) {
+        if (response.status === 401) window.location.assign("/login");
+        throw new Error(feedbackSource(body.code));
+      }
+      if (response.ok) toast.success(copy("Research stopped."));
+      setOpen(false);
+      await onCancelled();
+    } catch (error) {
+      toast.error(copy(error instanceof Error ? error.message : "Your change could not be saved."));
+    } finally {
+      setCancelling(false);
+    }
+  }
+  return (
+    <>
+      <Button ref={trigger} type="button" variant="outline" className="w-fit" onClick={() => setOpen(true)}>
+        <CircleStop data-icon="inline-start" />
+        {copy("Stop research")}
+      </Button>
+      <Dialog open={open} onOpenChange={(value) => !cancelling && setOpen(value)}>
+        <DialogContent
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            trigger.current?.focus();
+          }}
+        >
+          <DialogHeader>
+            <DialogTitle>{copy("Stop this research?")}</DialogTitle>
+            <DialogDescription>
+              {copy("The run stops before its next search or model request, and no report is produced. Sources found so far stay on this page. A stopped run cannot be resumed: start a new one when you are ready.")}
+            </DialogDescription>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            {copy("If nothing has been spent yet, the research run goes back to your allowance. Otherwise it counts like any other unfinished run.")}
+          </p>
+          <DialogFooter className="mt-2 gap-2">
+            <Button type="button" variant="outline" disabled={cancelling} onClick={() => setOpen(false)}>{copy("Keep running")}</Button>
+            <Button type="button" variant="destructive" disabled={cancelling} onClick={() => void stop()}>
+              {cancelling ? copy("Stopping…") : copy("Stop research")}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </>
