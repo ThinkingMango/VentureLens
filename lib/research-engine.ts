@@ -4,12 +4,14 @@ import { qwenModel, verifyQwenModel, searchQwen } from "@/lib/qwen-provider";
 import { QWEN_PROVIDER } from "@/lib/qwen-core";
 import { geminiModel, verifyGeminiModel, searchGemini } from "@/lib/gemini-provider";
 import { GEMINI_PROVIDER, geminiPricing, withResearchFallback, requestWasRejected } from "@/lib/research-fallback-core";
+import { generateClaudeObject, verifyClaudeModel, searchClaude } from "@/lib/claude-provider";
+import { CLAUDE_PROVIDER } from "@/lib/claude-core";
 import { fetchResearchSource } from "@/lib/research-source";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { researchProviderSettings } from "@/lib/provider-settings";
 import { defaultProviderSettings, providerPlan, providerSettingsSchema, resolveSourcePolicy, legacySourcePolicy, retrievalLimits, runShape, searchGuidance, queryEvidence, queryGuidance, type ProviderSettings, type SourcePolicy } from "@/lib/provider-settings-core";
-import { selectedModel, researchModelPricing, geminiThinkingOptions, qwenModelSchema, geminiModelSchema, searchTimeout, MIN_SEARCH_MS, RETRIEVAL_STEP_BUDGET_MS, type ResearchModelId } from "@/lib/research-models";
+import { selectedModel, researchModelPricing, geminiThinkingOptions, qwenModelSchema, geminiModelSchema, claudeModelSchema, searchTimeout, MIN_SEARCH_MS, RETRIEVAL_STEP_BUDGET_MS, type ResearchModelId } from "@/lib/research-models";
 import { reservationFor, estimateRunCost } from "@/lib/research-budget";
 import { briefFocus, searchLanguage } from "@/lib/research-options";
 import { researchRequestSchema, profileSchema, opportunitySchema } from "@/lib/workspace-schema";
@@ -25,8 +27,15 @@ import {
 const pricingSchema = z.object({ input: z.number().positive().max(0.00001), output: z.number().positive().max(0.00003), search: z.number().positive().max(0.05), checked_at: z.string() });
 type Pricing = z.infer<typeof pricingSchema>;
 type Context = { runId: string; userId: string; workflowId: string };
-type SetupOutput = Record<string, unknown> & { active_provider?: string; search_provider?: string; fallback_pricing?: Pricing; provider_settings?: ProviderSettings; source_policy?: unknown; fallback_allowed?: boolean; brief?: { language?: unknown } };
+type SetupOutput = Record<string, unknown> & { active_provider?: string; search_provider?: string; fallback_pricing?: Pricing; claude_pricing?: Pricing; provider_settings?: ProviderSettings; source_policy?: unknown; fallback_allowed?: boolean; brief?: { language?: unknown } };
 const db = createAdminClient;
+type ProviderKey = ProviderSettings["primary"];
+/** The provider id recorded on runs and usage rows for each provider of the research policy. */
+const providerIds: Record<ProviderKey, string> = { qwen: QWEN_PROVIDER, gemini: GEMINI_PROVIDER, claude: CLAUDE_PROVIDER };
+/** The policy provider behind a recorded provider id. Runs recorded before Gemini and Claude ids existed are Qwen. */
+export function providerKey(id: string | undefined): ProviderKey {
+  return id === GEMINI_PROVIDER ? "gemini" : id === CLAUDE_PROVIDER ? "claude" : "qwen";
+}
 function checked<T>(result: { data: T; error: unknown }): T {
   if (result.error) {
     const message = typeof result.error === "object" && "message" in result.error ? String(result.error.message) : "";
@@ -146,7 +155,7 @@ export async function initializeResearch(ctx: Context) {
   const cached = checked(await client.from("research_stages").select("output").eq("run_id", ctx.runId).eq("user_id", ctx.userId).eq("stage_key", "setup").maybeSingle());
   if (!cached) {
     const saved = await researchProviderSettings();
-    const providerSettings = providerSettingsSchema.parse({ primary: saved.primary, autoFallback: saved.autoFallback, qwenModel: saved.qwenModel, geminiModel: saved.geminiModel, budgetUsd: saved.budgetUsd });
+    const providerSettings = providerSettingsSchema.parse({ primary: saved.primary, autoFallback: saved.autoFallback, ...(saved.fallbackProvider ? { fallbackProvider: saved.fallbackProvider } : {}), qwenModel: saved.qwenModel, geminiModel: saved.geminiModel, claudeModel: saved.claudeModel, budgetUsd: saved.budgetUsd });
     // Breadth and depth of evidence collection, frozen with the model choice so a policy change never alters a run.
     const sourcePolicy = resolveSourcePolicy(saved.sources);
     const plan = providerPlan(providerSettings);
@@ -174,6 +183,7 @@ export async function initializeResearch(ctx: Context) {
     }
     const verify = async (provider: ProviderSettings["primary"]) => {
       if (provider === "gemini") { await verifyGeminiModel(providerSettings.geminiModel); return GEMINI_PROVIDER; }
+      if (provider === "claude") { await verifyClaudeModel(providerSettings.claudeModel); return CLAUDE_PROVIDER; }
       await verifyQwenModel(providerSettings.qwenModel); return QWEN_PROVIDER;
     };
     let verifyFailure: string | undefined;
@@ -184,17 +194,18 @@ export async function initializeResearch(ctx: Context) {
     );
     const pricing = pricingSchema.parse(researchModelPricing(providerSettings.qwenModel));
     const fallbackPricing = pricingSchema.parse(researchModelPricing(providerSettings.geminiModel));
-    const active = activeProvider === GEMINI_PROVIDER ? "gemini" : "qwen";
+    const claudePricing = pricingSchema.parse(researchModelPricing(providerSettings.claudeModel));
+    const active = providerKey(activeProvider);
     // A check of one idea needs no memory: it researches exactly what the founder wrote.
     const history = configuration.brief.discovery_mode === "verify" ? [] : await collectHistory(ctx);
     await checkpoint(ctx, "setup", {
-      ...configuration, history, pricing, fallback_pricing: fallbackPricing, active_provider: activeProvider, provider_settings: providerSettings, source_policy: sourcePolicy,
+      ...configuration, history, pricing, fallback_pricing: fallbackPricing, claude_pricing: claudePricing, active_provider: activeProvider, provider_settings: providerSettings, source_policy: sourcePolicy,
       // The fallback stays available mid-run only when it, too, can finish within the budget.
       fallback_allowed: order.length > 1 && !verifyFailure,
       model: selectedModel(active, providerSettings), provider: activeProvider, methodology,
       ...(primarySkipped ? { primary_skipped: primarySkipped } : {}),
     });
-  } else if (![QWEN_PROVIDER, GEMINI_PROVIDER].includes((cached.output as { provider?: string }).provider ?? "")) {
+  } else if (![QWEN_PROVIDER, GEMINI_PROVIDER, CLAUDE_PROVIDER].includes((cached.output as { provider?: string }).provider ?? "")) {
     throw new Error("PROVIDER_CONFIGURATION");
   }
   return true;
@@ -235,14 +246,18 @@ async function providerCall<T>(ctx: Context, stage: string, prompt: string, prim
   // Searches can run on a different provider from the structured stages: Qwen's native search is agent-style and
   // multi-round, so it can exceed its timeout while Qwen's structured output stays fast and far cheaper.
   const current = search ? setup.search_provider ?? setup.active_provider : setup.active_provider;
-  const plan = providerPlan(settings, current === GEMINI_PROVIDER ? "gemini" : "qwen");
+  const plan = providerPlan(settings, providerKey(current));
   const fallback = plan.fallback && setup.fallback_allowed !== false ? plan.fallback : undefined;
-  const primary = plan.primary === "gemini" ? GEMINI_PROVIDER : QWEN_PROVIDER;
+  const primary = providerIds[plan.primary];
   let primaryFailure: string | undefined;
   const attempt = async (provider: string) => {
-    const model = selectedModel(provider === GEMINI_PROVIDER ? "gemini" : "qwen", settings);
+    const key = providerKey(provider);
+    const model = selectedModel(key, settings);
     const currentPricing = researchModelPricing(model);
-    const savedPricing = provider === GEMINI_PROVIDER ? pricingSchema.parse(setup.fallback_pricing ?? geminiPricing) : primaryPricing;
+    // Each provider is billed at the pricing frozen at setup, or today's if that is higher.
+    const savedPricing = key === "gemini" ? pricingSchema.parse(setup.fallback_pricing ?? geminiPricing)
+      : key === "claude" ? pricingSchema.parse(setup.claude_pricing ?? currentPricing)
+      : primaryPricing;
     const pricing = { ...savedPricing, input: Math.max(savedPricing.input, currentPricing.input), output: Math.max(savedPricing.output, currentPricing.output), search: Math.max(savedPricing.search, currentPricing.search) };
     const reservation = reservationFor(model, pricing, { promptBytes: Buffer.byteLength(prompt), systemBytes: Buffer.byteLength(system), schemaBytes, search });
     const id = await reserve(ctx, stage, prompt, pricing, provider, model, reservation);
@@ -268,7 +283,7 @@ async function providerCall<T>(ctx: Context, stage: string, prompt: string, prim
   };
   return withResearchFallback(
     () => attempt(primary),
-    fallback ? () => attempt(fallback === "gemini" ? GEMINI_PROVIDER : QWEN_PROVIDER) : undefined,
+    fallback ? () => attempt(providerIds[fallback]) : undefined,
     error => primaryFailure = errorCode(error),
   );
 }
@@ -280,6 +295,9 @@ async function providerCall<T>(ctx: Context, stage: string, prompt: string, prim
 async function structured<D, T>(ctx: Context, stage: string, draft: z.ZodType<D>, normalize: (value: D) => T, prompt: string, pricing: Pricing): Promise<T> {
   const schemaBytes = Buffer.byteLength(JSON.stringify(z.toJSONSchema(draft)));
   const call = () => providerCall(ctx, stage, prompt, pricing, false, schemaBytes, async (provider, model, maxOutputTokens, system) => {
+    if (provider === CLAUDE_PROVIDER) {
+      return generateClaudeObject({ model: claudeModelSchema.parse(model), system, prompt: `Return a JSON object matching the supplied schema.\n${prompt}`, schema: draft, maxOutputTokens, timeoutMs: 120000 });
+    }
     const result = await generateText({ model: provider === GEMINI_PROVIDER ? geminiModel(geminiModelSchema.parse(model)) : qwenModel(qwenModelSchema.parse(model)), system, prompt: `Return a JSON object matching the supplied schema.\n${prompt}`, output: Output.object({ schema: draft }), ...(provider === GEMINI_PROVIDER ? { providerOptions: geminiThinkingOptions(geminiModelSchema.parse(model)) } : {}), maxOutputTokens, maxRetries: 0, abortSignal: AbortSignal.timeout(120000) });
     return { value: result.output, tokens: result.totalUsage };
   });
@@ -287,7 +305,8 @@ async function structured<D, T>(ctx: Context, stage: string, draft: z.ZodType<D>
   try {
     value = await call();
   } catch (error) {
-    if (!NoObjectGeneratedError.isInstance(error)) throw error;
+    // Claude marks an answer that did not parse the same way (parseClaudeObject in claude-core.ts).
+    if (!NoObjectGeneratedError.isInstance(error) && !(error instanceof Error && "unparsedOutput" in error)) throw error;
     log("warn", "structured output did not parse; retrying once", ctx, { stage, ...describeFailure(error) });
     value = await call();
   }
@@ -324,10 +343,12 @@ async function retrieve(ctx: Context, candidate: Candidate & { query_alt?: strin
     try {
       // Native search context and query reservations are estimates, not provider-enforced limits.
       const result = await providerCall(ctx, index === 0 ? `retrieval:${candidate.key}` : `retrieval:${candidate.key}:alt`, prompt, pricing, true, 0, async (provider, model) => {
-        const timeoutMs = searchTimeout(provider === GEMINI_PROVIDER ? "gemini" : "qwen", stepStart);
+        const timeoutMs = searchTimeout(providerKey(provider), stepStart);
         // Too little time left: not sent, so its reservation is released and the fallback (if any) gets the same check.
         if (timeoutMs < MIN_SEARCH_MS) throw Object.assign(new Error("TRANSIENT_PROVIDER: no time left in this retrieval step"), { requestNotSent: true });
-        const result = await (provider === GEMINI_PROVIDER ? searchGemini(prompt, geminiModelSchema.parse(model), timeoutMs) : searchQwen(prompt, qwenModelSchema.parse(model), timeoutMs));
+        const result = await (provider === GEMINI_PROVIDER ? searchGemini(prompt, geminiModelSchema.parse(model), timeoutMs)
+          : provider === CLAUDE_PROVIDER ? searchClaude(prompt, claudeModelSchema.parse(model), timeoutMs)
+          : searchQwen(prompt, qwenModelSchema.parse(model), timeoutMs));
         return { value: result, tokens: result.tokens, searchRequests: result.searchRequests };
       });
       lists.push(result.sources);

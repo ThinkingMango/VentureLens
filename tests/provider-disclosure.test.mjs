@@ -53,6 +53,9 @@ const policies = {
   qwenOnly: policy({ primary: "qwen", autoFallback: false }),
   geminiWithFallback: policy({ primary: "gemini", autoFallback: true, geminiModel: "gemini-4-argon" }),
   geminiOnly: policy({ primary: "gemini", autoFallback: false, geminiModel: "gemini-3.8-flash" }),
+  claudeWithFallback: policy({ primary: "claude", autoFallback: true, claudeModel: "claude-sonnet-5-5" }),
+  claudeToQwen: policy({ primary: "claude", autoFallback: true, fallbackProvider: "qwen", claudeModel: "claude-haiku-5-5" }),
+  geminiToClaude: policy({ primary: "gemini", autoFallback: true, fallbackProvider: "claude" }),
 };
 const CHINA = "mainland China";
 
@@ -73,12 +76,24 @@ test("the disclosure mirrors the saved routing policy exactly", () => {
 
   const defaults = providerDisclosure({ ...providerSettingsSchema.parse({ primary: "qwen", autoFallback: true }), updatedAt: null });
   assert.equal(defaults.settingsUpdatedAt, null);
+
+  const claude = providerDisclosure(policies.claudeWithFallback);
+  assert.deepEqual([claude.primary.provider, claude.primary.processor, claude.primary.modelName, claude.fallback?.provider], ["claude", "Anthropic", "Claude Sonnet 5.5", "gemini"]);
+  assert.equal(claude.processesInChina, false, "Claude with its default Gemini fallback sends nothing to mainland China");
+
+  const claudeToQwen = providerDisclosure(policies.claudeToQwen);
+  assert.deepEqual([claudeToQwen.primary.modelName, claudeToQwen.fallback?.provider], ["Claude Haiku 5.5", "qwen"]);
+  assert.equal(claudeToQwen.processesInChina, true, "A chosen Qwen fallback means data may reach mainland China");
+
+  const geminiToClaude = providerDisclosure(policies.geminiToClaude);
+  assert.deepEqual([geminiToClaude.fallback?.provider, geminiToClaude.fallback?.modelName], ["claude", "Claude Opus 5.5"]);
+  assert.equal(geminiToClaude.processesInChina, false);
 });
 
 test("an unreadable policy discloses every provider rather than understating processing", () => {
   const unknown = providerDisclosure(null);
   assert.equal(unknown.known, false);
-  assert.deepEqual(unknown.providers.map(p => p.processor), ["Alibaba Cloud Model Studio", "Google"]);
+  assert.deepEqual(unknown.providers.map(p => p.processor), ["Alibaba Cloud Model Studio", "Google", "Anthropic"]);
   assert.equal(unknown.processesInChina, true);
   // The browser receives derived facts only: never the budget or anything about credentials.
   assert.ok(!("budgetUsd" in providerDisclosure(policies.qwenOnly)));
@@ -106,7 +121,18 @@ test("the Privacy Policy names only the providers and regions the current policy
   assert.match(reversed, /fall back to Qwen 3\.8 Flash through Alibaba Cloud Model Studio, which processes requests in mainland China/);
 
   const unknown = render("../components/privacy.tsx", "Privacy", providerDisclosure(null)).text;
-  assert.match(unknown, /Qwen through Alibaba Cloud Model Studio, which processes requests in mainland China \(Beijing region\), or the Google Gemini API/);
+  assert.match(unknown, /Qwen through Alibaba Cloud Model Studio, which processes requests in mainland China \(Beijing region\), the Google Gemini API, or the Anthropic Claude API/);
+  assert.match(unknown, /Anthropic AI model \(Claude\)/);
+
+  const claude = render("../components/privacy.tsx", "Privacy", providerDisclosure(policies.claudeWithFallback)).text;
+  assert.match(claude, /Research runs currently use Claude Sonnet 5\.5 through the Anthropic Claude API\./);
+  assert.match(claude, /Anthropic Primary AI model \(Claude\).*Google Fallback AI model \(Gemini\)/);
+  assert.ok(!claude.includes(CHINA), "No mainland China processing is claimed for Claude with a Gemini fallback");
+
+  const claudeFallback = render("../components/privacy.tsx", "Privacy", providerDisclosure(policies.geminiToClaude)).text;
+  assert.match(claudeFallback, /fall back to Claude Opus 5\.5 through the Anthropic Claude API/);
+  assert.match(claudeFallback, /Anthropic Fallback AI model \(Claude\)/);
+  assert.ok(!claudeFallback.includes("Alibaba"), "Qwen is not listed when neither primary nor fallback uses it");
   assert.match(unknown, /for Qwen research runs, mainland China/);
   assert.ok(!unknown.includes("last changed"), "No change date is shown when the policy could not be read");
 });
@@ -122,7 +148,11 @@ test("the Support page answers which model runs research from the current policy
   assert.match(argon, /fall back to Qwen 3\.8 Flash through Alibaba Cloud Model Studio/);
 
   const unknown = render("../components/support.tsx", "Support", providerDisclosure(null)).text;
-  assert.match(unknown, /Research runs use Qwen through Alibaba Cloud Model Studio.*or the Google Gemini API/);
+  assert.match(unknown, /Research runs use Qwen through Alibaba Cloud Model Studio.*the Google Gemini API, or the Anthropic Claude API/);
+
+  const claude = render("../components/support.tsx", "Support", providerDisclosure(policies.claudeToQwen)).text;
+  assert.match(claude, /New research runs use Claude Haiku 5\.5 through the Anthropic Claude API\./);
+  assert.match(claude, /fall back to Qwen 3\.8 Flash through Alibaba Cloud Model Studio, which processes requests in mainland China/);
 });
 
 test("every policy variant renders only text that is translated in all three languages", () => {

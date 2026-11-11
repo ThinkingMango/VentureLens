@@ -8,6 +8,7 @@ import { useCopy } from "@/i18n/use-copy";
 const providerNames: Record<string, string> = {
   "dashscope-beijing": "Qwen via DashScope",
   "google-gemini": "Gemini via Google",
+  "anthropic-claude": "Claude via Anthropic",
 };
 export function ModelTag({ model, provider, planned = false }: { model: string | null; provider?: string | null; planned?: boolean }) {
   const copy = useCopy();

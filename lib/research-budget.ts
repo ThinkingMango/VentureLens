@@ -1,12 +1,12 @@
-import { researchModels, researchModelPricing, searchQueryAllowance, type ResearchModelId } from "./research-models.ts";
+import { researchModels, researchModelPricing, searchQueryAllowance, providerOfModel, type ResearchModelId, type ResearchProviderName } from "./research-models.ts";
 
 export type UnitPricing = { input: number; output: number; search: number };
 
 // Fixed context headroom added to every reservation for provider-side wrapping and tool instructions.
 export const RESERVATION_CONTEXT_HEADROOM = 12_000;
 
-export function providerOf(model: ResearchModelId): "qwen" | "gemini" {
-  return model.startsWith("qwen") ? "qwen" : "gemini";
+export function providerOf(model: ResearchModelId): ResearchProviderName {
+  return providerOfModel(model);
 }
 
 /**
@@ -33,7 +33,9 @@ export function reservationFor(model: ResearchModelId, pricing: UnitPricing, cal
 export const typicalRun = {
   candidates: 8,
   discovery: { inputTokens: 1_500, outputTokens: 2_000, promptBytes: 3_000 },
-  retrieval: { inputTokens: { gemini: 400, qwen: 8_000 }, queries: 2, promptBytes: 700 },
+  // Claude: not yet calibrated against the ledger. Its search results (page titles and content) are added to the
+  // search call's input; 20,000 tokens is a conservative estimate for two searches. Re-calibrate after real runs.
+  retrieval: { inputTokens: { gemini: 400, qwen: 8_000, claude: 20_000 }, queries: 2, promptBytes: 700 },
   classification: { calls: 4, inputTokens: 7_000, outputTokens: 2_500, promptBytes: 28_000 },
   // Methodology v3 (WP-07): 3–12 claims per candidate add about 1,500 output tokens per batch of two. Re-calibrate
   // against the usage ledger after real v3 runs.

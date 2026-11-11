@@ -9,6 +9,7 @@ import { researchProviderSettings } from "@/lib/provider-settings";
 import { providerPlan } from "@/lib/provider-settings-core";
 import { selectedModel } from "@/lib/research-models";
 import { QWEN_PROVIDER } from "@/lib/qwen-core";
+import { CLAUDE_PROVIDER } from "@/lib/claude-core";
 import { GEMINI_PROVIDER } from "@/lib/research-fallback-core";
 import { outcomeSchema, interruptionFor, DISPATCH_GRACE_MS, type ActiveRun } from "@/lib/research-core";
 import { PROGRESS_SOURCES, estimateMinutes, progressSource, type RunProgress } from "@/lib/research-progress";
@@ -208,7 +209,7 @@ async function describeModel(setupOutput: unknown, usage: { provider?: string | 
   try {
     const settings = await researchProviderSettings();
     const plan = providerPlan(settings);
-    return { provider: plan.primary === "gemini" ? GEMINI_PROVIDER : QWEN_PROVIDER, model: selectedModel(plan.primary, settings), planned: true, used };
+    return { provider: plan.primary === "gemini" ? GEMINI_PROVIDER : plan.primary === "claude" ? CLAUDE_PROVIDER : QWEN_PROVIDER, model: selectedModel(plan.primary, settings), planned: true, used };
   } catch {
     return { provider: null, model: null, planned: true, used };
   }

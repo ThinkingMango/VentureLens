@@ -1,5 +1,5 @@
 import { providerPlan, type ProviderSettings, type ResearchProvider } from "./provider-settings-core.ts";
-import { researchModels, selectedModel, type ResearchModelId } from "./research-models.ts";
+import { researchModels, researchProviders, selectedModel, type ResearchModelId } from "./research-models.ts";
 
 // What the public Privacy Policy and Support page say about AI processing, derived from the same research policy
 // (public.app_settings, key "research") that new runs read. Only these derived facts reach the browser; the budget
@@ -38,9 +38,10 @@ export type ProviderDisclosure =
 const processors: Record<ResearchProvider, { processor: string; processesInChina: boolean }> = {
   qwen: { processor: "Alibaba Cloud Model Studio", processesInChina: true },
   gemini: { processor: "Google", processesInChina: false },
+  claude: { processor: "Anthropic", processesInChina: false },
 };
 
-function describe(provider: ResearchProvider, settings: Partial<Pick<ProviderSettings, "qwenModel" | "geminiModel">>): DisclosedProvider {
+function describe(provider: ResearchProvider, settings: Partial<Pick<ProviderSettings, "qwenModel" | "geminiModel" | "claudeModel">>): DisclosedProvider {
   const model = selectedModel(provider, settings);
   return { provider, model, modelName: researchModels[model].name, ...processors[provider] };
 }
@@ -52,7 +53,7 @@ function describe(provider: ResearchProvider, settings: Partial<Pick<ProviderSet
 export function providerDisclosure(settings: (ProviderSettings & { updatedAt?: string | null }) | null): ProviderDisclosure {
   if (!settings) {
     // Default models: with the policy unreadable, the provider names are what matters for the disclosure.
-    return { known: false, providers: [describe("qwen", {}), describe("gemini", {})], processesInChina: true, settingsUpdatedAt: null };
+    return { known: false, providers: researchProviders.map(provider => describe(provider, {})), processesInChina: true, settingsUpdatedAt: null };
   }
   const plan = providerPlan(settings);
   const primary = describe(plan.primary, settings);

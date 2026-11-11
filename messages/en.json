@@ -1,14 +1,14 @@
 {
   "admin": {
     "title": "AI providers",
-    "description": "Choose how new research runs use Qwen and Gemini.",
+    "description": "Choose how new research runs use Qwen, Gemini and Claude.",
     "administrator": "Administrator",
     "routing": "Research provider",
     "routingHelp": "This policy applies to new research runs across all workspaces.",
     "primary": "Primary provider",
     "primaryHelp": "The selected provider handles analysis and native web retrieval.",
     "fallback": "Automatic fallback",
-    "fallbackHelp": "Try the other provider if the primary has a configuration, credit, availability, or retrieval failure.",
+    "fallbackHelp": "Try the fallback provider if the primary has a configuration, credit, availability, or retrieval failure.",
     "nextRun": "Routing for new research",
     "noFallback": "No fallback",
     "fallbackLimit": "One-way fallback only. If a reservation is rejected before sending a request, the other configured provider may be tried within the same budget. Validation, evidence, and post-request budget failures never trigger fallback.",
@@ -92,7 +92,10 @@
     "pagesOption": "{count, plural, one {# page} other {# pages}}",
     "pagesPerIdeaHelp": "More pages give each idea more chances to find independent support, and add classification cost. Verify my idea reads twice as many.",
     "sourcesSummary": "A discovery run makes up to {searches} searches for {ideas} ideas and reads up to {pages} of {results} results for each; Verify my idea reads up to {verifyPages} pages.",
-    "sourcesGate": "These settings change what is searched and read, never the evidence rules: an opportunity still needs supporting sources from at least two independent domains, at least one of them not a vendor."
+    "sourcesGate": "These settings change what is searched and read, never the evidence rules: an opportunity still needs supporting sources from at least two independent domains, at least one of them not a vendor.",
+    "fallbackProvider": "Fallback provider",
+    "fallbackProviderHelp": "The provider that takes over when the primary fails. A run falls back at most once.",
+    "claudeSearch": "Native web_search tool with sources"
   },
   "ui": {
     "m1pbhrck": "Admin",
@@ -1992,7 +1995,16 @@
     "m132zmf1": "Stopping…",
     "m4ndd1b": "This run used one of your research runs: it had already spent part of its budget, and your account has reached its limit of returned runs.",
     "m12w8nf4": "Stopping returned this research run to your allowance.",
-    "mrb9hhk": "Stopped by you"
+    "mrb9hhk": "Stopped by you",
+    "m3c65rb": "Claude via Anthropic",
+    "m1b43ymw": "New research runs use {model} through the Anthropic Claude API.",
+    "mhr0cvw": "If it is unavailable, a run may fall back to {model} through the Anthropic Claude API.",
+    "mn46hns": "Research runs currently use {model} through the Anthropic Claude API.",
+    "m1eod6qi": "Research runs use Qwen through Alibaba Cloud Model Studio, which processes requests in mainland China (Beijing region), the Google Gemini API, or the Anthropic Claude API, as chosen by an administrator.",
+    "m18twc5e": "Primary AI model (Claude) and web search for research runs.",
+    "mid1lns": "Fallback AI model (Claude) and web search for research runs.",
+    "mbj1zl8": "AI model (Claude) and web search for research runs.",
+    "m4u4lhv": "Anthropic"
   },
   "language": {
     "label": "Interface language",

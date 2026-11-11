@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { DEFAULT_QWEN_MODEL, DEFAULT_GEMINI_MODEL, qwenModelSchema, geminiModelSchema, selectedModel } from "./research-models.ts";
+import { DEFAULT_QWEN_MODEL, DEFAULT_GEMINI_MODEL, DEFAULT_CLAUDE_MODEL, qwenModelSchema, geminiModelSchema, claudeModelSchema, researchProviders, selectedModel } from "./research-models.ts";
 import { estimateRunCost } from "./research-budget.ts";
 import { sourcePolicySchema, resolveSourcePolicy, runShape } from "./source-policy.ts";
 
@@ -18,10 +18,14 @@ export const DEFAULT_RESEARCH_BUDGET_USD = 0.25;
 export const MIN_RESEARCH_BUDGET_USD = 0.05;
 export const MAX_RESEARCH_BUDGET_USD = 5;
 export const providerSettingsSchema = z.strictObject({
-  primary: z.enum(["qwen", "gemini"]),
+  primary: z.enum(researchProviders),
   autoFallback: z.boolean(),
+  // Which provider takes over when the primary fails. Absent on rows saved before Claude was added: those keep the
+  // fallback they always had (defaultFallback).
+  fallbackProvider: z.enum(researchProviders).optional(),
   qwenModel: qwenModelSchema.default(DEFAULT_QWEN_MODEL),
   geminiModel: geminiModelSchema.default(DEFAULT_GEMINI_MODEL),
+  claudeModel: claudeModelSchema.default(DEFAULT_CLAUDE_MODEL),
   // Hard per-run spend cap applied by enqueue_research to new runs.
   budgetUsd: z.number().min(MIN_RESEARCH_BUDGET_USD).max(MAX_RESEARCH_BUDGET_USD).default(DEFAULT_RESEARCH_BUDGET_USD),
 });
@@ -53,12 +57,19 @@ export function readStoredProviderSettings(value: unknown): ProviderSettingsResp
   return parsed.data;
 }
 
-export function providerPlan(settings: ProviderSettings, active: ResearchProvider = settings.primary) {
+/** The fallback for each primary when none is chosen: Qwen and Gemini back each other up, as before Claude existed. */
+export const defaultFallback: Record<ResearchProvider, ResearchProvider> = { qwen: "gemini", gemini: "qwen", claude: "gemini" };
+
+/** The provider that takes over from `primary`: the chosen one, or the default when none is chosen or it is the primary itself. */
+export function fallbackFor(settings: Pick<ProviderSettings, "primary"> & { fallbackProvider?: ResearchProvider }): ResearchProvider {
+  const chosen = settings.fallbackProvider;
+  return chosen && chosen !== settings.primary ? chosen : defaultFallback[settings.primary];
+}
+
+export function providerPlan(settings: Pick<ProviderSettings, "primary" | "autoFallback"> & { fallbackProvider?: ResearchProvider }, active: ResearchProvider = settings.primary) {
   return {
     primary: active,
-    fallback: settings.autoFallback && active === settings.primary
-      ? (active === "qwen" ? "gemini" : "qwen") as ResearchProvider
-      : undefined,
+    fallback: settings.autoFallback && active === settings.primary ? fallbackFor(settings) : undefined,
   };
 }
 
