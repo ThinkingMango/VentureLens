@@ -10,6 +10,7 @@ import * as presentation from "../lib/report-presentation.ts";
 import * as researchCore from "../lib/research-core.ts";
 import * as researchOptions from "../lib/research-options.ts";
 import { messageKey, locales } from "../i18n/config.ts";
+import * as outcomeLabels from "../lib/outcome-labels.ts";
 
 const { scoreBreakdown, scoreBand, scoreBands } = presentation;
 const { scoreParts, weightedScore, normalizeReview, REVIEW_MAX_PENALTY } = researchCore;
@@ -51,11 +52,19 @@ test("band labels and meanings are translated in all three languages", () => {
       for (const locale of locales) assert.ok(catalogs[locale].ui[messageKey(text)], `${locale}: ${text}`);
 });
 
+// Modules added by report export (WP-11), for components loaded without them in their dependency list.
+const exportMocks = {
+  "@/components/report-export": { ExportButton: () => null, PrintButton: () => null },
+  "@/lib/report-export": { buildOpportunityExport() {}, opportunityMarkdown() {}, exportFileName() {}, reportToMarkdown() {} },
+  "@/lib/outcome-labels": outcomeLabels,
+  // The real next-intl (notify.ts translates with it), with a locale for components rendered outside a provider.
+  get "next-intl"() { return { ...require("next-intl"), useLocale: () => "en" }; },
+};
 function loadModule(file, dependencies) {
   const source = readFileSync(new URL(file, import.meta.url), "utf8");
   const { outputText } = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } });
   const module = { exports: {} };
-  const dependency = name => Object.hasOwn(dependencies, name) ? dependencies[name] : require(name);
+  const dependency = name => Object.hasOwn(dependencies, name) ? dependencies[name] : Object.hasOwn(exportMocks, name) ? exportMocks[name] : require(name);
   new Function("require", "exports", "module", "process", outputText)(dependency, module.exports, module, { env: {} });
   return module.exports;
 }

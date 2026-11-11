@@ -503,3 +503,40 @@ main[id] {
     scroll-behavior: auto !important;
   }
 }
+
+/* Print views (WP-11): a plain document on screen and on paper. */
+.print-doc { color: var(--foreground); line-height: 1.6; }
+.print-doc article { display: flex; flex-direction: column; gap: 0.75rem; }
+.print-doc h1 { font-size: 1.875rem; line-height: 1.2; font-weight: 600; text-wrap: balance; }
+.print-doc h2 { font-size: 1.375rem; font-weight: 600; margin-top: 1.25rem; }
+.print-doc h3 { font-size: 1.125rem; font-weight: 600; margin-top: 1rem; }
+.print-doc h4, .print-doc h5, .print-doc h6 { font-size: 1rem; font-weight: 600; margin-top: 0.75rem; }
+.print-doc .print-opportunity-title { font-size: 1.5rem; margin-top: 0; }
+.print-doc p, .print-doc li { overflow-wrap: anywhere; }
+.print-doc ul { list-style: disc; padding-left: 1.25rem; display: flex; flex-direction: column; gap: 0.375rem; }
+.print-doc ol { list-style: decimal; padding-left: 1.5rem; display: flex; flex-direction: column; gap: 0.375rem; }
+.print-doc ol.print-sources { list-style: none; padding-left: 0; gap: 0.875rem; }
+.print-doc a { color: var(--primary); text-decoration: underline; text-underline-offset: 2px; }
+.print-doc blockquote { border-left: 3px solid var(--border); padding-left: 0.875rem; margin-top: 0.375rem; color: var(--muted-foreground); }
+.print-doc .print-note { font-size: 0.875rem; color: var(--muted-foreground); }
+.print-doc .print-verdict { border: 1px solid var(--border); border-radius: 0.5rem; padding: 0.75rem 1rem; }
+.print-doc .print-facts { display: grid; gap: 0.375rem; }
+.print-doc .print-facts > div { display: flex; flex-wrap: wrap; gap: 0 0.5rem; }
+.print-doc .print-facts dt { color: var(--muted-foreground); }
+.print-doc .print-facts dt::after { content: ":"; }
+.print-doc .print-facts dd { font-weight: 500; }
+.print-doc .print-break { display: flex; flex-direction: column; gap: 0.75rem; border-top: 1px solid var(--border); padding-top: 1.5rem; margin-top: 1rem; }
+.print-doc .print-footer { margin-top: 0.5rem; }
+
+@media print {
+  @page { margin: 16mm 14mm; }
+  html, body { background: #fff !important; }
+  .print-hide { display: none !important; }
+  .print-doc { max-width: none; padding: 0; color: #111; font-size: 11pt; }
+  .print-doc a { color: #111; }
+  /* Paper has no links to follow, so each source's address is printed beside its title. */
+  .print-doc a[href^="http"]::after { content: " (" attr(href) ")"; font-size: 0.85em; color: #444; overflow-wrap: anywhere; }
+  .print-doc .print-break { break-before: page; border-top: 0; padding-top: 0; margin-top: 0; }
+  .print-doc h1, .print-doc h2, .print-doc h3, .print-doc h4, .print-doc h5 { break-after: avoid; }
+  .print-doc blockquote, .print-doc li, .print-doc .print-verdict { break-inside: avoid; }
+}
