@@ -25,6 +25,7 @@ Read from `supabase_migrations.schema_migrations` on the live project:
 | `20261110160000` | `run_focus` | `supabase/migrations/20261110160000_run_focus.sql` | identical (applied from the repository file after #49 merged, under the file's own version; stored one statement per element without the final semicolons; checked 2026-11-10) |
 | `20261110170000` | `report_feedback` | `supabase/migrations/20261110170000_report_feedback.sql` | identical (applied from the repository file after #53 merged, under the file's own version; stored one statement per element without the final semicolons; checked 2026-11-11) |
 | `20261110180000` | `run_notifications` | `supabase/migrations/20261110180000_run_notifications.sql` | identical (applied from the repository file after #55 merged, under the file's own version; stored one statement per element without the final semicolons; checked 2026-11-11) |
+| `20261111120000` | `validation_sprints` | `supabase/migrations/20261111120000_validation_sprints.sql` | identical (applied from the repository file after #56 merged, under the file's own version; stored one statement per element without the final semicolons; checked 2026-11-11) |
 
 "Identical" means the MD5 of the SQL with all whitespace removed matches between the repository file and the `statements` column of the applied migration.
 
@@ -48,11 +49,7 @@ After this change `supabase migration list` shows local and remote in sync, and 
 
 ## Written but not yet applied
 
-| Version | Name | File | Pull request | What it does |
-| --- | --- | --- | --- | --- |
-| `20261111120000` | `validation_sprints` | `supabase/migrations/20261111120000_validation_sprints.sql` | WP-10 | New tables `validation_sprints` and `validation_tasks` (RLS enabled and forced; composite foreign keys to `opportunities (id, user_id)` and `validation_sprints (id, user_id)`, cascading on delete; select, insert and own-field updates for `authenticated`, plus task delete; nothing for `anon`). One active sprint per opportunity per founder (partial unique index); at most 50 tasks a sprint (trigger). New function `start_validation_sprint(uuid, integer, text[])`, security invoker, executable by `authenticated` only. No existing table changes; `saved_opportunities.completed_tasks` is read, never rewritten. |
-
-When a pull request adds a migration, list it here until it is applied, and apply it only with the owner's approval. If `apply_migration` assigns a different version, rename the file to that version before merging. Merging to `main` can apply a migration to production: the Supabase integration applied `20261109150000`, `20261109160000`, `20261110120000`, `20261110130000`, `20261110140000`, `20261110150000`, `20261110160000`, `20261110170000` and `20261110180000` that way.
+None. When a pull request adds a migration, list it here until it is applied, and apply it only with the owner's approval. If `apply_migration` assigns a different version, rename the file to that version before merging. Merging to `main` can apply a migration to production: the Supabase integration applied `20261109150000`, `20261109160000`, `20261110120000`, `20261110130000`, `20261110140000`, `20261110150000`, `20261110160000`, `20261110170000`, `20261110180000` and `20261111120000` that way.
 
 ## Rules going forward
 
