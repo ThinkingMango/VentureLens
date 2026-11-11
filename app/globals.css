@@ -23,6 +23,7 @@
   --color-accent-foreground: var(--primary);
   --color-warm: var(--warm);
   --color-warm-soft: var(--warm-soft);
+  --color-warm-ink: var(--warm-ink);
   --color-success: var(--success);
   --color-success-soft: var(--success-soft);
   --color-border: var(--border);
@@ -50,6 +51,8 @@
   --muted-foreground: #53675e;
   --warm: #c4863c;
   --warm-soft: #f4e9d7;
+  /* Ochre dark enough for text on paper (5.6:1); --warm itself is decorative only. */
+  --warm-ink: #8a5a1f;
   --success: #2f6b52;
   --success-soft: #e2eee6;
   --destructive: #a43f3f;
@@ -241,30 +244,6 @@ button {
     var(--background);
 }
 
-.hero-layout {
-  display: grid;
-  gap: 2.5rem;
-}
-
-.hero-copy {
-  display: grid;
-  gap: 1.5rem;
-  align-content: center;
-  align-items: start;
-}
-
-.hero-copy h1 {
-  font-family: var(--font-display);
-  font-size: clamp(3rem, 6vw, 5.6rem);
-  line-height: 0.98;
-  letter-spacing: -0.05em;
-  font-weight: 500;
-}
-
-.hero-copy > p {
-  max-width: 58ch;
-}
-
 .hero-preview {
   border: 1px solid var(--border);
   background: var(--card);
@@ -313,19 +292,6 @@ button {
   font-size: 0.8125rem;
   font-weight: 600;
   letter-spacing: 0.04em;
-}
-
-.step-number {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2.75rem;
-  height: 2.75rem;
-  border-radius: 50%;
-  font-family: var(--font-display);
-  font-size: 1.35rem;
-  color: var(--primary);
-  background: var(--secondary);
 }
 
 .field-select {
@@ -448,17 +414,151 @@ progress::-moz-progress-bar {
   animation: pulse-ring 1.8s ease-out infinite;
 }
 
+/* Landing page. One bold element (the run ledger); everything else is type and hairlines. */
+.hero-layout {
+  display: grid;
+  gap: 2rem;
+  grid-template-areas: "title" "copy" "preview";
+}
+
+.hero-title {
+  grid-area: title;
+}
+
+.hero-copy {
+  grid-area: copy;
+  display: grid;
+  gap: 1.5rem;
+  align-content: start;
+}
+
+.hero-layout > .hero-preview {
+  grid-area: preview;
+}
+
+.landing-title {
+  font-family: var(--font-display);
+  font-size: clamp(3rem, 7.4vw, 6.9rem);
+  font-weight: 500;
+  line-height: 0.94;
+  letter-spacing: -0.04em;
+  text-wrap: balance;
+}
+
+.landing-heading {
+  font-family: var(--font-display);
+  font-size: clamp(2.1rem, 4.2vw, 3.4rem);
+  font-weight: 500;
+  line-height: 1.04;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+
+/* Chinese display headings break at punctuation, not mid-word; overflow-wrap still rescues a narrow column. */
+html:lang(zh-Hans) :is(.landing-title, .landing-heading),
+html:lang(zh-Hant) :is(.landing-title, .landing-heading) {
+  word-break: keep-all;
+}
+
+.landing-rule {
+  border-top: 1px solid var(--border);
+}
+
+/* The run ledger: a list on phones, a five-column grid from 1024px. Display is set only in the media query, because
+   unlayered CSS outranks Tailwind's layered utilities and would override the header's "hidden". */
+
+.ledger-struck {
+  color: var(--muted-foreground);
+  text-decoration: none;
+  background-image: linear-gradient(var(--warm-ink), var(--warm-ink));
+  background-repeat: no-repeat;
+  background-position: 0 56%;
+  background-size: 100% 1.5px;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+.ledger-track {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.ledger-track > span {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--secondary);
+}
+
+.ledger-track > span[data-state="passed"] {
+  background: var(--primary);
+}
+
+.ledger-track > span[data-state="stopped"] {
+  background: var(--warm-ink);
+}
+
+@keyframes ledger-strike {
+  from {
+    background-size: 0% 1.5px;
+  }
+  to {
+    background-size: 100% 1.5px;
+  }
+}
+
+/* Scrolling draws the line through each dropped idea. Browsers without scroll timelines show it drawn. */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .ledger-struck {
+      animation: ledger-strike linear both;
+      animation-timeline: view();
+      animation-range: entry 60% cover 40%;
+    }
+  }
+}
+
+.faq-item + .faq-item {
+  border-top: 1px solid var(--border);
+}
+
+.faq-item summary {
+  list-style: none;
+}
+
+.faq-item summary::-webkit-details-marker {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .hero-layout {
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+    grid-template-areas: "title title" "copy preview";
+    column-gap: 3.5rem;
+    row-gap: 2.75rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .ledger-row,
+  .ledger-head {
+    display: grid;
+    gap: 0.75rem 1.25rem;
+    grid-template-columns: minmax(0, 2.1fr) repeat(4, minmax(0, 1fr)) 4.5rem;
+    align-items: center;
+  }
+
+  .hero-layout {
+    grid-template-columns: minmax(0, 0.84fr) minmax(0, 1.16fr);
+  }
+}
+
 section[id],
 main[id] {
   scroll-margin-top: 96px;
 }
 
 @media (min-width: 768px) {
-  .hero-layout {
-    grid-template-columns: minmax(0, 1.08fr) minmax(340px, 0.92fr);
-    align-items: center;
-  }
-
   .terminal-stats {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
@@ -483,6 +583,10 @@ main[id] {
 
   .hero-actions > a {
     width: 100%;
+  }
+
+  .landing-title {
+    font-size: 2.85rem;
   }
 
   .page-heading {

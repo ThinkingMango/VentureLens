@@ -149,3 +149,20 @@ test("research setup is divided into named scannable groups", () => {
   assert.match(config, /aria-labelledby="research-focus-group"/);
   assert.match(config, /aria-labelledby="research-review-group"/);
 });
+
+test("the landing page's claims about scoring match the engine", async () => {
+  const landing = read("components/landing.tsx");
+  const core = read("lib/research-core.ts");
+  // The review penalty is read from code, never typed into the copy.
+  assert.match(landing, /REVIEW_MAX_PENALTY/);
+  assert.doesNotMatch(landing, /up to \d+ points/);
+  // The page advertises an 85 cap, so no demo score shown beside it may exceed the engine's cap.
+  assert.match(core, /const cap = evidenceCount >= 3 \? 85 : 70;/);
+  assert.match(landing, /tops out at 85/);
+  const { opportunities } = await import("../lib/demo-data.ts");
+  for (const o of opportunities) assert.ok(o.score <= 85, `${o.id} scores ${o.score}, above the 85 cap`);
+  // The ledger's desktop header must stay hidden on phones: its grid display lives only in the 1024px query.
+  const css = read("app/globals.css");
+  const base = css.slice(0, css.indexOf("@media (min-width: 1024px)"));
+  assert.doesNotMatch(base, /\.ledger-head[^{]*\{[^}]*display:/);
+});

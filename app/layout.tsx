@@ -9,6 +9,8 @@ const geist = Geist({ subsets: ["latin"], variable: "--font-geist" });
 const newsreader = Newsreader({
   subsets: ["latin"],
   display: "swap",
+  // The optical-size axis gives large headlines the display cut and small text a sturdier one.
+  axes: ["opsz"],
   variable: "--font-newsreader",
 });
 const cjk = Noto_Sans_SC({

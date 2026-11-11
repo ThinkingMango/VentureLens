@@ -10,7 +10,7 @@ import {
 export function ScoreChart() {
   const copy = useCopy();
   const data = [
-    { name: "Proposal", score: 87 },
+    { name: "Proposal", score: 84 },
     { name: "Feedback", score: 83 },
     { name: "Finance", score: 79 },
     { name: "Workflow", score: 76 },
@@ -18,7 +18,7 @@ export function ScoreChart() {
   return (
     <figure
       aria-label={copy(
-        "Synthetic opportunity scores: proposal 87, feedback 83, finance 79, workflow 76 out of 100",
+        "Synthetic opportunity scores: proposal 84, feedback 83, finance 79, workflow 76 out of 100",
       )}
     >
       <ChartContainer

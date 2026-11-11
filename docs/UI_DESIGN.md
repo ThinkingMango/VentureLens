@@ -39,3 +39,16 @@ Product Design was installed during the session, but no Product Design skills or
 ## Card presentation
 
 Overview, results, and saved opportunities use the shared OpportunityCard component. Cards stack on phones and form two columns on wider screens, with score, title, description, buyer, pricing assumptions, risk, confidence, and a full-width mobile report action. Save remains an independent accessible toggle. Landing preview choices are also presented as selectable cards. The results comparison view remains optional.
+
+## Landing page (November 2026 redesign)
+
+The landing page spends its boldness in one place, the **run ledger**, and keeps everything else quiet: type, whitespace and hairline rules instead of card grids.
+
+- **Hero:** one full-width Newsreader headline (optical-size axis enabled in `app/layout.tsx`), then the copy and calls to action beside the interactive `EvidencePreview`. No eyebrow, no accented phrase.
+- **How it works:** three numbered steps, because they are a real sequence: profile, research run (find or check), validation sprint.
+- **Run ledger** (`#research-run`): an illustrative run of eight hypotheses against the four gates the engine applies in order (evidence found, two independent websites, non-vendor buyer demand, adversarial review). The four survivors are the demo opportunities and link to their demo pages; the four dropped ideas are struck through with the reason given. From 1024px it is a grid with one column per gate; on phones each row shows a four-segment track and a plain-language status. Scrolling draws the strike-through (`animation-timeline: view()`); browsers without scroll timelines, and reduced-motion users, see it drawn.
+- **Rules:** stated beside the ledger with numbers read from code where they can drift (`REVIEW_MAX_PENALTY`). The evidence caps (70 / 85) match `scoreParts` in `lib/research-core.ts`; the demo's top score is 84 so the page never shows a score above the cap it advertises.
+- **Report contents, audiences, FAQ, closing:** definition list, prose columns, a hairline `details` list, and a closing statement on the card surface. No green call-to-action box.
+- `--warm-ink` (#8a5a1f) is the ochre used for text (dropped reasons); `--warm` stays decorative.
+- Chinese display headings use `word-break: keep-all` so they break at punctuation, not mid-word.
+- Custom layout classes set `display` only inside media queries where a Tailwind visibility utility (`hidden`, `lg:grid`) shares the element, because unlayered CSS outranks Tailwind v4's layered utilities.
