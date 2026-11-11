@@ -854,7 +854,6 @@
     "m1d15ue7": "Find a business worth building.",
     "m1k3638h": "Then prove it.",
     "mfzhhsh": "VentureLens turns your experience into a shortlist of GenAI-enabled, recurring-revenue businesses—each backed by linked sources, an explainable score, a critique, and a validation plan.",
-    "m16pdezy": "Explore the live demo",
     "m16ow48j": "Create a free account",
     "mq34vnv": "No credit card",
     "m1hzhiln": "English · 简体中文 · 繁體中文",
@@ -869,7 +868,6 @@
     "mhp6te0": "Straight answers before you start",
     "msk6ifr": "Still unsure? Open the demo and read a full sample report first.",
     "m16b98za": "Read a sample report",
-    "mrglaxa": "Live demo",
     "mt3xpi6": "Evidence-first research for founders exploring GenAI-enabled, recurring-revenue businesses. Private accounts, saved briefs, and a synthetic demo you can explore without signing up.",
     "mmx6d3g": "Product",
     "moyp43g": "Account",
@@ -1936,7 +1934,6 @@
     "m1ewn0l0": "{gate}: dropped here.",
     "mlw2jjb": "{proposed} ideas proposed, {dropped} dropped, {kept} in the report. Illustrative run with synthetic data; the four that survive are the demo’s opportunities.",
     "m1tlrx4g": "Start from your experience, or from an idea you already have. VentureLens searches the web for independent evidence, drops what it can’t support, and gives you a scored report with a plan to test what’s left.",
-    "muaxv0m": "The demo needs no account. Every confirmed account includes one free research run.",
     "mykiork": "Most ideas don’t survive the research. That’s the point.",
     "mygyczx": "Every run proposes five to eight hypotheses, then tries to break them. These rules are enforced in code, not in a prompt, so an idea reaches your report only if the evidence holds up.",
     "mvkx80q": "Synthetic opportunity scores: proposal 84, feedback 83, finance 79, workflow 76 out of 100",
@@ -1973,7 +1970,11 @@
     "m1qpvuag": "You don’t pay for our failures.",
     "ma1cc2y": "Failures on our side always return the credit. When the evidence is too thin for a report, the credit also returns, up to a per-account limit that prevents abuse. Your free run works this way today, and paid credits will too.",
     "mazgqs4": "Start with the free run. Decide about credits later.",
-    "m17awdrn": "No card, no subscription. The demo needs no account at all."
+    "m17awdrn": "No card, no subscription. The demo needs no account at all.",
+    "mhied74": "Try the demo",
+    "m19in7lp": "{proposed} ideas proposed. {dropped} dropped. {kept} in the report.",
+    "m1pwatdd": "Illustrative run with synthetic data; the four that survive are the demo’s opportunities.",
+    "m1gi5ohp": "The demo needs no account. Every confirmed account includes one free research run, and a full run usually takes 5–10 minutes."
   },
   "language": {
     "label": "Interface language",
@@ -1981,7 +1982,7 @@
     "error": "Language could not be saved. Please try again."
   },
   "metadata": {
-    "title": "VentureLens AI — Find your next opportunity",
-    "description": "Build your founder profile, save private research briefs, and manage your opportunity shortlist. Explore clearly labeled sample reports in a separate demo."
+    "title": "VentureLens AI — Find a business worth building",
+    "description": "Evidence-first research for founders. Start from your experience or your own idea, keep only what independent evidence supports, and get a plan to test it. Your first run is free."
   }
 }

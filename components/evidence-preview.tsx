@@ -35,8 +35,25 @@ export function EvidencePreview() {
             <span>{copy("Opportunities")}</span>
             <span>{copy("Demo score")}</span>
           </div>
+          {/* Phones: a short list of links into the demo, so the page reaches the run ledger sooner. */}
+          <ul className="grid gap-2.5 px-5 py-4 sm:hidden">
+            {opportunities.map((opportunity) => (
+              <li key={opportunity.id}>
+                <Link
+                  href={`/demo/opportunities/${opportunity.id}`}
+                  className="flex min-h-11 items-center justify-between gap-3 rounded-lg border px-4 py-3 hover:border-primary/50 hover:bg-secondary/40"
+                >
+                  <span className="min-w-0 text-sm font-medium leading-snug">{opportunity.title}</span>
+                  <span className="flex shrink-0 items-center gap-2">
+                    <span className="terminal-number text-lg text-primary">{opportunity.score}</span>
+                    <ArrowUpRight className="size-4 text-muted-foreground" aria-hidden="true" />
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
           <div
-            className="grid gap-2.5 px-5 py-4 sm:grid-cols-2 sm:gap-3 sm:p-4 lg:grid-cols-1"
+            className="hidden gap-2.5 px-5 py-4 sm:grid sm:grid-cols-2 sm:gap-3 sm:p-4 lg:grid-cols-1"
             role="group"
             aria-label={copy("Opportunities")}
           >
@@ -66,7 +83,7 @@ export function EvidencePreview() {
         </div>
         <div
           id="preview-detail"
-          className="space-y-5 p-5 sm:p-6"
+          className="hidden space-y-5 p-5 sm:block sm:p-6"
           aria-live="polite"
           aria-atomic="true"
         >

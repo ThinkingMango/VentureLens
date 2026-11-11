@@ -216,7 +216,7 @@ export function Pricing() {
                   "Every confirmed account gets one full research run: discovery, web evidence, scoring, adversarial review and a saved report. Paid credits are planned but not on sale yet, so nothing on this page can charge you.",
                 )}
               </p>
-              <div className="hero-actions flex flex-wrap gap-3 md:justify-end">
+              <div className="hero-actions flex flex-wrap gap-3 md:justify-end" data-cta-start>
                 <Button asChild size="lg">
                   <Link href="/signup">
                     {copy("Create a free account")}
@@ -224,7 +224,7 @@ export function Pricing() {
                   </Link>
                 </Button>
                 <Button asChild variant="outline" size="lg">
-                  <Link href="/demo/dashboard">{copy("Explore the live demo")}</Link>
+                  <Link href="/demo/dashboard">{copy("Try the demo")}</Link>
                 </Button>
               </div>
             </div>
@@ -282,7 +282,7 @@ export function Pricing() {
           </div>
         </section>
 
-        <section className="border-t bg-card">
+        <section className="border-t bg-card" data-cta-end>
           <div className="mx-auto flex max-w-7xl flex-col gap-8 px-5 py-16 md:px-8 md:py-24 lg:flex-row lg:items-end lg:justify-between">
             <div className="flex max-w-3xl flex-col gap-4">
               <h2 className="landing-heading">{copy("Start with the free run. Decide about credits later.")}</h2>
@@ -298,7 +298,7 @@ export function Pricing() {
                 </Link>
               </Button>
               <Button asChild variant="outline" size="lg">
-                <Link href="/demo/dashboard">{copy("Explore the live demo")}</Link>
+                <Link href="/demo/dashboard">{copy("Try the demo")}</Link>
               </Button>
             </div>
           </div>

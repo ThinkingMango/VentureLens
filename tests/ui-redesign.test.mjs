@@ -186,3 +186,31 @@ test("the pricing page states only what the product and the refund rule actually
   // The demo billing page reuses the same comparison, kept as a card inside the workspace.
   assert.match(read("components/billing.tsx"), /<PlanTable bleed=\{false\} \/>/);
 });
+
+test("public pages keep a call to action in reach on phones and share with a proper preview", () => {
+  const shell = read("components/public-shell.tsx");
+  const css = read("app/globals.css");
+  // The phone bar takes display from Tailwind only; unlayered CSS would override "lg:hidden" on desktop.
+  assert.match(shell, /className="mobile-cta flex gap-3 lg:hidden"/);
+  assert.doesNotMatch(css.match(/\.mobile-cta \{[^}]*\}/)[0], /display:/);
+  for (const page of ["components/landing.tsx", "components/pricing.tsx"]) {
+    const source = read(page);
+    assert.match(source, /data-cta-start/, page);
+    assert.match(source, /data-cta-end/, page);
+    // The demo is synthetic, so it is never called "live".
+    assert.doesNotMatch(source, /live demo/i, page);
+  }
+  assert.doesNotMatch(shell, /"Live demo"/);
+  // The menu follows the order of the landing page's sections.
+  assert.ok(shell.indexOf('"/#how-it-works"') < shell.indexOf('"/#whats-inside"'));
+  // The landing states run time with the same figure the run page shows.
+  assert.match(read("components/research-run.tsx"), /A full run usually takes 5–10 minutes\./);
+  assert.match(read("components/landing.tsx"), /a full run usually takes 5–10 minutes\./);
+  // Link previews: a share image and Open Graph / Twitter metadata.
+  assert.ok(readFileSync(new URL("../app/opengraph-image.png", import.meta.url)).length > 10_000);
+  const layout = read("app/layout.tsx");
+  assert.match(layout, /openGraph:/);
+  assert.match(layout, /summary_large_image/);
+  const en = JSON.parse(read("messages/en.json"));
+  assert.doesNotMatch(en.metadata.description, /manage your opportunity shortlist/);
+});
