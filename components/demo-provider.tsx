@@ -24,6 +24,8 @@ type WorkspaceState = {
   setRun: (r: ResearchBrief) => Promise<void>;
   /** "Clear idea memory": later research no longer avoids ideas from earlier runs. Not available in the demo. */
   clearMemory: () => Promise<void>;
+  /** Turns the "report ready" email on or off (WP-08). Not available in the demo. */
+  setNotify: (enabled: boolean) => Promise<void>;
   completed: string[];
   toggleTask: (id: string) => void;
   href: (path: string) => string;
@@ -84,6 +86,7 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
           setProfile(p);
         },
         clearMemory: async () => undefined,
+        setNotify: async () => undefined,
         setRun: async (r) => {
           setRunEdited(true);
           setRun(r);
@@ -177,6 +180,7 @@ export function WorkspaceProvider({
         setProfile: (profile, starter) => persist({ action: "profile", profile, ...(starter ? { starter } : {}) }),
         setRun: (project) => persist({ action: "project", project }),
         clearMemory: () => persist({ action: "clear_memory" }),
+        setNotify: (enabled) => persist({ action: "notify", enabled }),
         toggleSave: (id) =>
           handleMutation({
             action: "save",

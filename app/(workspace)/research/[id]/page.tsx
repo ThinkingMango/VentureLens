@@ -6,6 +6,7 @@ import { researchDetail } from "@/lib/research-service";
 import { ResearchRunView } from "@/components/research-run";
 import { after } from "next/server";
 import { track } from "@/lib/events";
+import { notificationMode, type NotifyEnv } from "@/lib/notify-core";
 export async function generateMetadata() {
   const copy = await getCopy();
   return {
@@ -30,7 +31,9 @@ export default async function Page({
     for (const candidate of outcome.candidates) reasonCounts[candidate.reason] = (reasonCounts[candidate.reason] ?? 0) + 1;
     after(() => track("outcome_viewed", { userId: user.id, props: { reasonCounts } }));
   }
-  return <ResearchRunView initialData={detail} rating={await reportRating(supabase, user.id, id)} />;
+  // Promise an email only when one will really be sent: email is on for this deployment and the founder kept it on.
+  const emailOn = notificationMode(process.env as NotifyEnv).mode === "send" && ["pending", "running"].includes(detail.status) && await notifyPreference(supabase, user.id);
+  return <ResearchRunView initialData={detail} rating={await reportRating(supabase, user.id, id)} emailOnFinish={emailOn} />;
 }
 
 /** The founder's own rating of this report (WP-13). A read failure only hides the saved rating; the page still loads. */
@@ -40,5 +43,15 @@ async function reportRating(supabase: Awaited<ReturnType<typeof requireUser>>["s
     return !error && data && typeof data.rating === "number" ? { rating: data.rating, comment: typeof data.comment === "string" ? data.comment : "" } : null;
   } catch {
     return null;
+  }
+}
+
+/** The founder's "email me" preference (WP-08); on when it cannot be read. */
+async function notifyPreference(supabase: Awaited<ReturnType<typeof requireUser>>["supabase"], userId: string) {
+  try {
+    const { data, error } = await supabase.from("founder_profiles").select("notify_on_complete").eq("user_id", userId).maybeSingle();
+    return error ? true : data?.notify_on_complete !== false;
+  } catch {
+    return true;
   }
 }

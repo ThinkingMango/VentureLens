@@ -607,7 +607,7 @@ test("the outcome checkpoint keeps the first version written", async () => {
 test("concurrent dispatches share a durable hook and manual retries get a new identity", async () => {
   const row = { status: "pending", workflow_id: null, retry_count: 0 };
   const hooks = new Map(), requests = [], updates = [];
-  const service = loadModule("../lib/research-service.ts", {
+  const service = loadModule("../lib/research-service.ts", { "@/lib/research-progress": require("../lib/research-progress.ts"),
     "server-only": {}, "@/lib/research-core": researchCore,
     "@/lib/provider-settings": { researchProviderSettings: async () => ({ primary: "qwen", autoFallback: true }) }, "@/lib/provider-settings-core": settingsCore, "@/lib/research-models": models, "@/lib/qwen-core": { QWEN_PROVIDER: "dashscope-beijing" }, "@/lib/research-fallback-core": fallbackCore,
     "workflow/api": { start: async (_workflow, args, options) => {
@@ -666,7 +666,7 @@ test("research detail explains blocked reservations without adding them to spent
     };
     return query;
   }
-  const service = loadModule("../lib/research-service.ts", { "server-only": {}, "@/lib/research-core": researchCore, "workflow/api": {}, "workflow/errors": {}, "@/workflows/research": {}, "@/lib/provider-settings": { researchProviderSettings: async () => ({ primary: "qwen", autoFallback: true }) }, "@/lib/provider-settings-core": settingsCore, "@/lib/research-models": models, "@/lib/qwen-core": { QWEN_PROVIDER: "dashscope-beijing" }, "@/lib/research-fallback-core": fallbackCore, "@/lib/supabase/admin": {} });
+  const service = loadModule("../lib/research-service.ts", { "@/lib/research-progress": require("../lib/research-progress.ts"), "server-only": {}, "@/lib/research-core": researchCore, "workflow/api": {}, "workflow/errors": {}, "@/workflows/research": {}, "@/lib/provider-settings": { researchProviderSettings: async () => ({ primary: "qwen", autoFallback: true }) }, "@/lib/provider-settings-core": settingsCore, "@/lib/research-models": models, "@/lib/qwen-core": { QWEN_PROVIDER: "dashscope-beijing" }, "@/lib/research-fallback-core": fallbackCore, "@/lib/supabase/admin": {} });
   const detail = await service.researchDetail({ from }, "owner", "run");
   assert.equal(detail.usage.committed_usd, 0.051042);
   assert.equal(detail.usage.search_requests, 0);
@@ -689,7 +689,7 @@ test("research detail returns the run's outcome, read with the owner's own clien
     };
     return query;
   }
-  const service = loadModule("../lib/research-service.ts", { "server-only": {}, "@/lib/research-core": researchCore, "workflow/api": {}, "workflow/errors": {}, "@/workflows/research": {}, "@/lib/provider-settings": { researchProviderSettings: async () => ({ primary: "qwen", autoFallback: true }) }, "@/lib/provider-settings-core": settingsCore, "@/lib/research-models": models, "@/lib/qwen-core": { QWEN_PROVIDER: "dashscope-beijing" }, "@/lib/research-fallback-core": fallbackCore, "@/lib/supabase/admin": {} });
+  const service = loadModule("../lib/research-service.ts", { "@/lib/research-progress": require("../lib/research-progress.ts"), "server-only": {}, "@/lib/research-core": researchCore, "workflow/api": {}, "workflow/errors": {}, "@/workflows/research": {}, "@/lib/provider-settings": { researchProviderSettings: async () => ({ primary: "qwen", autoFallback: true }) }, "@/lib/provider-settings-core": settingsCore, "@/lib/research-models": models, "@/lib/qwen-core": { QWEN_PROVIDER: "dashscope-beijing" }, "@/lib/research-fallback-core": fallbackCore, "@/lib/supabase/admin": {} });
   const detail = await service.researchDetail({ from }, "owner", "run");
   assert.deepEqual(detail.outcome, outcome);
   assert.equal(detail.outcome.candidates[0].reason, "SEARCH_FAILED");
@@ -700,6 +700,7 @@ test("the actual progress view renders blocked-request costs and a usable recove
   const data = { id: "run", status: "failed", stage: "retrieval", error_code: "BUDGET_EXCEEDED", retry_count: 0, model: { provider: "google-gemini", model: "gemini-4-argon", planned: false, used: ["gemini-4-argon"] }, configuration: { brief: { name: "Test 1" } }, report: null, steps: [{ stage_key: "discovery" }, { stage_key: "retrieval:c1" }], usage: { estimated_usd: 0.051042, committed_usd: 0.051042, budget_usd: 0.25, uncertain_calls: 0, input_tokens: 756, output_tokens: 4953, search_requests: 0 }, budget_block: { model: "gemini-4-argon", required_usd: 0.20448, remaining_usd: 0.198958 } };
   const { ResearchRunView } = loadModule("../components/research-run.tsx", {
     "@/components/report-feedback": { ReportRating: ({ runId }) => createElement("aside", { "data-rating": runId }, "RATING") },
+    "@/lib/research-progress": require("../lib/research-progress.ts"),
     "next/link": { default: ({ children, ...props }) => createElement("a", props, children) },
     "swr": { default: () => ({ data, mutate: async () => undefined }) },
     "@/components/ui/button": { Button: ({ asChild, children, ...props }) => asChild ? cloneElement(children, props) : createElement("button", props, children) },
@@ -741,6 +742,7 @@ function runViewWithOutcome(data) {
   const outcomeModule = loadModule("../components/research-outcome.tsx", { ...shared, "lucide-react": { ExternalLink: () => null, SearchX: () => null } });
   const { ResearchRunView } = loadModule("../components/research-run.tsx", {
     "@/components/report-feedback": { ReportRating: ({ runId }) => createElement("aside", { "data-rating": runId }, "RATING") },
+    "@/lib/research-progress": require("../lib/research-progress.ts"),
     ...shared,
     "swr": { default: () => ({ data, mutate: async () => undefined }) },
     "@/components/shared": { PageHeader: ({ title }) => createElement("h1", null, title) },
@@ -892,6 +894,7 @@ test("a failed run says whether its slot was returned, from the server's refund 
     const data = { id: "run", status: "failed", stage: "classification", error_code: "INVALID_OUTPUT", retry_count: 0, quota_released, model: { provider: "dashscope-beijing", model: "qwen3.8-flash", planned: false, used: ["qwen3.8-flash"] }, configuration: { brief: { name: "Test" } }, report: null, steps: [{ stage_key: "discovery" }], usage: { estimated_usd: 0.04, committed_usd: 0.04, budget_usd: 0.25, uncertain_calls: 0, input_tokens: 1, output_tokens: 1, search_requests: 1 } };
     const { ResearchRunView } = loadModule("../components/research-run.tsx", {
     "@/components/report-feedback": { ReportRating: ({ runId }) => createElement("aside", { "data-rating": runId }, "RATING") },
+    "@/lib/research-progress": require("../lib/research-progress.ts"),
       "next/link": { default: ({ children, ...props }) => createElement("a", props, children) },
       "swr": { default: () => ({ data, mutate: async () => undefined }) },
       "@/components/ui/button": { Button: ({ asChild, children, ...props }) => asChild ? cloneElement(children, props) : createElement("button", props, children) },
@@ -1227,7 +1230,7 @@ test("a run whose models cannot finish within its budget stops before any provid
 test("dispatch falls back to a plain start when the deployment does not support start hooks", async () => {
   const row = { status: "pending", workflow_id: null, retry_count: 0 };
   const starts = [];
-  const service = loadModule("../lib/research-service.ts", {
+  const service = loadModule("../lib/research-service.ts", { "@/lib/research-progress": require("../lib/research-progress.ts"),
     "server-only": {}, "@/lib/research-core": researchCore,
     "@/lib/provider-settings": {}, "@/lib/provider-settings-core": settingsCore, "@/lib/research-models": models, "@/lib/qwen-core": { QWEN_PROVIDER: "dashscope-beijing" }, "@/lib/research-fallback-core": fallbackCore,
     "workflow/api": { start: async (_workflow, _args, options) => {

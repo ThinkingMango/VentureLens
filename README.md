@@ -41,7 +41,13 @@ DASHSCOPE_WORKSPACE_ID=<beijing workspace id>
 GOOGLE_GENERATIVE_AI_API_KEY=<key>
 # Optional: idempotent workflow dispatch through start hooks (dispatch works without it)
 WORKFLOW_VERCEL_EXPERIMENTAL_START_HOOK=1
+# Optional: "report ready" email (lib/notify.ts). Without a key nothing is sent.
+RESEND_API_KEY=<key>                                  # server only, never NEXT_PUBLIC_
+NOTIFY_DRY_RUN=1                                      # log emails instead of sending them
+SITE_URL=http://localhost:3000                        # origin for links in emails
 ```
+
+Research notification emails are sent with [Resend](https://resend.com) from `VentureLens <notifications@smartmango.ai>`, with replies to `support@smartmango.ai` (decision D1). They go out only on the Vercel **production** deployment with `RESEND_API_KEY` set; development, previews and tests only log them, unless `NOTIFY_SEND=1` is set deliberately, and `NOTIFY_DRY_RUN=1` always only logs. `NOTIFY_FROM` and `NOTIFY_REPLY_TO` override the addresses. Links use `SITE_URL`, falling back to Vercel's production domain. Before turning email on, verify the sending domain in Resend (its SPF and DKIM DNS records). Each run sends at most one email (`research_runs.notified_at`), and founders can turn it off on their profile (`founder_profiles.notify_on_complete`).
 
 Apply the migrations in `supabase/migrations/` to your project, then:
 
