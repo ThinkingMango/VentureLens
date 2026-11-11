@@ -34,6 +34,27 @@ export const researchModels = {
 // strategy may search several rounds but each query costs a fraction of a cent.
 export const searchQueryAllowance = { qwen: 32, gemini: 4 } as const;
 
+/**
+ * Wall-clock limits for one retrieval step (one candidate's searches plus reading their pages). A workflow step is
+ * bounded by the platform's function duration (300 s by default on Vercel), and a step killed by the platform loses
+ * the search it already paid for. So each step works to a fixed budget, and every search gets the smaller of its own
+ * cap and what is left of that budget after reserving time to read pages.
+ *
+ * Qwen's native search is agent-style and multi-round: in production (2026-11-11) most searches finished in about
+ * 30 s, but 2 of 7 ran 16–20 query rounds for about 60 s, and one passed the former 90 s cap. Gemini issues 1–2
+ * queries per call and keeps the 90 s cap.
+ */
+export const RETRIEVAL_STEP_BUDGET_MS = 240_000;
+export const PAGE_READ_RESERVE_MS = 60_000;
+export const SEARCH_TIMEOUT_MS = { qwen: 150_000, gemini: 90_000 } as const;
+/** A search given less time than this is not sent: it would almost certainly time out after being billed. */
+export const MIN_SEARCH_MS = 20_000;
+
+/** How long a search that starts now may run, for a retrieval step that started at `stepStart`; below MIN_SEARCH_MS, skip it. */
+export function searchTimeout(provider: "qwen" | "gemini", stepStart: number, now = Date.now()) {
+  return Math.min(SEARCH_TIMEOUT_MS[provider], stepStart + RETRIEVAL_STEP_BUDGET_MS - PAGE_READ_RESERVE_MS - now);
+}
+
 export function selectedModel(provider: "qwen" | "gemini", settings: { qwenModel?: QwenModelId; geminiModel?: GeminiModelId }): ResearchModelId {
   return provider === "qwen"
     ? qwenModelSchema.parse(settings.qwenModel ?? DEFAULT_QWEN_MODEL)

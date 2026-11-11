@@ -142,9 +142,13 @@ async function typicalMinutes(mode: string): Promise<number | null> {
 // Which model a run uses: the recorded choice once the run has initialized, otherwise the configured primary.
 async function describeModel(setupOutput: unknown, usage: { provider?: string | null; model?: string | null }[]): Promise<ResearchModelInfo> {
   const used = [...new Set(usage.map(row => row.model).filter((value): value is string => typeof value === "string" && value.length > 0))];
-  const setup = setupOutput && typeof setupOutput === "object" ? setupOutput as { provider?: unknown; model?: unknown } : null;
+  const setup = setupOutput && typeof setupOutput === "object" ? setupOutput as { provider?: unknown; model?: unknown; primary_skipped?: { model?: unknown; required_usd?: unknown; budget_usd?: unknown } } : null;
   if (setup && typeof setup.model === "string") {
-    return { provider: typeof setup.provider === "string" ? setup.provider : null, model: setup.model, planned: false, used };
+    const skipped = setup.primary_skipped;
+    const primary_skipped = skipped && typeof skipped.model === "string" && Number.isFinite(skipped.required_usd) && Number.isFinite(skipped.budget_usd)
+      ? { model: skipped.model, required_usd: Number(skipped.required_usd), budget_usd: Number(skipped.budget_usd) }
+      : undefined;
+    return { provider: typeof setup.provider === "string" ? setup.provider : null, model: setup.model, planned: false, used, ...(primary_skipped ? { primary_skipped } : {}) };
   }
   try {
     const settings = await researchProviderSettings();

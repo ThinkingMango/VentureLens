@@ -88,14 +88,24 @@ const pick = <T extends string>(value: unknown, keys: readonly T[]): Partial<Rec
   return out;
 };
 /** Only the structural fields of the setup, failure and budget checkpoints: never the brief or profile stored in setup. */
-export const structuralSetup = (output: unknown) => pick(output, ["provider", "model", "active_provider", "search_provider", "fallback_allowed", "methodology"] as const);
+export const structuralSetup = (output: unknown) => {
+  // primary_skipped: the configured primary could not finish within the run's budget, so the run started on the fallback.
+  const skipped = pick(output && typeof output === "object" ? (output as { primary_skipped?: unknown }).primary_skipped : null, ["model", "required_usd"] as const);
+  return {
+    ...pick(output, ["provider", "model", "active_provider", "search_provider", "fallback_allowed", "methodology"] as const),
+    ...(typeof skipped.model === "string" ? { primary_skipped: skipped.model, primary_required_usd: typeof skipped.required_usd === "number" ? skipped.required_usd : null } : {}),
+  };
+};
 export const structuralFailure = (output: unknown) => pick(output, ["stage", "code", "name", "status", "at"] as const);
 export const structuralBudgetBlock = (output: unknown) => pick(output, ["stage", "kind", "provider", "model", "required_usd"] as const);
 
 export type CandidateDiagnostic = {
   key: string;
-  /** searched: a retrieval checkpoint with evidence; skipped: the search found nothing readable; not_reached: no checkpoint yet. */
-  retrieval: "searched" | "skipped" | "not_reached";
+  /**
+   * searched: a retrieval checkpoint with evidence; skipped: the search found nothing readable; failed: the search failed
+   * transiently (timeout, 429, 5xx) and the run went on without it; not_reached: no checkpoint yet.
+   */
+  retrieval: "searched" | "skipped" | "failed" | "not_reached";
   sources: number;
   /** Distinct registrable domains among this candidate's saved sources. */
   domains: number;
@@ -133,7 +143,7 @@ export function candidateDiagnostics(input: {
     const gate = input.classifications ? evidenceGate(key, input.evidence, input.classifications) : null;
     return {
       key,
-      retrieval: !checkpoint ? "not_reached" : checkpoint.skipped ? "skipped" : "searched",
+      retrieval: !checkpoint ? "not_reached" : checkpoint.skipped === "TRANSIENT_PROVIDER" ? "failed" : checkpoint.skipped ? "skipped" : "searched",
       sources: evidence.length,
       domains: new Set(rows.map(row => row.domain).filter(Boolean)).size,
       classified: classified.length,

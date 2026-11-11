@@ -183,6 +183,16 @@ export function ResearchRunView({
       </PageHeader>
       <div className="flex flex-wrap items-center gap-2">
         <ModelTag model={data.report?.model ?? data.model?.model ?? null} provider={data.report ? data.report.provider ?? data.model?.provider : data.model?.provider} planned={!data.report && !!data.model?.planned} />
+        {data.model?.primary_skipped && (
+          <span className="text-sm text-muted-foreground">
+            {copy("This run uses {model} because the configured {configured} needs a budget of at least {required} and this run's budget is {budget}.", {
+              model: (researchModels as Record<string, { name: string }>)[data.model.model ?? ""]?.name ?? data.model.model ?? "",
+              configured: (researchModels as Record<string, { name: string }>)[data.model.primary_skipped.model]?.name ?? data.model.primary_skipped.model,
+              required: format.usd(data.model.primary_skipped.required_usd, 2),
+              budget: format.usd(data.model.primary_skipped.budget_usd, 2),
+            })}
+          </span>
+        )}
         {data.model?.used.length > 1 && (
           <span className="text-sm text-muted-foreground">
             {copy("Models used: {models}", { models: data.model.used.map((id) => (researchModels as Record<string, { name: string }>)[id]?.name ?? id).join(", ") })}

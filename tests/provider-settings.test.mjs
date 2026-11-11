@@ -1358,3 +1358,126 @@ test("discovery queries look for evidence of the problem, not for products", () 
   assert.match(source, /Do not name products or ask for tools or software\./);
   assert.match(source, /rather than for software that claims to solve it/);
 });
+
+// Regression for run 0373ec17 (2026-11-11): 7 of 8 candidates had 28 sources when Qwen's search for the 8th timed out,
+// and that one timeout failed the whole run.
+const eightCandidates = () => ({ candidates: Array.from({ length: 8 }, (_, i) => ({ key: `c${i + 1}`, title: `Candidate ${i + 1}`, buyer: "Accounting firm partners", pain: "Compliance checklists", solution: "Automation", advantage: "Network", query: "accounting firm compliance checklist burden survey" })) });
+const searchTimedOut = () => Object.assign(new Error("The operation was aborted due to timeout"), { name: "TimeoutError" });
+const withEvidence = { evidence: [{ source_key: "s1" }] };
+function quietly(run) { const warn = console.warn; console.warn = () => {}; return run().finally(() => { console.warn = warn; }); }
+
+test("one candidate's timed-out search is skipped and the run goes on, as an empty search already is", async () => {
+  const checkpoints = new Map([["discovery", eightCandidates()]]);
+  for (const key of ["c1", "c2", "c3", "c4", "c5", "c6", "c7"]) checkpoints.set(`retrieval:${key}`, withEvidence);
+  const timeouts = [];
+  const fixture = researchFixture({ spent: 0, checkpoints, settings: { primary: "qwen", autoFallback: false, qwenModel: "qwen3.8-flash", geminiModel: "gemini-3.5-flash-lite" },
+    search: { qwen: async (_prompt, _model, timeoutMs) => { timeouts.push(timeoutMs); throw searchTimedOut(); } } });
+  await quietly(() => fixture.engine.executeResearchStage(fixture.context, "retrieval:c8"));
+  assert.deepEqual(checkpoints.get("retrieval:c8"), { evidence: [], skipped: "TRANSIENT_PROVIDER" });
+  assert.deepEqual(fixture.records.map(record => record.status), ["unknown"], "a timed-out call may have been billed, so its reservation is kept");
+  assert.ok(timeouts[0] > 90_000 && timeouts[0] <= models.SEARCH_TIMEOUT_MS.qwen, "Qwen searches get more than the former 90 s");
+  // The outcome reports the skipped candidate as a failed search.
+  const outcome = researchCore.researchOutcome({ mode: "combined", candidates: eightCandidates().candidates, evidence: [], classifications: [], retrievalFailures: ["c8"] });
+  assert.equal(outcome.candidates[7].reason, "SEARCH_FAILED");
+});
+
+test("transient search failures still end the run when the provider looks down or nothing else has evidence", async () => {
+  const failing = { primary: "qwen", autoFallback: false, qwenModel: "qwen3.8-flash", geminiModel: "gemini-3.5-flash-lite" };
+  const search = { qwen: async () => { throw searchTimedOut(); } };
+  // Two in a row.
+  const twice = new Map([["discovery", eightCandidates()], ["retrieval:c1", withEvidence], ["retrieval:c2", { evidence: [], skipped: "TRANSIENT_PROVIDER" }]]);
+  const outage = researchFixture({ spent: 0, checkpoints: twice, settings: failing, search });
+  await quietly(() => assert.rejects(outage.engine.executeResearchStage(outage.context, "retrieval:c3"), /TimeoutError|timeout/));
+  assert.equal(twice.has("retrieval:c3"), false);
+  // A quarter of eight candidates already skipped this way.
+  const many = new Map([["discovery", eightCandidates()], ["retrieval:c1", { evidence: [], skipped: "TRANSIENT_PROVIDER" }], ["retrieval:c2", withEvidence], ["retrieval:c3", { evidence: [], skipped: "TRANSIENT_PROVIDER" }], ["retrieval:c4", withEvidence]]);
+  const capped = researchFixture({ spent: 0, checkpoints: many, settings: failing, search });
+  await quietly(() => assert.rejects(capped.engine.executeResearchStage(capped.context, "retrieval:c5"), /timeout/));
+  // The last candidate when no earlier one found anything.
+  const empty = new Map([["discovery", { candidates: eightCandidates().candidates.slice(0, 3) }], ["retrieval:c1", { evidence: [], skipped: "RETRIEVAL_UNAVAILABLE" }], ["retrieval:c2", { evidence: [], skipped: "RETRIEVAL_UNAVAILABLE" }]]);
+  const nothing = researchFixture({ spent: 0, checkpoints: empty, settings: failing, search });
+  await quietly(() => assert.rejects(nothing.engine.executeResearchStage(nothing.context, "retrieval:c3"), /timeout/));
+  // Configuration errors are never skipped.
+  const config = researchFixture({ spent: 0, checkpoints: new Map([["discovery", eightCandidates()], ["retrieval:c1", withEvidence]]), settings: failing,
+    search: { qwen: async () => { throw Object.assign(new Error("PROVIDER_CONFIGURATION"), { statusCode: 401 }); } } });
+  await quietly(() => assert.rejects(config.engine.executeResearchStage(config.context, "retrieval:c2"), /PROVIDER_CONFIGURATION/));
+});
+
+test("a verify run's single candidate is never skipped on a transient failure", async () => {
+  const candidate = { key: "c1", title: verifyIdea.title, buyer: verifyIdea.buyer, pain: verifyIdea.pain, solution: "", advantage: "", query: "physio clinic missed appointments cost", query_alt: "physio clinic appointment reminder alternatives" };
+  const fixture = verifyFixture({ settings: { primary: "qwen", autoFallback: false, qwenModel: "qwen3.8-flash", geminiModel: "gemini-3.5-flash-lite" }, search: { qwen: async () => { throw searchTimedOut(); } } });
+  fixture.checkpoints.set("discovery", { candidates: [candidate] });
+  await quietly(() => assert.rejects(fixture.engine.executeResearchStage(fixture.context, "retrieval:c1"), /timeout/));
+});
+
+test("a search is not sent when the retrieval step has too little time left, and its reservation is released", async () => {
+  const candidate = { key: "c1", title: verifyIdea.title, buyer: verifyIdea.buyer, pain: verifyIdea.pain, solution: "", advantage: "", query: "physio clinic missed appointments cost", query_alt: "physio clinic appointment reminder alternatives" };
+  const realNow = Date.now;
+  let clock = realNow();
+  Date.now = () => clock;
+  const searched = [];
+  try {
+    const fixture = verifyFixture({
+      fetchSource: async url => ({ url, title: "A", excerpt: "Physiotherapy clinic owners describe missed appointments costing them money every week." }),
+      search: {
+        // The first search runs long: 170 s of the 240 s step budget, leaving 10 s after the page-read reserve.
+        qwen: async (_prompt, _model, timeoutMs) => { searched.push(["qwen", timeoutMs]); clock += 170_000; return { sources: [{ url: "https://a.org/1" }], tokens: { inputTokens: 10, outputTokens: 10 }, searchRequests: 1 }; },
+        gemini: async () => { searched.push(["gemini"]); throw new Error("must not be sent"); },
+      },
+    });
+    fixture.checkpoints.set("discovery", { candidates: [candidate] });
+    await quietly(() => fixture.engine.executeResearchStage(fixture.context, "retrieval:c1"));
+    assert.deepEqual(searched, [["qwen", models.SEARCH_TIMEOUT_MS.qwen]], "neither the alternatives search nor its fallback is sent");
+    assert.deepEqual(fixture.checkpoints.get("retrieval:c1").evidence.map(e => e.title), ["A"], "the first search's pages are still read");
+    assert.equal(fixture.records[0].status, "completed");
+    assert.ok(fixture.records.slice(1).length >= 1);
+    for (const record of fixture.records.slice(1)) assert.deepEqual([record.status, record.estimated_usd], ["completed", 0], "unsent searches cost nothing");
+  } finally {
+    Date.now = realNow;
+  }
+});
+
+test("a run started on the fallback because the configured model does not fit records why", async () => {
+  const fixture = researchFixture({ spent: 0, providerSettings: { primary: "gemini", autoFallback: true, qwenModel: "qwen3.8-flash", geminiModel: "gemini-4-argon", budgetUsd: 0.25, updatedAt: null },
+    verify: { qwen: async () => {}, gemini: async () => {} } });
+  fixture.setup.profile = { ...workspaceSchema.emptyProfile, name: "Founder", skills: "Operations" };
+  fixture.checkpoints.delete("setup");
+  const error = console.error; const logged = []; console.error = (...args) => logged.push(args);
+  try { assert.equal(await fixture.engine.initializeResearch(fixture.context), true); } finally { console.error = error; }
+  const setup = fixture.checkpoints.get("setup");
+  assert.equal(setup.model, "qwen3.8-flash");
+  assert.equal(setup.fallback_allowed, false);
+  assert.deepEqual(setup.primary_skipped, { provider: "gemini", model: "gemini-4-argon", required_usd: budget.estimateRunCost("gemini-4-argon").requiredUsd, budget_usd: 0.25 });
+  assert.equal(setup.provider_settings.budgetUsd, 0.25, "the snapshot records the saved budget, not a schema default");
+  assert.match(String(logged[0]?.[0]), /configured primary cannot finish/);
+  // A run on its configured primary records nothing.
+  const fits = researchFixture({ spent: 0, providerSettings: { primary: "qwen", autoFallback: false, qwenModel: "qwen3.8-flash", geminiModel: "gemini-3.5-flash-lite", budgetUsd: 0.25, updatedAt: null }, verify: { qwen: async () => {} } });
+  fits.setup.profile = fixture.setup.profile;
+  fits.checkpoints.delete("setup");
+  await fits.engine.initializeResearch(fits.context);
+  assert.equal("primary_skipped" in fits.checkpoints.get("setup"), false);
+});
+
+test("the run page says which configured model was skipped and why", () => {
+  const data = { id: "run", status: "failed", stage: "retrieval", error_code: "TRANSIENT_PROVIDER", retry_count: 0, model: { provider: "dashscope-beijing", model: "qwen3.8-flash", planned: false, used: ["qwen3.8-flash"], primary_skipped: { model: "gemini-3.8-flash", required_usd: 0.5675, budget_usd: 0.55 } }, configuration: { brief: { name: "Business Ideas" } }, report: null, steps: [{ stage_key: "discovery" }], usage: { estimated_usd: 0.054, committed_usd: 0.0822, budget_usd: 0.55, uncertain_calls: 1, input_tokens: 1, output_tokens: 1, search_requests: 54 } };
+  const copy = () => (text, values = {}) => text.replace(/\{(\w+)\}/g, (_match, key) => values[key] ?? key);
+  const { ResearchRunView } = loadModule("../components/research-run.tsx", {
+    "@/components/report-feedback": { ReportRating: () => null },
+    "@/lib/research-progress": require("../lib/research-progress.ts"),
+    "next/link": { default: ({ children, ...props }) => createElement("a", props, children) },
+    "swr": { default: () => ({ data, mutate: async () => undefined }) },
+    "@/components/ui/button": { Button: ({ asChild, children, ...props }) => asChild ? cloneElement(children, props) : createElement("button", props, children) },
+    "@/components/shared": { PageHeader: ({ title }) => createElement("h1", null, title) },
+    "@/components/demo-provider": { useDemo: () => ({ refresh: async () => undefined }) },
+    "@/components/research-report": { ResearchReportView: () => null },
+    "@/components/research-outcome": { ResearchOutcomeView: () => null },
+    "@/components/model-tag": { ModelTag: () => null },
+    "@/lib/research-core": researchCore,
+    "@/lib/research-models": models,
+    "@/i18n/use-copy": { useCopy: copy, useFormats: () => ({ usd: (value, digits = 2) => `$${value.toFixed(digits)}`, number: value => String(value) }) },
+    "@/i18n/errors": { feedbackSource: (_code, fallback) => fallback },
+    "@/lib/api-client": apiClient,
+  });
+  const html = renderToStaticMarkup(createElement(ResearchRunView, { initialData: data }));
+  assert.match(html, /This run uses Qwen 3\.8 Flash because the configured Gemini 3\.8 Flash needs a budget of at least \$0\.57 and this run(&#x27;|')s budget is \$0\.55\./);
+});
