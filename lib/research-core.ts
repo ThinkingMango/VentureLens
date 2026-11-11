@@ -261,9 +261,10 @@ function matchIds<T>(expected: string[], items: T[], id: (item: T) => string): T
   });
 }
 
-export function normalizeDiscovery(draft: z.infer<typeof discoveryDraftSchema>): z.infer<typeof discoverySchema> {
-  // Keys are positional labels, so they are assigned here rather than trusted from the model.
-  const candidates = draft.candidates.slice(0, 8).map((candidate, index) => {
+export function normalizeDiscovery(draft: z.infer<typeof discoveryDraftSchema>, max = 8): z.infer<typeof discoverySchema> {
+  // Keys are positional labels, so they are assigned here rather than trusted from the model. `max` is the number of
+  // ideas the source policy asks for (5–8); extra ideas the model returns are dropped.
+  const candidates = draft.candidates.slice(0, Math.min(8, Math.max(5, max))).map((candidate, index) => {
     const query = clipText(candidate.query, 300);
     return {
       key: `c${index + 1}`, title: clipText(candidate.title, 180),

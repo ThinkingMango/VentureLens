@@ -74,12 +74,34 @@ export type RunCostEstimate = {
 };
 
 /**
- * Estimates what a complete run on one model costs and the budget it needs to finish. Estimates, not quotes.
- * `mode` "verify" estimates a single-idea run; every other mode runs the eight-candidate pipeline.
+ * How much a run researches, from the administrator's source policy (lib/source-policy.ts `runShape`). The default is
+ * the shape the calibration above describes: 8 ideas, 4 pages each, one search per idea.
  */
-export function estimateRunCost(model: ResearchModelId, at = new Date(), mode = "combined"): RunCostEstimate {
+export type RunShape = { candidates: number; pagesPerIdea: number; alternativesSearch: boolean };
+export const defaultRunShape: RunShape = { candidates: typicalRun.candidates, pagesPerIdea: 4, alternativesSearch: false };
+
+/** Model calls per stage for a run shape. Classification reads sources in batches of 8; evaluation and review take 2 ideas per call. */
+export function stageCalls(run: RunShape, mode = "combined") {
+  if (mode === "verify") {
+    return { searches: typicalVerifyRun.searches, classification: Math.ceil((run.pagesPerIdea * 2) / 8), evaluation: 1, review: 1 };
+  }
+  return {
+    searches: run.candidates * (run.alternativesSearch ? 2 : 1),
+    classification: Math.ceil((run.candidates * run.pagesPerIdea) / 8),
+    evaluation: Math.ceil(run.candidates / 2),
+    review: Math.ceil(run.candidates / 2),
+  };
+}
+
+/**
+ * Estimates what a complete run on one model costs and the budget it needs to finish. Estimates, not quotes.
+ * `mode` "verify" estimates a single-idea run; every other mode runs the multi-idea pipeline. `run` is the breadth and
+ * depth the source policy sets; more ideas, pages or searches cost more and need a larger budget.
+ */
+export function estimateRunCost(model: ResearchModelId, at = new Date(), mode = "combined", run: RunShape = defaultRunShape): RunCostEstimate {
   const verify = mode === "verify";
   const shape = verify ? typicalVerifyRun : typicalRun;
+  const counts = stageCalls(run, mode);
   const pricing = researchModelPricing(model, at);
   const provider = providerOf(model);
   const calls: { stage: string; reservation: number; actual: number }[] = [];
@@ -88,13 +110,15 @@ export function estimateRunCost(model: ResearchModelId, at = new Date(), mode = 
     calls.push({ stage, reservation, actual: shape.inputTokens * pricing.input + structuredOutputTokens(model, shape.outputTokens) * pricing.output });
   };
   structured("discovery", shape.discovery);
-  const searches = verify ? typicalVerifyRun.searches : typicalRun.candidates;
-  for (let i = 1; i <= searches; i++) {
+  // Searches in engine order: every idea's search, then (with the alternatives search) its second search.
+  const perIdea = !verify && run.alternativesSearch ? 2 : 1;
+  for (let i = 0; i < counts.searches; i++) {
     const reservation = reservationFor(model, pricing, { promptBytes: typicalRun.retrieval.promptBytes, search: true }).usd;
-    calls.push({ stage: verify ? (i === 1 ? "retrieval:c1" : "retrieval:c1:alt") : `retrieval:c${i}`, reservation, actual: typicalRun.retrieval.inputTokens[provider] * pricing.input + researchModels[model].searchOutputTokens * pricing.output + typicalRun.retrieval.queries * pricing.search });
+    const stage = verify ? (i === 0 ? "retrieval:c1" : "retrieval:c1:alt") : `retrieval:c${Math.floor(i / perIdea) + 1}${i % perIdea ? ":alt" : ""}`;
+    calls.push({ stage, reservation, actual: typicalRun.retrieval.inputTokens[provider] * pricing.input + researchModels[model].searchOutputTokens * pricing.output + typicalRun.retrieval.queries * pricing.search });
   }
   for (const stage of ["classification", "evaluation", "review"] as const) {
-    for (let i = 0; i < shape[stage].calls; i++) structured(`${stage}:batch:${i}`, shape[stage]);
+    for (let i = 0; i < counts[stage]; i++) structured(`${stage}:batch:${i}`, shape[stage]);
   }
   let spent = 0;
   let requiredUsd = 0;
@@ -107,6 +131,6 @@ export function estimateRunCost(model: ResearchModelId, at = new Date(), mode = 
   return { model, expectedUsd: round(spent), requiredUsd: round(requiredUsd), peakStage };
 }
 
-export function fitsBudget(model: ResearchModelId, budgetUsd: number, at = new Date(), mode = "combined") {
-  return estimateRunCost(model, at, mode).requiredUsd <= budgetUsd;
+export function fitsBudget(model: ResearchModelId, budgetUsd: number, at = new Date(), mode = "combined", run: RunShape = defaultRunShape) {
+  return estimateRunCost(model, at, mode, run).requiredUsd <= budgetUsd;
 }

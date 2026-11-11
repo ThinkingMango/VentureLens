@@ -1359,6 +1359,129 @@ test("discovery queries look for evidence of the problem, not for products", () 
   assert.match(source, /rather than for software that claims to solve it/);
 });
 
+// Source policy (breadth and depth of evidence collection), set at /admin and frozen into each run.
+const fullSources = { kinds: ["communities", "research"], sectorCommunities: true, alternativesSearch: true, vendorPages: 0, recency: "1y", candidates: 5, pagesPerIdea: 2 };
+test("the provider API accepts a complete source policy within the request limit and rejects an invalid one", async () => {
+  const calls = [];
+  const api = route(verified, async (id, settings) => { calls.push(settings); return { settings }; });
+  const body = { primary: "qwen", autoFallback: true, qwenModel: "qwen3.8-flash", geminiModel: "gemini-3.5-flash-lite", budgetUsd: 0.25, sources: { ...fullSources, kinds: [...settingsCore.sourceKinds] } };
+  assert.ok(Buffer.byteLength(JSON.stringify(body)) < 1024, "the largest valid policy fits the request limit");
+  assert.equal((await api.PATCH(patch(body))).status, 200);
+  assert.deepEqual(calls[0].sources, body.sources);
+  for (const sources of [{ ...fullSources, vendorPages: 3 }, { ...fullSources, candidates: 12 }, { ...fullSources, kinds: [] }, { ...fullSources, apiKey: "x" }]) {
+    assert.equal((await api.PATCH(patch({ ...body, sources }))).status, 400);
+  }
+  assert.equal(calls.length, 1);
+});
+test("saving keeps the stored source policy when a caller omits it, and replaces it when one is sent", async () => {
+  const rows = { research: { primary: "qwen", autoFallback: true, qwenModel: "qwen3.8-flash", geminiModel: "gemini-3.5-flash-lite", budgetUsd: 0.25, sources: fullSources, updatedAt: verified.email_confirmed_at } };
+  const writes = [];
+  const service = storage({ rows, writes, admin: { getUserById: async () => ({ data: { user: verified }, error: null }) } });
+  await service.saveProviderSettings(verified.id, { primary: "qwen", autoFallback: false });
+  assert.deepEqual(writes[0].row.value.sources, fullSources, "a routing-only save does not reset the source policy");
+  const narrower = { ...fullSources, alternativesSearch: false, candidates: 8 };
+  await service.saveProviderSettings(verified.id, { primary: "qwen", autoFallback: false, sources: narrower });
+  assert.deepEqual(writes[1].row.value.sources, narrower);
+  // No stored policy: nothing is invented, and runs keep the defaults.
+  const fresh = [];
+  await storage({ writes: fresh, admin: { getUserById: async () => ({ data: { user: verified }, error: null }) } }).saveProviderSettings(verified.id, { primary: "qwen", autoFallback: true });
+  assert.equal("sources" in fresh[0].row.value, false);
+  // The budget check uses the policy: a second search per idea is refused when the budget cannot pay for it.
+  // At the smallest budget the default depth accepts, the same save with a second search per idea is refused.
+  const refused = [];
+  const gemini = storage({ writes: refused, admin: { getUserById: async () => ({ data: { user: verified }, error: null }) } });
+  const routing = { primary: "gemini", autoFallback: false, qwenModel: "qwen3.8-flash", geminiModel: "gemini-3.5-flash-lite" };
+  const budgetUsd = settingsCore.recommendedBudget(settingsCore.runCostEstimates({ ...routing, budgetUsd: 5 }).primary.requiredUsd);
+  await assert.rejects(gemini.saveProviderSettings(verified.id, { ...routing, budgetUsd, sources: { ...settingsCore.defaultSourcePolicy, alternativesSearch: true } }), /BUDGET_TOO_LOW/);
+  assert.equal(refused.length, 0);
+  await gemini.saveProviderSettings(verified.id, { ...routing, budgetUsd, sources: settingsCore.defaultSourcePolicy });
+  assert.equal(refused.length, 1, "the default breadth fits the same budget");
+});
+test("setup freezes the source policy, and a run set up without one researches on the defaults", async () => {
+  const providerSettings = { primary: "qwen", autoFallback: false, qwenModel: "qwen3.8-flash", geminiModel: "gemini-3.5-flash-lite", budgetUsd: 0.25, sources: fullSources, updatedAt: null };
+  const fixture = researchFixture({ spent: 0, providerSettings, verify: { qwen: async () => {} } });
+  fixture.setup.profile = { ...workspaceSchema.emptyProfile, name: "Founder", skills: "Operations" };
+  fixture.checkpoints.delete("setup");
+  assert.equal(await fixture.engine.initializeResearch(fixture.context), true);
+  assert.deepEqual(fixture.checkpoints.get("setup").source_policy, fullSources);
+  const legacy = researchFixture({ spent: 0, providerSettings: { ...providerSettings, sources: undefined }, verify: { qwen: async () => {} } });
+  legacy.setup.profile = fixture.setup.profile;
+  legacy.checkpoints.delete("setup");
+  await legacy.engine.initializeResearch(legacy.context);
+  assert.deepEqual(legacy.checkpoints.get("setup").source_policy, settingsCore.defaultSourcePolicy, "with no saved policy, a new run freezes the default");
+  assert.equal(legacy.checkpoints.get("setup").source_policy.sectorCommunities, true);
+});
+function sourceRetrievalFixture(sourcePolicy, sectors = ["Healthcare"]) {
+  const checkpoints = new Map();
+  checkpoints.set("discovery", { candidates: [{ key: "c1", title: "Intake relief", buyer: "Clinic managers", pain: "Intake paperwork", solution: "Automation", advantage: "Network", query: "clinic intake paperwork survey" }] });
+  const prompts = [], fetched = [];
+  const fixture = researchFixture({ spent: 0, checkpoints, settings: { primary: "qwen", autoFallback: false, qwenModel: "qwen3.8-flash", geminiModel: "gemini-3.5-flash-lite" },
+    search: { qwen: async prompt => { prompts.push(prompt); return { sources: Array.from({ length: 8 }, (_, i) => ({ url: `https://publisher${prompts.length}-${i}.org/page` })), tokens: { inputTokens: 10, outputTokens: 10 }, searchRequests: 1 }; } },
+    fetchSource: async url => { fetched.push(url); return { url, title: "Survey", excerpt: "Practice managers report intake paperwork takes nine hours every week." }; } });
+  fixture.setup.brief = { ...fixture.setup.brief, sectors };
+  if (sourcePolicy) fixture.setup.source_policy = sourcePolicy;
+  fixture.checkpoints.set("setup", fixture.setup);
+  return { fixture, prompts, fetched, checkpoints };
+}
+test("retrieval follows the frozen policy's breadth and depth; a run set up without one keeps the original search", async () => {
+  // Set up by earlier code: no policy in the checkpoint, so the legacy policy, not today's default.
+  const legacy = sourceRetrievalFixture(undefined);
+  await legacy.fixture.engine.executeResearchStage(legacy.fixture.context, "retrieval:c1");
+  assert.equal(legacy.prompts.length, 1, "one search per idea by default");
+  assert.match(legacy.prompts[0], /surveys and research, news and analyst coverage, government or regulatory pages, and job postings\. Include at most one vendor product page\. Objective:/);
+  assert.doesNotMatch(legacy.prompts[0], /Look first where these buyers discuss/);
+  assert.equal(legacy.checkpoints.get("retrieval:c1").evidence.length, 4, "four pages per idea by default");
+
+  // A new run on the default policy: the original guidance plus the community hint, same depth.
+  const current = sourceRetrievalFixture(settingsCore.defaultSourcePolicy);
+  await current.fixture.engine.executeResearchStage(current.fixture.context, "retrieval:c1");
+  assert.equal(current.prompts.length, 1);
+  assert.match(current.prompts[0], /Include at most one vendor product page\. Look first where these buyers discuss their own work: clinician and practice-manager forums[^.]*\. Objective:/);
+  assert.equal(current.checkpoints.get("retrieval:c1").evidence.length, 4);
+
+  const custom = sourceRetrievalFixture(fullSources);
+  await custom.fixture.engine.executeResearchStage(custom.fixture.context, "retrieval:c1");
+  assert.equal(custom.prompts.length, 2, "the alternatives search adds a second search");
+  assert.match(custom.prompts[1], /alternatives these buyers already use or pay for/);
+  for (const prompt of custom.prompts) {
+    assert.match(prompt, /Prefer sources that are not selling a product in this space: buyer forums and communities and surveys and research\./);
+    assert.match(prompt, /Do not include vendor product pages\./);
+    assert.doesNotMatch(prompt, /at most one vendor/);
+    assert.match(prompt, /clinician and practice-manager forums/);
+    assert.match(prompt, /last 12 months/);
+  }
+  assert.equal(custom.checkpoints.get("retrieval:c1").evidence.length, 2, "pages per idea caps what is read");
+  assert.ok(custom.fetched.length <= 6, "and how many results are tried");
+});
+test("discovery asks for the policy's number of ideas and keeps no more than that", async () => {
+  const draft = { candidates: Array.from({ length: 8 }, (_, i) => ({ key: `c${i + 1}`, title: `Idea ${i + 1}`, buyer: "Clinic owners", pain: "Missed appointments cost money.", solution: "Reminders", advantage: "Operations", query: `clinic missed appointments survey ${i + 1}` })) };
+  const fixture = researchFixture({ spent: 0, settings: { primary: "qwen", autoFallback: true, qwenModel: "qwen3.8-flash", geminiModel: "gemini-3.5-flash-lite" }, generate: async () => ({ output: draft, totalUsage: { inputTokens: 300, outputTokens: 600 } }) });
+  fixture.setup.brief = { ...fixture.setup.brief, sectors: ["Professional services"] };
+  fixture.setup.source_policy = fullSources;
+  fixture.checkpoints.set("setup", fixture.setup);
+  const keys = await fixture.engine.executeResearchStage(fixture.context, "discovery");
+  assert.deepEqual(keys, ["c1", "c2", "c3", "c4", "c5"]);
+  const prompt = fixture.calls[0].prompt;
+  assert.match(prompt, /Generate 5 specific/);
+  assert.match(prompt, /Keys must be c1 through c5\./);
+  assert.match(prompt, /\(surveys, industry reports, forum discussions\)/);
+  assert.match(prompt, /accountants, lawyers and consultants/);
+  assert.match(prompt, /Do not name products or ask for tools or software\./, "the no-products rule is kept");
+  const defaults = await discoveryPrompt("combined", workspaceSchema.emptyProfile);
+  assert.match(defaults, /Generate 8 specific/);
+  assert.match(defaults, /\(surveys, industry reports, forum discussions, news\), naming the buyer/);
+});
+test("the source policy never touches the evidence gate", () => {
+  const engine = readFileSync(new URL("../lib/research-engine.ts", import.meta.url), "utf8");
+  assert.match(engine, /source_policy: sourcePolicy/);
+  assert.match(engine, /resolveSourcePolicy\(setup\.source_policy, legacySourcePolicy\)/, "older runs fall back to the legacy policy, not today's default");
+  const policySource = readFileSync(new URL("../lib/source-policy.ts", import.meta.url), "utf8");
+  assert.doesNotMatch(policySource, /^import .*research-core/m, "the policy module cannot reach how evidence is counted");
+  assert.deepEqual([...policySource.matchAll(/^import .* from "([^"]+)"/gm)].map(match => match[1]), ["zod"], "it depends on nothing but zod");
+  const admin = readFileSync(new URL("../components/admin-sources.tsx", import.meta.url), "utf8");
+  assert.doesNotMatch(admin, /SUPABASE_SERVICE_ROLE_KEY|SUPABASE_SECRET_KEY|DASHSCOPE_API_KEY|GOOGLE_GENERATIVE_AI_API_KEY|localStorage/);
+});
+
 // Regression for run 0373ec17 (2026-11-11): 7 of 8 candidates had 28 sources when Qwen's search for the 8th timed out,
 // and that one timeout failed the whole run.
 const eightCandidates = () => ({ candidates: Array.from({ length: 8 }, (_, i) => ({ key: `c${i + 1}`, title: `Candidate ${i + 1}`, buyer: "Accounting firm partners", pain: "Compliance checklists", solution: "Automation", advantage: "Network", query: "accounting firm compliance checklist burden survey" })) });
