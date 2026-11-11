@@ -23,6 +23,7 @@ export const founderIndustries = [
   "Travel & hospitality",
   "Manufacturing & engineering",
   "Logistics & transportation",
+  "Supply chain & procurement",
   "Food & agriculture",
   "Energy & sustainability",
   "Legal & compliance",
@@ -45,7 +46,12 @@ export const founderGoals = [
   "Learn and explore before committing",
 ] as const;
 
+// Ordered from the specific (what a newcomer could not copy) to the general.
 export const skillSuggestions = [
+  "Senior leadership and P&L or budget ownership",
+  "Deep knowledge of a region or cross-border market",
+  "Supply chain, sourcing and supplier management",
+  "Regulation, compliance and risk",
   "Research and analysis",
   "Sales and customer relationships",
   "Marketing and content",
