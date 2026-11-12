@@ -297,6 +297,13 @@ Compare founders whose first report came after WP-16 with the WP-15 baseline coh
 
 **Tests:** eligibility; one email per founder per week; language; opt-out link; dry-run mode; daily cap ordering.
 
+**As built (2026-11-12), decision E2: on by default, an opt-out link in every email, a switch on the profile.**
+- **Daily cron, weekly email.** `/api/cron/weekly-progress` runs every day at 01:23 UTC; `weekly_emails` allows one email per founder per week (Monday to Sunday, UTC). The Monday run reaches almost everyone; later runs catch sprints that have just become old enough, failed sends (the claim is released) and anyone over `NOTIFY_WEEKLY_MAX`. Day and hour are set in `vercel.json`, not `app_settings`.
+- **Who:** an active sprint more than 3 days old with an open task; `notify_weekly` not turned off; a confirmed address. One email per founder, about the sprint whose next task is due soonest.
+- **What:** the opportunity's title, the sprint day and progress, the one next task with its details and due date, and "pick a day and time for it now"; in the report's language. No streaks or guilt.
+- **Opt-out without signing in:** the link opens `/unsubscribe`, which confirms with a button that POSTs; a GET changes nothing, because email scanners open links. RFC 8058 `List-Unsubscribe` and `List-Unsubscribe-Post` headers give mail apps their own one-click button. Links are HMAC-signed per founder with `NOTIFY_LINK_SECRET` (or `CRON_SECRET`); without a secret the email links to the profile page.
+- **Event:** `weekly_email_sent {}` on real sends only. Opens are not tracked.
+
 **Acceptance**
 - [ ] In dry-run, a cron call logs exactly one correct email per eligible founder and none twice.
 - [ ] Opt-out works from the email and from the profile.

@@ -15,6 +15,8 @@ const mutationSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("clear_memory") }),
   // "Email me when my research is ready" (WP-08).
   z.object({ action: z.literal("notify"), enabled: z.boolean() }),
+  // Weekly progress email (WP-17).
+  z.object({ action: z.literal("notify_weekly"), enabled: z.boolean() }),
   z.object({ action: z.literal("save"), id: z.uuid(), saved: z.boolean() }),
   // Archive or restore an opportunity (WP-12), through set_opportunity_archived: founders cannot update opportunities.
   z.object({ action: z.literal("archive"), id: z.uuid(), archived: z.boolean() }),
@@ -121,6 +123,12 @@ export async function POST(request: NextRequest) {
       const { error } = await supabase
         .from("founder_profiles")
         .update({ notify_on_complete: input.enabled })
+        .eq("user_id", user.id);
+      if (error) throw error;
+    } else if (input.action === "notify_weekly") {
+      const { error } = await supabase
+        .from("founder_profiles")
+        .update({ notify_weekly: input.enabled })
         .eq("user_id", user.id);
       if (error) throw error;
     } else if (input.action === "clear_memory") {

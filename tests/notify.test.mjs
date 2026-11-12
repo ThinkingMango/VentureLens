@@ -283,20 +283,24 @@ test("the run page shows per-candidate progress, the latest sources and an estim
   assert.doesNotMatch(done, /email you|found so far/);
 });
 
-test("the profile toggle shows the founder's choice and saves it; the demo has none", async () => {
+test("the profile toggles show the founder's choices and save them; the demo has none", async () => {
   const calls = [];
-  const settings = enabled => load("../components/notification-settings.tsx", {
+  const settings = (enabled, weekly = enabled) => load("../components/notification-settings.tsx", {
     "@/i18n/use-copy": { useCopy: () => (text, values = {}) => text.replace(/\{(\w+)\}/g, (_m, key) => values[key] ?? key) },
-    "@/components/demo-provider": { useDemo: () => ({ data: enabled === "demo" ? null : { email: "founder@example.com", notifyOnComplete: enabled }, isDemo: enabled === "demo", busy: false, setNotify: async value => calls.push(value) }) },
+    "@/components/demo-provider": { useDemo: () => ({ data: enabled === "demo" ? null : { email: "founder@example.com", notifyOnComplete: enabled, notifyWeekly: weekly }, isDemo: enabled === "demo", busy: false, setNotify: async value => calls.push(["notify", value]), setNotifyWeekly: async value => calls.push(["weekly", value]) }) },
     "sonner": { toast: { success() {}, error() {} } },
   }).NotificationSettings;
+  const switches = html => [...html.matchAll(/<input[^>]*role="switch"[^>]*>/g)].map(([tag]) => tag.includes('checked=""'));
   const on = renderToStaticMarkup(createElement(settings(true)));
-  assert.match(on, /role="switch"[^>]*checked=""|checked=""[^>]*role="switch"/);
+  assert.deepEqual(switches(on), [true, true]);
   assert.match(on, /Email me when my research is ready/);
   assert.match(on, /sent to founder@example\.com/);
-  assert.doesNotMatch(renderToStaticMarkup(createElement(settings(false))), /checked=""/);
+  assert.match(on, /Send me my next step each week/);
+  assert.match(on, /Every email has a link to turn this off/);
+  assert.deepEqual(switches(renderToStaticMarkup(createElement(settings(false)))), [false, false]);
+  assert.deepEqual(switches(renderToStaticMarkup(createElement(settings(true, false)))), [true, false], "the two choices are independent");
   assert.equal(renderToStaticMarkup(createElement(settings("demo"))), "");
-  assert.equal(renderToStaticMarkup(createElement(settings(undefined))).includes('checked=""'), true, "on when the preference could not be read");
+  assert.deepEqual(switches(renderToStaticMarkup(createElement(settings(undefined)))), [true, true], "on when the preferences could not be read");
 });
 
 test("the run page polls from its first render, slows down for long runs, and stops once the run has finished", () => {

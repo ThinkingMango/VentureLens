@@ -12,7 +12,8 @@ import {
 } from "@/lib/notify-core";
 
 // Notifications (spec WP-08). One provider interface, so another email service can replace SMTP in one place.
-export type OutgoingEmail = EmailMessage & { to: string; idempotencyKey: string };
+/** `headers`: extra headers, such as List-Unsubscribe on the weekly email (WP-17). */
+export type OutgoingEmail = EmailMessage & { to: string; idempotencyKey: string; headers?: Record<string, string> };
 export interface NotificationProvider {
   send(message: OutgoingEmail): Promise<void>;
 }
@@ -35,6 +36,7 @@ export function smtpProvider(config: SmtpConfig, createTransport: (options: Reco
         await transport.sendMail({
           from: config.from, to: message.to, replyTo: config.replyTo, subject: message.subject, html: message.html, text: message.text,
           messageId: `<${message.idempotencyKey}@${domain}>`,
+          ...(message.headers ? { headers: message.headers } : {}),
         });
       } catch (error) {
         // Never pass the provider's error on: it can echo the address or the server's reply. A short code is enough.

@@ -94,10 +94,10 @@ export async function readWorkspace(
     savesResult,
     accessResult,
   ] = await Promise.all([
-    // Read on its own, like the memory date below: before the WP-08 migration this only falls back to "on".
+    // Read on its own, like the memory date below: before the WP-08 or WP-17 migration both fall back to "on".
     supabase
       .from("founder_profiles")
-      .select("notify_on_complete")
+      .select("notify_on_complete,notify_weekly")
       .eq("user_id", user.id)
       .maybeSingle(),
     // Read on its own, so a database without the WP-04 column only loses the "cleared on" date, never the workspace.
@@ -198,6 +198,7 @@ export async function readWorkspace(
     onboarded: row?.onboarding_completed ?? false,
     memoryResetAt: memoryResult.error ? null : (memoryResult.data?.history_reset_at ?? null),
     notifyOnComplete: notifyResult.error ? true : notifyResult.data?.notify_on_complete !== false,
+    notifyWeekly: notifyResult.error ? true : notifyResult.data?.notify_weekly !== false,
     activeSprints: await activeSprints,
     access,
     projects: projectsResult.data ?? [],

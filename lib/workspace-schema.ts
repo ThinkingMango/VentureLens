@@ -231,6 +231,8 @@ export type WorkspaceData = {
   memoryResetAt?: string | null;
   /** Whether a finished run sends a "report ready" email (WP-08). True when the preference cannot be read. */
   notifyOnComplete?: boolean;
+  /** Whether an active sprint sends a weekly progress email (WP-17). True when the preference cannot be read. */
+  notifyWeekly?: boolean;
   /** Active validation sprints for the dashboard (WP-10), newest first; empty when there are none or they cannot be read. */
   activeSprints?: import("./sprint-core").ActiveSprintSummary[];
   access: ResearchAccess;
