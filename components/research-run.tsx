@@ -424,7 +424,7 @@ export function ResearchRunView({
               </dt>
               <dd>
                 {format.usd(data.usage.committed_usd, 4)} /{" "}
-                {format.usd(data.usage.budget_usd)}
+                {data.usage.budget_usd === null ? copy("No budget") : format.usd(data.usage.budget_usd)}
               </dd>
             </div>
             <div>

@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldContent, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Separator } from "@/components/ui/separator";
-import { providerPlan, fallbackFor, runCostEstimates, recommendedBudget, parseBudgetInput, settleBudgetInput, resolveSourcePolicy, sameSourcePolicy, MIN_RESEARCH_BUDGET_USD, MAX_RESEARCH_BUDGET_USD, type ResearchSettings, type ProviderSettingsResponse, type ResearchProvider } from "@/lib/provider-settings-core";
+import { providerPlan, fallbackFor, runCostEstimates, recommendedBudget, effectiveBudget, parseBudgetInput, settleBudgetInput, resolveSourcePolicy, sameSourcePolicy, MIN_RESEARCH_BUDGET_USD, MAX_RESEARCH_BUDGET_USD, DEFAULT_RESEARCH_BUDGET_USD, NO_BUDGET_CEILING_USD, type ResearchSettings, type ProviderSettingsResponse, type ResearchProvider } from "@/lib/provider-settings-core";
 import { useFormats } from "@/i18n/use-copy";
 import { ProviderModelField } from "@/components/provider-model-field";
 import { AdminSources } from "@/components/admin-sources";
@@ -46,8 +46,10 @@ export function AdminProviders({ initialData }: { initialData: ProviderSettingsR
   const estimates = runCostEstimates(settings);
   // The primary must fit with headroom (BUDGET_HEADROOM), the same rule the server applies on save.
   const primaryBudget = recommendedBudget(estimates.primary.requiredUsd);
-  const primaryFits = primaryBudget <= settings.budgetUsd;
-  const fallbackFits = !estimates.fallback || estimates.fallback.requiredUsd <= settings.budgetUsd;
+  // "No budget" (null) is checked against the safety ceiling, which every configurable run fits under.
+  const noBudget = settings.budgetUsd === null;
+  const primaryFits = primaryBudget <= effectiveBudget(settings.budgetUsd);
+  const fallbackFits = !estimates.fallback || estimates.fallback.requiredUsd <= effectiveBudget(settings.budgetUsd);
 
   function change(patch: Partial<ResearchSettings>) {
     const next = { primary: settings.primary, autoFallback: settings.autoFallback, fallbackProvider, qwenModel: settings.qwenModel, geminiModel: settings.geminiModel, claudeModel: settings.claudeModel, budgetUsd: settings.budgetUsd, sources, ...patch };
@@ -112,17 +114,33 @@ export function AdminProviders({ initialData }: { initialData: ProviderSettingsR
                 <ProviderModelField provider="gemini" model={settings.geminiModel} disabled={saving || !!loadError} onChange={model => change({ geminiModel: geminiModelSchema.parse(model) })} />
                 <ProviderModelField provider="claude" model={settings.claudeModel} disabled={saving || !!loadError} onChange={model => change({ claudeModel: claudeModelSchema.parse(model) })} />
                 <p className="text-sm leading-relaxed text-muted-foreground">{t("modelBudget")}</p>
-                <Field data-disabled={saving}>
-                  <FieldLabel htmlFor="research-budget">{t("budget")}</FieldLabel>
+                {/* With "No budget" on there is no amount to enter, so the field is hidden rather than left empty. */}
+                {!noBudget && (
+                  <Field data-disabled={saving}>
+                    <FieldLabel htmlFor="research-budget">{t("budget")}</FieldLabel>
+                    <input
+                      id="research-budget" type="number" inputMode="decimal" step="0.01" min={MIN_RESEARCH_BUDGET_USD} max={MAX_RESEARCH_BUDGET_USD}
+                      value={budgetText ?? settings.budgetUsd ?? ""} disabled={saving || !!loadError} aria-describedby="budget-help"
+                      // Keep what is typed; apply it once it is a usable budget, and clamp only when the field is left.
+                      onChange={event => { setBudgetText(event.target.value); const value = parseBudgetInput(event.target.value); if (value !== null) change({ budgetUsd: value }); }}
+                      onBlur={() => { if (budgetText !== null) { change({ budgetUsd: settleBudgetInput(budgetText, settings.budgetUsd ?? DEFAULT_RESEARCH_BUDGET_USD) }); setBudgetText(null); } }}
+                      className="h-12 w-full rounded-md border bg-card px-3 text-base text-foreground md:max-w-xs"
+                    />
+                    <FieldDescription id="budget-help">{t("budgetHelp", { min: MIN_RESEARCH_BUDGET_USD, max: MAX_RESEARCH_BUDGET_USD })}</FieldDescription>
+                  </Field>
+                )}
+                <Field orientation="horizontal" data-disabled={saving}>
                   <input
-                    id="research-budget" type="number" inputMode="decimal" step="0.01" min={MIN_RESEARCH_BUDGET_USD} max={MAX_RESEARCH_BUDGET_USD}
-                    value={budgetText ?? settings.budgetUsd} disabled={saving || !!loadError} aria-describedby="budget-help"
-                    // Keep what is typed; apply it once it is a usable budget, and clamp only when the field is left.
-                    onChange={event => { setBudgetText(event.target.value); const value = parseBudgetInput(event.target.value); if (value !== null) change({ budgetUsd: value }); }}
-                    onBlur={() => { if (budgetText !== null) { change({ budgetUsd: settleBudgetInput(budgetText, settings.budgetUsd) }); setBudgetText(null); } }}
-                    className="h-12 w-full rounded-md border bg-card px-3 text-base text-foreground md:max-w-xs"
+                    id="no-budget" type="checkbox" checked={noBudget}
+                    // Leaving "No budget" restores a budget the configured primary fits (within the 0.05–5 range).
+                    onChange={event => { setBudgetText(null); change({ budgetUsd: event.target.checked ? null : Math.min(MAX_RESEARCH_BUDGET_USD, Math.max(DEFAULT_RESEARCH_BUDGET_USD, primaryBudget)) }); }}
+                    disabled={saving || !!loadError} aria-describedby="no-budget-help"
+                    className="size-5 shrink-0 accent-primary"
                   />
-                  <FieldDescription id="budget-help">{t("budgetHelp", { min: MIN_RESEARCH_BUDGET_USD, max: MAX_RESEARCH_BUDGET_USD })}</FieldDescription>
+                  <FieldContent>
+                    <FieldLabel htmlFor="no-budget">{t("noBudget")}</FieldLabel>
+                    <FieldDescription id="no-budget-help">{t("noBudgetHelp", { ceiling: formats.usd(NO_BUDGET_CEILING_USD, 0) })}</FieldDescription>
+                  </FieldContent>
                 </Field>
                 <Separator />
                 <Field orientation="horizontal" data-disabled={saving}>
@@ -160,6 +178,7 @@ export function AdminProviders({ initialData }: { initialData: ProviderSettingsR
                     {researchModels[selectedModel(plan.primary, settings)].name}
                     {plan.fallback ? <><ArrowRight className="size-4 text-muted-foreground" aria-hidden="true" />{researchModels[selectedModel(plan.fallback, settings)].name}</> : <span className="text-sm font-normal text-muted-foreground">· {t("noFallback")}</span>}
                   </p>
+                  {noBudget && <p className="text-sm font-medium">{t("noBudgetActive", { ceiling: formats.usd(NO_BUDGET_CEILING_USD, 0) })}</p>}
                   <p className="text-sm text-muted-foreground">{t("costEstimate", { expected: formats.usd(estimates.primary.expectedUsd, 2), required: formats.usd(primaryBudget, 2) })}</p>
                   <p className="text-sm text-muted-foreground">{t("verifyEstimate", { expected: formats.usd(estimates.verify.primary.expectedUsd, 2), required: formats.usd(estimates.verify.primary.requiredUsd, 2) })}</p>
                   {!primaryFits && <p className="text-sm font-medium text-destructive">{t("budgetTooLow", { model: researchModels[estimates.primary.model].name, required: formats.usd(primaryBudget, 2) })}</p>}
