@@ -27,6 +27,7 @@ import { ProfileChoice } from "@/components/profile-choice";
 import {
   founderRoles,
   founderIndustries,
+  founderIndustryHints,
   founderGoals,
   skillSuggestions,
   interestSuggestions,
@@ -391,6 +392,7 @@ export function Onboarding({ editing = false }: { editing?: boolean }) {
                   label="Which industry do you know best?"
                   value={draft.industry}
                   options={founderIndustries}
+                  hints={founderIndustryHints}
                   maxLength={100}
                   disabled={busy}
                   onChange={(value) => update("industry", value)}

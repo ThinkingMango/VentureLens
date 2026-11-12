@@ -72,3 +72,45 @@ export const interestSuggestions = [
   "Creative tools",
   "Local and home services",
 ] as const;
+
+// Short explanations shown when a founder hovers over or focuses the info icon next to an industry.
+export const founderIndustryHints: Partial<Record<(typeof founderIndustries)[number], string>> = {
+  "Professional services":
+    "Expertise sold by the hour or project. E.g. consulting, accounting, architecture, IT services.",
+  "B2B SaaS":
+    "Subscription software sold to businesses. E.g. CRM, invoicing, scheduling or analytics tools.",
+  "Finance & operations":
+    "Money and back-office work. E.g. banking, insurance, bookkeeping, payroll, FP&A.",
+  Healthcare:
+    "Care and the systems around it. E.g. clinics, pharmacy, medical devices, wellness, elder care.",
+  Education:
+    "Teaching and learning. E.g. schools, tutoring, online courses, corporate training.",
+  "Retail & e-commerce":
+    "Selling products to shoppers. E.g. shops, online stores, marketplaces, Amazon sellers.",
+  "Marketing & media":
+    "Reaching and engaging audiences. E.g. agencies, advertising, PR, publishing, content creation.",
+  "Real estate & property":
+    "Buildings and land. E.g. agency, property management, development, construction, facilities.",
+  "Travel & hospitality":
+    "Trips and guest experiences. E.g. hotels, restaurants, tour operators, events, airlines.",
+  "Manufacturing & engineering":
+    "Designing and making physical things. E.g. factories, industrial equipment, electronics, automotive.",
+  "Logistics & transportation":
+    "Moving goods and people. E.g. freight, shipping, warehousing, couriers, fleet management.",
+  "Supply chain & procurement":
+    "Sourcing and buying for organisations. E.g. supplier management, purchasing, import/export, inventory.",
+  "Food & agriculture":
+    "Growing, producing and selling food. E.g. farming, food processing, F&B brands, catering.",
+  "Energy & sustainability":
+    "Power and the environment. E.g. solar, utilities, EV charging, recycling, ESG reporting.",
+  "Legal & compliance":
+    "Law and regulation. E.g. law firms, contracts, regulatory affairs, risk and audit.",
+  "HR & recruitment":
+    "Finding and managing people. E.g. hiring, staffing agencies, payroll, training, employee benefits.",
+  "Nonprofits & social impact":
+    "Mission-driven work. E.g. charities, NGOs, social enterprises, community and public programmes.",
+  "Consumer products & services":
+    "Things people buy for themselves. E.g. beauty, fitness, pets, home services, apparel.",
+  "No specific industry yet":
+    "That is fine. VentureLens will lean on your skills and interests instead of one industry.",
+};

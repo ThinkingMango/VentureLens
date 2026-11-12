@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check } from "lucide-react";
+import { Check, Info } from "lucide-react";
 import { useCopy } from "@/i18n/use-copy";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,7 @@ export function ProfileChoice({
   label,
   value,
   options,
+  hints,
   maxLength,
   disabled,
   onChange,
@@ -20,12 +21,15 @@ export function ProfileChoice({
   label: string;
   value: string;
   options: readonly string[];
+  /** Optional explanation per option, shown on hover or keyboard focus of an info icon. */
+  hints?: Partial<Record<string, string>>;
   maxLength: number;
   disabled: boolean;
   onChange: (value: string) => void;
 }) {
   const copy = useCopy();
   const [custom, setCustom] = useState(!options.includes(value));
+  const [openHint, setOpenHint] = useState<string | null>(null);
   const isCustom = custom || !options.includes(value);
   const choices = [...options, "__custom__"] as const;
 
@@ -41,6 +45,8 @@ export function ProfileChoice({
           {choices.map((option, index) => {
             const selected = option === "__custom__" ? isCustom : !isCustom && value === option;
             const optionId = `${id}-${index}`;
+            const hint = option === "__custom__" ? undefined : hints?.[option];
+            const hintId = `${optionId}-hint`;
             return (
               <label
                 key={option}
@@ -66,6 +72,38 @@ export function ProfileChoice({
                   }}
                 />
                 <span>{option === "__custom__" ? copy("Other — describe your own") : copy(option)}</span>
+                {hint && (
+                  <span className="group/hint relative inline-flex">
+                    <button
+                      type="button"
+                      aria-label={copy("What does this mean?")}
+                      aria-describedby={hintId}
+                      aria-expanded={openHint === option}
+                      className="inline-flex size-6 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground focus-visible:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      // The icon sits inside the option's label: stop a click on it from also selecting the option.
+                      onClick={(event) => {
+                        event.preventDefault();
+                        setOpenHint((current) => (current === option ? null : option));
+                      }}
+                      onBlur={() => setOpenHint(null)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Escape") setOpenHint(null);
+                      }}
+                    >
+                      <Info className="size-4" aria-hidden="true" />
+                    </button>
+                    <span
+                      id={hintId}
+                      role="tooltip"
+                      className={cn(
+                        "pointer-events-none invisible absolute bottom-full left-1/2 z-50 mb-2 w-64 max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-lg border bg-popover px-3 py-2 text-xs leading-relaxed font-normal text-popover-foreground opacity-0 shadow-md transition-opacity group-hover/hint:visible group-hover/hint:opacity-100 group-has-[:focus-visible]/hint:visible group-has-[:focus-visible]/hint:opacity-100",
+                        openHint === option && "visible opacity-100",
+                      )}
+                    >
+                      {copy(hint)}
+                    </span>
+                  </span>
+                )}
                 {selected && <Check className="ml-auto size-4 shrink-0 text-primary" aria-hidden="true" />}
               </label>
             );
