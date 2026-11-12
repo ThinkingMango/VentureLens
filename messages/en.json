@@ -51,6 +51,9 @@
     "modelBudget": "Max and Argon use more of the same research budget and may hit the existing limit sooner. Native search context and query costs are estimates, not provider-enforced caps. Google Search requires paid-tier access.",
     "budget": "Per-run budget (USD)",
     "budgetHelp": "Hard cap on model and search spend for each new research run, between {min} and {max} USD. Existing runs keep the cap they started with.",
+    "noBudget": "No budget",
+    "noBudgetHelp": "Runs are never shortened, moved to the fallback or stopped because of cost. Each run still has a fixed safety ceiling of {ceiling}, about five times the most expensive run any model can be configured for, so a fault cannot spend without limit.",
+    "noBudgetActive": "No budget: new runs are limited only by the {ceiling} safety ceiling. The estimates below are what a run is expected to cost.",
     "costEstimate": "Estimated cost of a complete run: about {expected}. Set a per-run budget of at least {required}: every reservation fits, with 10% headroom so a change to the estimate does not move runs to another model.",
     "budgetTooLow": "{model} cannot finish a run within this budget with headroom: it needs at least {required}. Raise the budget or choose a less expensive model; otherwise runs move to the fallback model or stop before their report.",
     "fallbackOverBudget": "{model} needs at least {required} to finish a run, so it will not be used as a fallback at this budget.",
@@ -2153,7 +2156,8 @@
     "mo27mf2": "Turn what you know into something sellable without your hours. E.g. courses, templates, software.",
     "m8vb5lx": "Add customers, products or markets to a business you already run.",
     "mq75tzw": "A business whose main purpose includes helping people or the planet, while paying its way.",
-    "m11feynr": "See what is possible and build understanding before choosing a direction."
+    "m11feynr": "See what is possible and build understanding before choosing a direction.",
+    "mt0v047": "No budget"
   },
   "language": {
     "label": "Interface language",

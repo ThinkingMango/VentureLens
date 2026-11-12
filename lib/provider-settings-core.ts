@@ -17,6 +17,14 @@ export const RESEARCH_SETTINGS_KEY = "research";
 export const DEFAULT_RESEARCH_BUDGET_USD = 0.25;
 export const MIN_RESEARCH_BUDGET_USD = 0.05;
 export const MAX_RESEARCH_BUDGET_USD = 5;
+/**
+ * The hard stop for a run started with "No budget" (`budgetUsd: null`). Such a run is never sized, moved to the
+ * fallback or stopped because of a configured budget; this ceiling only catches a runaway (a pipeline bug, a provider
+ * billing far above its published price). It is about five times the most expensive run any model and source policy
+ * can be configured for (Claude Opus 5.5 at the widest policy needs ≈ $4.52), so a working run never reaches it.
+ * public.reserve_research_usage applies the same figure (migration 20261112160000); a test keeps the two equal.
+ */
+export const NO_BUDGET_CEILING_USD = 25;
 export const providerSettingsSchema = z.strictObject({
   primary: z.enum(researchProviders),
   autoFallback: z.boolean(),
@@ -26,8 +34,9 @@ export const providerSettingsSchema = z.strictObject({
   qwenModel: qwenModelSchema.default(DEFAULT_QWEN_MODEL),
   geminiModel: geminiModelSchema.default(DEFAULT_GEMINI_MODEL),
   claudeModel: claudeModelSchema.default(DEFAULT_CLAUDE_MODEL),
-  // Hard per-run spend cap applied by enqueue_research to new runs.
-  budgetUsd: z.number().min(MIN_RESEARCH_BUDGET_USD).max(MAX_RESEARCH_BUDGET_USD).default(DEFAULT_RESEARCH_BUDGET_USD),
+  // Hard per-run spend cap applied by enqueue_research to new runs. null is "No budget": runs are stopped only by
+  // NO_BUDGET_CEILING_USD.
+  budgetUsd: z.number().min(MIN_RESEARCH_BUDGET_USD).max(MAX_RESEARCH_BUDGET_USD).nullable().default(DEFAULT_RESEARCH_BUDGET_USD),
 });
 export type ProviderSettings = z.infer<typeof providerSettingsSchema>;
 export type ResearchProvider = ProviderSettings["primary"];
@@ -108,12 +117,21 @@ export function recommendedBudget(requiredUsd: number) {
   return Math.ceil(Math.round(requiredUsd * BUDGET_HEADROOM * 10_000) / 100) / 100;
 }
 
+/**
+ * The most a run may spend: its budget, or NO_BUDGET_CEILING_USD for a run with no budget. Accepts the database
+ * value as well, where numeric columns can arrive as strings.
+ */
+export function effectiveBudget(budgetUsd: number | string | null | undefined): number {
+  return budgetUsd === null || budgetUsd === undefined ? NO_BUDGET_CEILING_USD : Number(budgetUsd);
+}
+
 // A primary model that cannot finish a run within the per-run budget makes every run fail after spending money, or
-// moves it to the fallback. A fallback that cannot finish is allowed; the engine simply does not use it.
+// moves it to the fallback. A fallback that cannot finish is allowed; the engine simply does not use it. With no
+// budget every configurable run fits under the safety ceiling, so this never refuses.
 export function assertBudgetFits(settings: ProviderSettings & { sources?: unknown }, at = new Date()) {
   const { primary } = runCostEstimates(settings, at);
   const recommended = recommendedBudget(primary.requiredUsd);
-  if (recommended > settings.budgetUsd) throw Object.assign(new Error("BUDGET_TOO_LOW"), { requiredUsd: recommended, model: primary.model });
+  if (recommended > effectiveBudget(settings.budgetUsd)) throw Object.assign(new Error("BUDGET_TOO_LOW"), { requiredUsd: recommended, model: primary.model });
 }
 
 /**

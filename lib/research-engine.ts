@@ -10,7 +10,7 @@ import { fetchResearchSource } from "@/lib/research-source";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { researchProviderSettings } from "@/lib/provider-settings";
-import { defaultProviderSettings, providerPlan, providerSettingsSchema, resolveSourcePolicy, legacySourcePolicy, retrievalLimits, runShape, searchGuidance, queryEvidence, queryGuidance, type ProviderSettings, type SourcePolicy } from "@/lib/provider-settings-core";
+import { defaultProviderSettings, providerPlan, providerSettingsSchema, resolveSourcePolicy, legacySourcePolicy, retrievalLimits, runShape, searchGuidance, queryEvidence, queryGuidance, effectiveBudget, type ProviderSettings, type SourcePolicy } from "@/lib/provider-settings-core";
 import { selectedModel, researchModelPricing, geminiThinkingOptions, qwenModelSchema, geminiModelSchema, claudeModelSchema, searchTimeout, MIN_SEARCH_MS, RETRIEVAL_STEP_BUDGET_MS, type ResearchModelId } from "@/lib/research-models";
 import { reservationFor, estimateRunCost } from "@/lib/research-budget";
 import { briefFocus, searchLanguage } from "@/lib/research-options";
@@ -163,7 +163,8 @@ export async function initializeResearch(ctx: Context) {
     const plan = providerPlan(providerSettings);
     // A run whose models cannot finish within its budget would spend money and then stop with no report. Check before
     // the first request: skip a provider that cannot finish, and stop early (uncharged) when none can.
-    const budget = Number(row.budget_usd);
+    // A run started with "No budget" has none recorded; only the safety ceiling applies, so every model fits.
+    const budget = effectiveBudget(row.budget_usd);
     // Verify runs (one idea) are estimated as verify runs; every other mode as the eight-candidate pipeline.
     const estimate = (provider: ProviderSettings["primary"]) => estimateRunCost(selectedModel(provider, providerSettings), new Date(), configuration.brief.discovery_mode ?? "combined", runShape(sourcePolicy));
     const feasible = (provider: ProviderSettings["primary"]) => estimate(provider).requiredUsd <= budget;

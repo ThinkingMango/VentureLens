@@ -71,7 +71,7 @@ export async function runInspection(user: Identity, id: string) {
   assertAdministrator(user);
   const client = createAdminClient();
   const run = checked(await client.from("research_runs")
-    .select(`${RUN_FIELDS},user_id,updated_at,budget_usd,quota_released,workflow_id`).eq("id", id).maybeSingle()) as (RunRecord & { user_id: string; updated_at: string; budget_usd: number | string; quota_released: boolean; workflow_id: string | null }) | null;
+    .select(`${RUN_FIELDS},user_id,updated_at,budget_usd,quota_released,workflow_id`).eq("id", id).maybeSingle()) as (RunRecord & { user_id: string; updated_at: string; budget_usd: number | string | null; quota_released: boolean; workflow_id: string | null }) | null;
   if (!run) return null;
   const [stages, usage, evidence, opportunities] = await Promise.all([
     readAll<{ stage_key: string; created_at: string; output: unknown }>((from, to) => client.from("research_stages").select("stage_key,created_at,output").eq("run_id", id).order("stage_key").range(from, to)),
@@ -91,7 +91,7 @@ export async function runInspection(user: Identity, id: string) {
     run: {
       ...runListRow(run, settled, opportunities.length),
       user_id: run.user_id, started_at: run.started_at, completed_at: run.completed_at, updated_at: run.updated_at,
-      budget_usd: Number(run.budget_usd), quota_released: run.quota_released, workflow_id: run.workflow_id,
+      budget_usd: run.budget_usd === null ? null : Number(run.budget_usd), quota_released: run.quota_released, workflow_id: run.workflow_id,
     },
     setup: structuralSetup(stage("setup")),
     failure: stage("failure") ? structuralFailure(stage("failure")) : null,
