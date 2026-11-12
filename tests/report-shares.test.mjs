@@ -38,32 +38,39 @@ function fakeDb(tables, { insertError = null } = {}) {
     from(table) {
       const filters = [];
       let columns = "", inserting = null;
-      const run = () => (tables[table] ?? []).filter(row => filters.every(([key, value]) => (value === null ? row[key] == null : row[key] === value)));
+      const run = () => (tables[table] ?? []).filter(row => filters.every(([key, value]) => (typeof value === "function" ? value(row) : value === null ? row[key] == null : row[key] === value)));
       const query = {
         select: c => { columns = c; reads.push({ table, columns }); return query; },
         eq: (k, v) => { filters.push([k, v]); return query; },
         is: (k, v) => { filters.push([k, v]); return query; },
+        gt: (k, v) => { filters.push([k, row => row[k] > v]); return query; },
+        lte: (k, v) => { filters.push([k, row => row[k] <= v]); return query; },
         insert: row => { inserting = row; return query; },
-        update: () => query,
+        update: values => { query.updating = values; return query; },
         maybeSingle: async () => ({ data: run()[0] ?? null, error: null }),
         single: async () => {
           if (insertError) return { data: null, error: insertError };
-          (tables[table] ??= []).push({ ...inserting, created_at: "now", revoked_at: null });
-          return { data: { token: inserting.token, created_at: "now" }, error: null };
+          (tables[table] ??= []).push({ ...inserting, created_at: "now", expires_at: LATER, revoked_at: null });
+          return { data: { token: inserting.token, created_at: "now", expires_at: LATER }, error: null };
         },
-        then: resolve => resolve({ data: run(), error: null }),
+        then: resolve => {
+          if (query.updating) { run().forEach(row => Object.assign(row, query.updating)); return resolve({ data: null, error: null }); }
+          return resolve({ data: run(), error: null });
+        },
       };
       return query;
     },
   };
 }
 const TOKEN = "A".repeat(43);
+const LATER = "2099-01-01T00:00:00.000Z";
+const EARLIER = "2020-01-01T00:00:00.000Z";
 const report = { mode: "combined", opportunities: [], summary: "s" };
 
 test("a shared page reads only the report, its dates and outcome, never the brief, profile or founder", async () => {
   const { loadSharedReport } = shares();
   const db = fakeDb({
-    report_shares: [{ token: TOKEN, run_id: "r1", user_id: "u1", revoked_at: null }],
+    report_shares: [{ token: TOKEN, run_id: "r1", user_id: "u1", revoked_at: null, expires_at: LATER }],
     research_runs: [{ id: "r1", user_id: "u1", status: "completed", report, created_at: "c", completed_at: "d", configuration: { brief: { name: "Secret" } } }],
     research_stages: [],
   });
@@ -77,8 +84,8 @@ test("a shared page reads only the report, its dates and outcome, never the brie
 test("an unknown, malformed or turned-off link, or a report that is no longer complete, shows nothing", async () => {
   const { loadSharedReport } = shares();
   const tables = () => ({
-    report_shares: [{ token: TOKEN, run_id: "r1", user_id: "u1", revoked_at: "2026-11-12" }, { token: "B".repeat(43), run_id: "r2", user_id: "u1", revoked_at: null }],
-    research_runs: [{ id: "r2", user_id: "u1", status: "failed", report: null }],
+    report_shares: [{ token: TOKEN, run_id: "r1", user_id: "u1", revoked_at: "2026-11-12" }, { token: "B".repeat(43), run_id: "r2", user_id: "u1", revoked_at: null, expires_at: LATER }, { token: "D".repeat(43), run_id: "r3", user_id: "u1", revoked_at: null, expires_at: EARLIER }],
+    research_runs: [{ id: "r2", user_id: "u1", status: "failed", report: null }, { id: "r3", user_id: "u1", status: "completed", report: { mode: "combined" }, created_at: "c", completed_at: "d" }],
     research_stages: [],
   });
   const db = fakeDb(tables());
@@ -87,12 +94,18 @@ test("an unknown, malformed or turned-off link, or a report that is no longer co
   assert.equal(await loadSharedReport(TOKEN, fakeDb(tables())), null, "turned off");
   assert.equal(await loadSharedReport("C".repeat(43), fakeDb(tables())), null, "unknown");
   assert.equal(await loadSharedReport("B".repeat(43), fakeDb(tables())), null, "not a completed report");
+  assert.equal(await loadSharedReport("D".repeat(43), fakeDb(tables())), null, "expired after 90 days, though the report is complete");
 });
 
 test("making a link returns the live one if it exists, survives a race, and treats a refused run as not found", async () => {
   const { createShare } = shares();
-  const live = fakeDb({ report_shares: [{ user_id: "u1", run_id: "r1", token: TOKEN, created_at: "then", revoked_at: null }] });
-  assert.deepEqual(await createShare(live, "u1", "r1"), { ok: true, token: TOKEN, created_at: "then" });
+  const live = fakeDb({ report_shares: [{ user_id: "u1", run_id: "r1", token: TOKEN, created_at: "then", expires_at: LATER, revoked_at: null }] });
+  assert.deepEqual(await createShare(live, "u1", "r1"), { ok: true, token: TOKEN, created_at: "then", expires_at: LATER });
+  // An expired link is retired, and sharing again makes a new one.
+  const expired = { report_shares: [{ user_id: "u1", run_id: "r1", token: TOKEN, created_at: "then", expires_at: EARLIER, revoked_at: null }] };
+  const renewed = await createShare(fakeDb(expired), "u1", "r1");
+  assert.ok(renewed.ok && renewed.token !== TOKEN && renewed.expires_at === LATER);
+  assert.ok(expired.report_shares[0].revoked_at, "the expired link is turned off");
   const fresh = await createShare(fakeDb({ report_shares: [] }), "u1", "r1");
   assert.ok(fresh.ok && isShareToken(fresh.token));
   assert.deepEqual(await createShare(fakeDb({ report_shares: [] }, { insertError: { code: "42501" } }), "u1", "r1"), { ok: false, code: "NOT_FOUND" });
@@ -110,4 +123,11 @@ test("routes and page: same-origin writes, signed-in owners only, unlisted with 
   assert.match(page, /shared: true/);
   assert.doesNotMatch(page, /includeBrief|brief:/);
   assert.doesNotMatch(read("../proxy.ts"), /\|s\|/, "shared pages need no sign-in");
+});
+
+test("the page's 90 days matches the expiry the database sets", () => {
+  assert.equal(shareCore.SHARE_DAYS, 90);
+  const migration = read("../supabase/migrations/20261112140000_report_share_expiry.sql");
+  assert.match(migration, new RegExp(`set default \\(now\\(\\) \\+ interval '${shareCore.SHARE_DAYS} days'\\)`));
+  assert.match(migration, /grant insert \(user_id, run_id, token\) on public\.report_shares to authenticated/);
 });
