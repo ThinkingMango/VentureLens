@@ -4,11 +4,12 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { isAdministrator } from "@/lib/admin-access";
 import { QWEN_MODEL } from "@/lib/qwen-core";
 import { GEMINI_MODEL } from "@/lib/research-fallback-core";
+import { CLAUDE_MODEL } from "@/lib/claude-core";
 import {
   RESEARCH_SETTINGS_KEY,
   assertBudgetFits,
   assertProvidersConfigured,
-  providerSettingsSchema,
+  researchSettingsSchema,
   readStoredProviderSettings,
   type ProviderAvailability,
   type ProviderSettingsResponse,
@@ -18,6 +19,7 @@ export function providerAvailability(): ProviderAvailability {
   return {
     qwen: { configured: !!process.env.DASHSCOPE_API_KEY && !!process.env.DASHSCOPE_WORKSPACE_ID, model: QWEN_MODEL },
     gemini: { configured: !!process.env.GOOGLE_GENERATIVE_AI_API_KEY, model: GEMINI_MODEL },
+    claude: { configured: !!process.env.ANTHROPIC_API_KEY, model: CLAUDE_MODEL },
   };
 }
 
@@ -38,12 +40,15 @@ export async function administratorSettings(user: User): Promise<ProviderSetting
 }
 
 export async function saveProviderSettings(actorId: string, input: unknown): Promise<ProviderSettingsResponse> {
-  const settings = providerSettingsSchema.parse(input);
+  const parsed = researchSettingsSchema.parse(input);
   const client = createAdminClient();
   // Re-check the actor against the auth server; the session cookie alone is not trusted for writes.
   const current = await client.auth.admin.getUserById(actorId);
   if (current.error) throw new Error("SETTINGS_UNAVAILABLE");
   if (!isAdministrator(current.data.user)) throw new Error("ADMIN_REQUIRED");
+  // A save without a source policy (an API caller that predates it) keeps the stored one rather than resetting it.
+  const sources = parsed.sources ?? await researchProviderSettings().then(saved => saved.sources, () => undefined);
+  const settings = { ...parsed, ...(sources ? { sources } : {}) };
   const providers = providerAvailability();
   assertProvidersConfigured(settings, providers);
   assertBudgetFits(settings);

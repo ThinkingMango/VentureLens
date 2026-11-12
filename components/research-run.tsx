@@ -11,9 +11,10 @@ import { ResearchReportView } from "@/components/research-report";
 import { ResearchOutcomeView } from "@/components/research-outcome";
 import { ModelTag } from "@/components/model-tag";
 import { ReportRating } from "@/components/report-feedback";
-import { DeleteRunButton } from "@/components/library";
+import { CancelRunButton, DeleteRunButton } from "@/components/library";
 import { canDeleteRun } from "@/lib/library-core";
 import { ExportButton } from "@/components/report-export";
+import { ShareReportButton } from "@/components/share-report";
 import { exportFileName, reportToMarkdown } from "@/lib/report-export";
 import { useLocale } from "next-intl";
 import { pollInterval, retrievalProgress } from "@/lib/research-progress";
@@ -178,11 +179,22 @@ export function ResearchRunView({
                 return { fileName: exportFileName(includeBrief ? data.configuration.brief.name : copy("VentureLens research report"), generatedAt), text };
               }}
             />
+            <ShareReportButton runId={data.id} />
           </div>
         )}
       </PageHeader>
       <div className="flex flex-wrap items-center gap-2">
         <ModelTag model={data.report?.model ?? data.model?.model ?? null} provider={data.report ? data.report.provider ?? data.model?.provider : data.model?.provider} planned={!data.report && !!data.model?.planned} />
+        {data.model?.primary_skipped && (
+          <span className="text-sm text-muted-foreground">
+            {copy("This run uses {model} because the configured {configured} needs a budget of at least {required} and this run's budget is {budget}.", {
+              model: (researchModels as Record<string, { name: string }>)[data.model.model ?? ""]?.name ?? data.model.model ?? "",
+              configured: (researchModels as Record<string, { name: string }>)[data.model.primary_skipped.model]?.name ?? data.model.primary_skipped.model,
+              required: format.usd(data.model.primary_skipped.required_usd, 2),
+              budget: format.usd(data.model.primary_skipped.budget_usd, 2),
+            })}
+          </span>
+        )}
         {data.model?.used.length > 1 && (
           <span className="text-sm text-muted-foreground">
             {copy("Models used: {models}", { models: data.model.used.map((id) => (researchModels as Record<string, { name: string }>)[id]?.name ?? id).join(", ") })}
@@ -262,7 +274,9 @@ export function ResearchRunView({
             <h2 className="text-lg font-semibold">
               {copy(
                 data.status === "failed"
-                  ? "Research incomplete"
+                  ? data.error_code === "CANCELLED"
+                    ? "Research stopped"
+                    : "Research incomplete"
                   : (stageLabels[data.stage] ?? "Queued"),
               )}
             </h2>
@@ -281,6 +295,15 @@ export function ResearchRunView({
                 ? copy("You can leave this page. We'll email you when it's ready.")
                 : copy("You can leave this page; progress is saved on the server.")}
             </p>
+          )}
+          {active && (
+            <CancelRunButton
+              runId={data.id}
+              onCancelled={async () => {
+                await mutate().catch(() => undefined);
+                void refresh();
+              }}
+            />
           )}
           {active && data.stage === "retrieval" && !verifying && retrieval.total !== null && (
             <p className="text-sm font-medium">
@@ -350,9 +373,13 @@ export function ResearchRunView({
                 )}
               </p>
               <p className="text-sm text-muted-foreground">
-                {data.quota_released === false
-                  ? copy("This run used one of your research runs because your account has reached its limit of returned failed runs. Retrying this run, where offered, does not use another one.")
-                  : copy("This run did not use up a research run: your allowance was restored. A retry takes the slot again until it completes.")}
+                {data.error_code === "CANCELLED"
+                  ? data.quota_released === false
+                    ? copy("This run used one of your research runs: it had already spent part of its budget, and your account has reached its limit of returned runs.")
+                    : copy("Stopping returned this research run to your allowance.")
+                  : data.quota_released === false
+                    ? copy("This run used one of your research runs because your account has reached its limit of returned failed runs. Retrying this run, where offered, does not use another one.")
+                    : copy("This run did not use up a research run: your allowance was restored. A retry takes the slot again until it completes.")}
               </p>
               {data.error_code === "BUDGET_EXCEEDED" && (
                 <p className="max-w-prose text-sm leading-relaxed text-muted-foreground">

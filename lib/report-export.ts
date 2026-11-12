@@ -61,7 +61,11 @@ export type ExportReport = {
   opportunitiesHeading: string;
   opportunities: ExportOpportunity[];
 };
-export type ExportContext = { copy: Copy; locale: string; generatedAt: Date | string; includeBrief?: boolean; brief?: ResearchBrief | null };
+/**
+ * `shared`: the read-only page behind a shared link (WP-26). It never includes the brief, and it leaves out each
+ * opportunity's score rationale, which explains the founder-advantage score from the founder's own background.
+ */
+export type ExportContext = { copy: Copy; locale: string; generatedAt: Date | string; includeBrief?: boolean; brief?: ResearchBrief | null; shared?: boolean };
 export type ExportRun = { id: string; created_at: string; completed_at: string | null; report: ResearchReport; outcome?: ResearchOutcome | null };
 
 const modeLabels = {
@@ -150,7 +154,7 @@ export function buildOpportunityExport(op: WorkspaceOpportunity, ctx: ExportCont
       { label: copy("Confidence"), value: confidenceLabel(copy, view.confidence) },
     ],
     verdict: { label: copy(band.label), meaning: copy(band.meaning), score: `${view.score}/100` },
-    rationale: nonEmpty(view.rationale) ? view.rationale : null,
+    rationale: !ctx.shared && nonEmpty(view.rationale) ? view.rationale : null,
     pain: { heading: copy("The problem worth solving"), text: view.pain },
     dimensions: {
       heading: copy("Score breakdown"),
@@ -178,7 +182,15 @@ export function buildOpportunityExport(op: WorkspaceOpportunity, ctx: ExportCont
       ],
     },
     risk: { heading: copy("Key risk to validate"), text: view.risk, review },
-    validation: view.validation.length ? { heading: copy("Next validation steps"), items: view.validation } : null,
+    // Next steps (WP-16) export as one line each, with where, done-when and stop-if; older reports keep plain steps.
+    validation: view.steps.length
+      ? { heading: copy("Next steps"), items: view.steps.map((step) => [
+          step.action,
+          step.source ? `${copy("Where")}: [${step.source.number}] ${step.source.title}` : step.hint ? `${copy("Where to look (suggestion)")}: ${step.hint}` : null,
+          `${copy("Done when")}: ${step.doneWhen}`,
+          `${copy("Stop if")}: ${step.stopIf}`,
+        ].filter(Boolean).join(" · ")) }
+      : view.validation.length ? { heading: copy("Next validation steps"), items: view.validation } : null,
     sources: view.sources.length
       ? {
           heading: copy("Sources"),
@@ -227,7 +239,7 @@ export function buildReportExport(run: ExportRun, ctx: ExportContext): ExportRep
   const opportunities = Array.isArray(report.opportunities) ? report.opportunities : [];
   const verified = report.mode === "verify" ? opportunities[0] : undefined;
   const notPassed = (run.outcome?.candidates ?? []).filter((candidate) => candidate.reason !== "PASSED");
-  const includeBrief = !!ctx.includeBrief && !!ctx.brief;
+  const includeBrief = !ctx.shared && !!ctx.includeBrief && !!ctx.brief;
   return {
     title: includeBrief && ctx.brief ? ctx.brief.name : copy("VentureLens research report"),
     generatedOn: copy("Generated on {date} by VentureLens", { date: date(ctx, ctx.generatedAt) ?? "" }),

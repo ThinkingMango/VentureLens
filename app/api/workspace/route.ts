@@ -15,6 +15,8 @@ const mutationSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("clear_memory") }),
   // "Email me when my research is ready" (WP-08).
   z.object({ action: z.literal("notify"), enabled: z.boolean() }),
+  // Weekly progress email (WP-17).
+  z.object({ action: z.literal("notify_weekly"), enabled: z.boolean() }),
   z.object({ action: z.literal("save"), id: z.uuid(), saved: z.boolean() }),
   // Archive or restore an opportunity (WP-12), through set_opportunity_archived: founders cannot update opportunities.
   z.object({ action: z.literal("archive"), id: z.uuid(), archived: z.boolean() }),
@@ -123,6 +125,12 @@ export async function POST(request: NextRequest) {
         .update({ notify_on_complete: input.enabled })
         .eq("user_id", user.id);
       if (error) throw error;
+    } else if (input.action === "notify_weekly") {
+      const { error } = await supabase
+        .from("founder_profiles")
+        .update({ notify_weekly: input.enabled })
+        .eq("user_id", user.id);
+      if (error) throw error;
     } else if (input.action === "clear_memory") {
       const { error } = await supabase
         .from("founder_profiles")
@@ -188,6 +196,10 @@ export async function POST(request: NextRequest) {
             { onConflict: "user_id,opportunity_id" },
           );
         if (error) throw error;
+        // A first step ticked outside a sprint is a validation action too (WP-15); a re-tick or an untick is not.
+        if (input.completed && !current.includes(taskKey)) {
+          after(() => track("task_completed", { userId: user.id, props: { origin: "checklist" } }));
+        }
       }
     }
     return json(await readWorkspace(supabase, user));

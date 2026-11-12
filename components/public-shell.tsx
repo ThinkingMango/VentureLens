@@ -2,16 +2,17 @@
 import { useCopy } from "@/i18n/use-copy";
 
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Menu, X, ArrowUpRight } from "lucide-react";
 import { Brand } from "@/components/shared";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { Button } from "@/components/ui/button";
 import { mailto, supportEmail } from "@/lib/contact";
+// In the order the sections appear on the landing page.
 const links = [
-  { href: "/#whats-inside", label: "What you get" },
   { href: "/#how-it-works", label: "How it works" },
-  { href: "/demo/dashboard", label: "Live demo" },
+  { href: "/#whats-inside", label: "What you get" },
+  { href: "/demo/dashboard", label: "Demo" },
   { href: "/pricing", label: "Pricing" },
   { href: "/#faq", label: "FAQ" },
 ];
@@ -95,14 +96,15 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
               </Link>
             ))}
             <Link href="/login">{copy("Log in")}</Link>
-            <Link href="/signup" className="text-primary">
-              {copy("Get started")}
-            </Link>
+            <Button asChild className="mt-2 justify-center">
+              <Link href="/signup">{copy("Get started")}</Link>
+            </Button>
             <div className="pt-2 sm:hidden"><LanguageSwitcher /></div>
           </nav>
         )}
       </header>
       {children}
+      <MobileCtaBar />
       <footer className="border-t bg-background">
         <div className="mx-auto grid max-w-7xl gap-10 px-5 py-12 sm:grid-cols-2 md:grid-cols-[1.4fr_1fr_1fr_1fr] md:px-8">
           <div className="flex flex-col gap-3 sm:col-span-2 md:col-span-1">
@@ -156,7 +158,7 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
             </Link>
             <p className="mt-2 text-muted-foreground">
               {copy(
-                "Every confirmed account includes one free research run. Pricing shown is planned, and no payments are collected yet.",
+                "Every confirmed account includes 10 free research runs. Pricing shown is planned, and no payments are collected yet.",
               )}
             </p>
           </div>
@@ -181,6 +183,49 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
           </p>
         </div>
       </footer>
+    </div>
+  );
+}
+
+/**
+ * Phones only: once the page's own call to action ([data-cta-start]) has scrolled away, keep "Get started" and the
+ * demo one tap away, until the closing call to action ([data-cta-end]) comes into view. Pages without the markers
+ * never show it. Display comes from Tailwind ("flex lg:hidden"); globals.css only slides it in and out.
+ */
+function MobileCtaBar() {
+  const copy = useCopy();
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const start = document.querySelector("[data-cta-start]");
+    const end = document.querySelector("[data-cta-end]");
+    if (!start) return;
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      const passedStart = start.getBoundingClientRect().bottom < 0;
+      const beforeEnd = !end || end.getBoundingClientRect().top > window.innerHeight;
+      setVisible(passedStart && beforeEnd);
+    };
+    const schedule = () => {
+      if (!frame) frame = requestAnimationFrame(update);
+    };
+    update();
+    window.addEventListener("scroll", schedule, { passive: true });
+    window.addEventListener("resize", schedule);
+    return () => {
+      window.removeEventListener("scroll", schedule);
+      window.removeEventListener("resize", schedule);
+      cancelAnimationFrame(frame);
+    };
+  }, []);
+  return (
+    <div className="mobile-cta flex gap-3 lg:hidden" data-visible={visible} inert={!visible}>
+      <Button asChild className="flex-1">
+        <Link href="/signup">{copy("Get started")}</Link>
+      </Button>
+      <Button asChild variant="outline" className="flex-1">
+        <Link href="/demo/dashboard">{copy("Try the demo")}</Link>
+      </Button>
     </div>
   );
 }

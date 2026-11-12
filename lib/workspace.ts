@@ -21,8 +21,9 @@ import {
  * step and the source links they count. The opportunity page reads the full record with readOpportunity().
  */
 export function workspaceOpportunity(item: WorkspaceOpportunity): WorkspaceOpportunity {
-  // Claims (WP-07) are read on the opportunity page, which loads the full payload; the workspace list does not need them.
-  const { rationale: _rationale, critique: _critique, falsification: _falsification, assumptions: _assumptions, claims: _claims, ...summary } = item;
+  // Claims (WP-07) and next steps (WP-16) are read on the opportunity page, which loads the full payload; the workspace
+  // list does not need them.
+  const { rationale: _rationale, critique: _critique, falsification: _falsification, assumptions: _assumptions, claims: _claims, steps: _steps, ...summary } = item;
   return {
     ...summary,
     evidence: item.evidence?.map(({ excerpt: _excerpt, ...source }) => source),
@@ -93,10 +94,10 @@ export async function readWorkspace(
     savesResult,
     accessResult,
   ] = await Promise.all([
-    // Read on its own, like the memory date below: before the WP-08 migration this only falls back to "on".
+    // Read on its own, like the memory date below: before the WP-08 or WP-17 migration both fall back to "on".
     supabase
       .from("founder_profiles")
-      .select("notify_on_complete")
+      .select("notify_on_complete,notify_weekly")
       .eq("user_id", user.id)
       .maybeSingle(),
     // Read on its own, so a database without the WP-04 column only loses the "cleared on" date, never the workspace.
@@ -197,6 +198,7 @@ export async function readWorkspace(
     onboarded: row?.onboarding_completed ?? false,
     memoryResetAt: memoryResult.error ? null : (memoryResult.data?.history_reset_at ?? null),
     notifyOnComplete: notifyResult.error ? true : notifyResult.data?.notify_on_complete !== false,
+    notifyWeekly: notifyResult.error ? true : notifyResult.data?.notify_weekly !== false,
     activeSprints: await activeSprints,
     access,
     projects: projectsResult.data ?? [],

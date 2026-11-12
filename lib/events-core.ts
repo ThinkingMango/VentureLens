@@ -19,13 +19,34 @@ export const eventSchemas = {
   outcome_viewed: z.strictObject({ reasonCounts: z.record(z.string().regex(/^[A-Z][A-Z_]{0,39}$/), count) }),
   report_exported: z.strictObject({ format: z.enum(["markdown", "pdf"]) }),
   sprint_created: z.strictObject({ length: z.union([z.literal(7), z.literal(14), z.literal(30)]) }),
-  task_completed: z.strictObject({}),
+  // Where the tick happened (WP-15): a sprint task, or one of an opportunity's fixed first steps outside a sprint.
+  // Events recorded before WP-15 carry no origin; they were all sprint tasks.
+  task_completed: z.strictObject({ origin: z.enum(["sprint", "checklist"]).optional() }),
   sprint_decided: z.strictObject({ decision: z.enum(["keep", "park", "kill"]) }),
   // Source flags (WP-13) are recorded under the same event, with the target that was flagged.
   claim_flagged: z.strictObject({ reason: z.enum(["wrong", "outdated", "irrelevant", "broken_link", "other"]), target: z.enum(["claim", "source"]).optional() }),
   report_rated: z.strictObject({ rating: z.number().int().min(1).max(5) }),
   starter_profile_used: z.strictObject({ id: z.string().regex(/^[a-z][a-z0-9-]{0,39}$/) }),
+  // Validation funnel (WP-15). A founder opened one of their opportunities; recorded at most once per founder per UTC
+  // day (trackDaily in lib/events.ts), so it carries no opportunity id.
+  opportunity_viewed: z.strictObject({}),
+  // Recorded from WP-20 (first-hand evidence) and WP-18 (kits); the schemas exist now so the funnel can count them.
+  evidence_logged: z.strictObject({ kind: z.enum(["interview", "signup", "loi", "deposit", "payment", "pilot", "rejection"]) }),
+  kit_generated: z.strictObject({ kind: z.enum(["buyers", "interview", "offer"]) }),
+  // WP-17: a weekly progress email was sent (or logged, in a dry run, which records nothing).
+  weekly_email_sent: z.strictObject({}),
+  // WP-26: a founder made or turned off a read-only link to a report. Views of shared pages are not recorded.
+  report_shared: z.strictObject({}),
+  report_unshared: z.strictObject({}),
 } as const;
+
+/** Events recorded at most once per founder per UTC day (see trackDaily). */
+export const dailyEvents = ["opportunity_viewed"] as const satisfies readonly ProductEvent[];
+
+/** Start of the UTC day that contains `now`, as an ISO timestamp. */
+export function utcDayStart(now: Date): string {
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())).toISOString();
+}
 
 export type ProductEvent = keyof typeof eventSchemas;
 export type EventProps<E extends ProductEvent> = z.input<(typeof eventSchemas)[E]>;

@@ -6,7 +6,7 @@ import { getLocale } from "next-intl/server";
 import { researchRequestSchema, profileSchema, profileColumns, profileV2FromRow } from "@/lib/workspace-schema";
 import { reportLanguage } from "@/lib/research-core";
 import { researchErrors, errorCode } from "@/lib/research-core";
-import { dispatchResearch, researchDetail } from "@/lib/research-service";
+import { cancelResearch, dispatchResearch, researchDetail, sweepStaleRuns } from "@/lib/research-service";
 export const runtime = "nodejs";
 export const maxDuration = 30;
 export const dynamic = "force-dynamic";
@@ -17,6 +17,7 @@ const inputSchema = z.discriminatedUnion("action", [
     requestKey: z.uuid(),
   }),
   z.object({ action: z.literal("retry"), id: z.uuid() }),
+  z.object({ action: z.literal("cancel"), id: z.uuid() }),
 ]);
 function json(value: unknown, status = 200) {
   return NextResponse.json(value, {
@@ -50,6 +51,19 @@ export async function POST(request: NextRequest) {
       return json({ code: "AUTH_REQUIRED", error: "Please log in first." }, 401);
     if (!user.email_confirmed_at)
       return json({ code: "EMAIL_UNVERIFIED", error: "Please confirm your email first." }, 403);
+    if (parsed.data.action === "cancel") {
+      try {
+        if (!(await cancelResearch(supabase, parsed.data.id)))
+          return json({ code: "RUN_NOT_ACTIVE", error: "This research has already finished." }, 409);
+      } catch (error) {
+        if (error instanceof Error && error.message === "NOT_FOUND")
+          return json({ code: "NOT_FOUND", error: "Research task not found." }, 404);
+        throw error;
+      }
+      return json({ id: parsed.data.id, cancelled: true });
+    }
+    // A run stuck in pending or running would otherwise block this founder's next run (one active run at a time).
+    await sweepStaleRuns({ userId: user.id, limit: 5 }).catch((error) => console.error("[research] stale-run check failed", { message: error instanceof Error ? error.message : String(error) }));
     const admin = createAdminClient();
     let id: string;
     if (parsed.data.action === "start") {

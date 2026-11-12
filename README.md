@@ -8,7 +8,7 @@ A founder describes their experience, constraints and goals; VentureLens discove
 - **Contact:** product help at `support@smartmango.ai`, privacy and data requests at `privacy@smartmango.ai` (`lib/contact.ts`). The Privacy Policy (`components/privacy.tsx`) describes the real data flows. Its AI-provider paragraphs, processor list and international-transfer clause, and the Support page's "Which AI model runs my research?" answer, are generated on every request from the research policy in `public.app_settings` (`lib/provider-disclosure.ts`), so saving a change at `/admin` updates them immediately; if the policy cannot be read they disclose every provider. Update the static text and `privacyUpdatedAt` whenever a cookie, stored field, or non-AI processor changes.
 - **Synthetic demo:** everything under `/demo/*` runs on fixed fixtures with no account and no AI calls.
 - **Languages:** English, Simplified Chinese, Traditional Chinese (interface). Source excerpts are kept in their original language.
-- **Status:** beta. Every confirmed account receives one free research run (`research_dev_access`, granted by a database trigger); failed runs are returned automatically (failures on our side and runs that spent nothing always; other failed runs up to `max_refunds` per account, default 3); payments are not connected. See [`plan.md`](./plan.md) for the roadmap and [`docs/REVIEW.md`](./docs/REVIEW.md) for the November 2026 holistic review (a historical snapshot; §8 there records what has since been fixed).
+- **Status:** beta. Every confirmed account receives 10 free research runs, valid for 90 days (`research_dev_access`, granted by a database trigger, `20261111140000`); failed runs are returned automatically (failures on our side and runs that spent nothing always; other failed runs up to `max_refunds` per account, default 3); payments are not connected. See [`plan.md`](./plan.md) for the roadmap and [`docs/REVIEW.md`](./docs/REVIEW.md) for the November 2026 holistic review (a historical snapshot; §8 there records what has since been fixed).
 
 ## Stack
 
@@ -17,13 +17,13 @@ A founder describes their experience, constraints and goals; VentureLens discove
 | Framework | Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS 4, shadcn-style primitives |
 | Data & auth | Supabase (Postgres, RLS, passwordless email OTP / magic link) |
 | Research job | Vercel Workflow (`workflows/research.ts`) with checkpointed stages |
-| Models | Qwen via DashScope (primary) and Gemini (fallback) through the Vercel AI SDK; native web search on both |
+| Models | Qwen via DashScope and Gemini through the Vercel AI SDK, and Claude (Haiku / Sonnet / Opus 5.5) through the Anthropic SDK; native web search on all three. An administrator picks the primary and the fallback |
 | i18n | `next-intl`; messages keyed by a hash of the English source string (`i18n/config.ts` → `messageKey`) |
 | Tests | `node:test` unit tests, a Supabase integration test, and a research E2E test |
 
 ## Local setup
 
-Prerequisites: Node 22, pnpm 10, a Supabase project (or the Supabase CLI), and optionally DashScope / Google AI keys.
+Prerequisites: Node 22, pnpm 10, a Supabase project (or the Supabase CLI), and optionally DashScope / Google AI / Anthropic keys.
 
 ```bash
 pnpm install --frozen-lockfile
@@ -39,6 +39,7 @@ SUPABASE_SECRET_KEY=<service role / secret key>      # server only
 DASHSCOPE_API_KEY=<key>
 DASHSCOPE_WORKSPACE_ID=<beijing workspace id>
 GOOGLE_GENERATIVE_AI_API_KEY=<key>
+ANTHROPIC_API_KEY=<key>                              # Claude (server only)
 # Optional: idempotent workflow dispatch through start hooks (dispatch works without it)
 WORKFLOW_VERCEL_EXPERIMENTAL_START_HOOK=1
 # Optional: "report ready" email (lib/notify.ts). Without SMTP settings nothing is sent.
@@ -49,6 +50,8 @@ SITE_URL=http://localhost:3000                        # origin for links in emai
 # SMTP_USER=notifications@smartmango.ai
 # SMTP_PASSWORD=<mailbox password>                    # server only, never NEXT_PUBLIC_
 ```
+
+**Weekly progress email (WP-17).** `/api/cron/weekly-progress` runs daily (`vercel.json`) and sends each founder with an active validation sprint, at least 4 days old and with an open task, at most one email per week (Monday to Sunday, UTC). It uses the same SMTP settings and rules as below. Founders turn it off on their profile (`founder_profiles.notify_weekly`, on by default) or with the link in every email, which needs no sign-in: links are signed with `NOTIFY_LINK_SECRET`, or `CRON_SECRET` when that is not set (at least 16 characters). Without either, the email links to the profile page instead. `NOTIFY_WEEKLY_MAX` caps emails per run (default 100); the rest go out on the next day's run. `weekly_emails` records each founder's week so a retried run never sends twice.
 
 Research notification emails are sent over SMTP from the Hostinger mailbox `notifications@smartmango.ai`, as `VentureLens <notifications@smartmango.ai>`, with replies to `support@smartmango.ai` (decision D1). They go out only on the Vercel **production** deployment with `SMTP_HOST`, `SMTP_USER` and `SMTP_PASSWORD` set; development, previews and tests only log them, unless `NOTIFY_SEND=1` is set deliberately, and `NOTIFY_DRY_RUN=1` always only logs. Port 465 uses TLS from the start; any other port (587) uses STARTTLS. `NOTIFY_FROM` and `NOTIFY_REPLY_TO` override the addresses, but Hostinger only accepts a From address that is the signed-in mailbox. Links use `SITE_URL`, falling back to Vercel's production domain. Hostinger limits each mailbox to a daily number of messages (about 1,000 on Business Email, 300 on Titan); use a mailbox kept for these emails only. Each run sends at most one email (`research_runs.notified_at`), and founders can turn it off on their profile (`founder_profiles.notify_on_complete`).
 
@@ -62,7 +65,7 @@ Migration versions match the live project's history; see [`docs/DATABASE_MIGRATI
 
 Email templates for the passwordless flow live in `supabase/templates/` with setup notes in that folder's README.
 
-Every confirmed account receives one free research run automatically. To give an account more during the beta, raise its grant (`max_runs` is bounded 1–100):
+Every confirmed account receives 10 free research runs automatically, valid for 90 days. To give an account more during the beta, raise its grant (`max_runs` is bounded 1–100):
 
 ```sql
 update public.research_dev_access set max_runs = 20, expires_at = now() + interval '30 days'
@@ -73,7 +76,11 @@ A failed run hands its slot back when the failure was on our side (dispatch, wor
 
 ## Administrators and settings
 
-Administrator access is granted only by a server-managed claim in `app_metadata`, set with the service role or in the Supabase dashboard: `app_metadata.role = "admin"` (use this one), or the legacy `app_metadata.is_admin = true`, which `lib/admin-access.ts` still accepts. Either also requires a confirmed email; no email address is special, and `user_metadata` never grants access. Administrators manage the research policy (primary provider, fallback, models, per-run budget cap) at `/admin`, which is stored in the service-role-only `public.app_settings` table under the key `research`. The page shows what a complete run is expected to cost and refuses a primary model that the per-run budget cannot pay for. At the $0.25 default only Qwen 3.8 Flash can finish a run; Gemini Flash-Lite needs about $0.40 because Google Search grounding is billed per query. See [`docs/GENERATION_PIPELINE_REVIEW.md`](./docs/GENERATION_PIPELINE_REVIEW.md).
+Administrator access is granted only by a server-managed claim in `app_metadata`, set with the service role or in the Supabase dashboard: `app_metadata.role = "admin"` (use this one), or the legacy `app_metadata.is_admin = true`, which `lib/admin-access.ts` still accepts. Either also requires a confirmed email; no email address is special, and `user_metadata` never grants access. Administrators manage the research policy (primary provider among Qwen, Gemini and Claude, the fallback provider, models, per-run budget cap) at `/admin`, which is stored in the service-role-only `public.app_settings` table under the key `research`. The same page sets the **source policy** (`sources` in that row, `lib/source-policy.ts`):
+- **Breadth:** which independent source types each search prefers; steering toward the communities where the brief's buyers discuss their own work; a second search per idea for current alternatives; at most one or no vendor pages; and a preference for recent sources.
+- **Depth:** 5–8 ideas per discovery run and 2–6 pages read per idea (twice that for a verify run).
+
+Each run freezes the policy at setup, and the cost estimate and the "budget too low" refusal account for it. A row without `sources` uses the defaults: the original prompts and depth plus **sector-community steering, on by default**. A run set up before the policy existed keeps the original behaviour (`legacySourcePolicy`). The policy only steers what is searched and read; the evidence gate is unchanged at every setting. The page shows what a complete run is expected to cost and refuses a primary model that the per-run budget cannot pay for. At the $0.25 default only Qwen 3.8 Flash can finish a run; Gemini Flash-Lite needs about $0.40 because Google Search grounding is billed per query. Claude Haiku 5.5 needs about $0.25, Sonnet 5.5 about $1.57 and Opus 5.5 about $3.39 (estimates; Claude search is not yet calibrated against real runs). Without a fallback choice, Qwen and Gemini back each other up and Claude falls back to Gemini. See [`docs/GENERATION_PIPELINE_REVIEW.md`](./docs/GENERATION_PIPELINE_REVIEW.md).
 
 ```sql
 update auth.users set raw_app_meta_data = coalesce(raw_app_meta_data, '{}'::jsonb) || '{"role": "admin"}'

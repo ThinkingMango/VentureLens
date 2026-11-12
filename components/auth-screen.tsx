@@ -341,7 +341,7 @@ export function AuthScreen() {
             )}
           </p>
           <p className="rounded-lg bg-secondary p-3 text-center text-sm text-foreground">
-            {copy("One free research run on sign-up. No card, no subscription, nothing to cancel.")}
+            {copy("10 free research runs on sign-up. No card, no subscription, nothing to cancel.")}
           </p>
           <p className="text-center text-xs text-muted-foreground">
             {copy("By continuing, you acknowledge how we handle your information:")}{" "}

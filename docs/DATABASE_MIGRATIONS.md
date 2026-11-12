@@ -26,7 +26,7 @@ Read from `supabase_migrations.schema_migrations` on the live project:
 | `20261110170000` | `report_feedback` | `supabase/migrations/20261110170000_report_feedback.sql` | identical (applied from the repository file after #53 merged, under the file's own version; stored one statement per element without the final semicolons; checked 2026-11-11) |
 | `20261110180000` | `run_notifications` | `supabase/migrations/20261110180000_run_notifications.sql` | identical (applied from the repository file after #55 merged, under the file's own version; stored one statement per element without the final semicolons; checked 2026-11-11) |
 | `20261111120000` | `validation_sprints` | `supabase/migrations/20261111120000_validation_sprints.sql` | identical (applied from the repository file after #56 merged, under the file's own version; stored one statement per element without the final semicolons; checked 2026-11-11) |
-| `20261111130000` | `library` | `supabase/migrations/20261111130000_library.sql` | identical (applied from the repository file after #59 merged, under the file's own version; stored one statement per element without the final semicolons; checked 2026-11-11) |
+| `20261111130000` | `library` | `supabase/migrations/20261111130000_library.sql` | identical (applied after #59 merged, under the file's own version; stored one statement per element without the final semicolons; checked 2026-11-11) |
 
 "Identical" means the MD5 of the SQL with all whitespace removed matches between the repository file and the `statements` column of the applied migration.
 
@@ -50,7 +50,19 @@ After this change `supabase migration list` shows local and remote in sync, and 
 
 ## Written but not yet applied
 
-None. When a pull request adds a migration, list it here until it is applied, and apply it only with the owner's approval. If `apply_migration` assigns a different version, rename the file to that version before merging. Merging to `main` can apply a migration to production: the Supabase integration applied `20261109150000`, `20261109160000`, `20261110120000`, `20261110130000`, `20261110140000`, `20261110150000`, `20261110160000`, `20261110170000`, `20261110180000`, `20261111120000` and `20261111130000` that way.
+These were merged to `main`, and the Supabase integration normally applies a migration on merge, but nobody has yet checked them against `supabase_migrations.schema_migrations` on the live project. Check each, record it in the table above, and remove it from this list.
+
+| Version | Name | File | Pull request | What it does |
+| --- | --- | --- | --- | --- |
+| `20261111140000` | `signup_grant_ten_runs` | `supabase/migrations/20261111140000_signup_grant_ten_runs.sql` | [#65](https://github.com/ThinkingMango/VentureLens/pull/65) | Replaces `grant_signup_research_run()`: a newly confirmed account gets **10** runs valid for **90 days** (was 1 run for 30 days). Who qualifies is unchanged (once per normalised email; `smartmango.ai` granted by hand). Existing grants are not touched. |
+| `20261111150000` | `cancel_research_run` | `supabase/migrations/20261111150000_cancel_research_run.sql` | [#67](https://github.com/ThinkingMango/VentureLens/pull/67) | Adds `cancel_research_run(p_run)`, callable by founders for their own pending or running run. It ends the run as `failed` / `CANCELLED`, so the existing triggers refund it (always when nothing was spent, otherwise against the refund allowance) and record `run_finished`; `reserve_research_usage` and `finish_research` then refuse the workflow. No table changes. |
+| `20261112100000` | `sprint_next_steps` | `supabase/migrations/20261112100000_sprint_next_steps.sql` | [#72](https://github.com/ThinkingMango/VentureLens/pull/72) | Replaces `start_validation_sprint` with a four-argument version (`p_labels`): a report with next steps seeds one task per step with labelled details, scaled due dates, carried ticks and prefilled go criteria; the three-argument version is dropped. |
+| `20261112110000` | `weekly_progress_email` | `supabase/migrations/20261112110000_weekly_progress_email.sql` | [#73](https://github.com/ThinkingMango/VentureLens/pull/73) | Adds `founder_profiles.notify_weekly` (default true) and the service-only `weekly_emails` table (one row per founder per week). |
+| `20261112120000` | `account_deletion` | `supabase/migrations/20261112120000_account_deletion.sql` | [#74](https://github.com/ThinkingMango/VentureLens/pull/74) | Adds the service-only `deleted_signup_grants` table, `signup_email_hash()`, `prepare_account_deletion()` (authenticated only), and one extra check in `grant_signup_research_run()`. |
+| `20261112130000` | `report_shares` | `supabase/migrations/20261112130000_report_shares.sql` | [#75](https://github.com/ThinkingMango/VentureLens/pull/75) | Adds `report_shares` (owner-only RLS; one live link per completed run; deleted with the run). |
+| `20261112140000` | `report_share_expiry` | `supabase/migrations/20261112140000_report_share_expiry.sql` | [#76](https://github.com/ThinkingMango/VentureLens/pull/76) | Adds `report_shares.expires_at` (default 90 days, backfilled from `created_at`) and limits founders' inserts to `user_id`, `run_id` and `token`. |
+
+When a pull request adds a migration, list it here until it is applied, and apply it only with the owner's approval. If `apply_migration` assigns a different version, rename the file to that version before merging. Merging to `main` can apply a migration to production: the Supabase integration applied `20261109150000`, `20261109160000`, `20261110120000`, `20261110130000`, `20261110140000`, `20261110150000`, `20261110160000`, `20261110170000`, `20261110180000`, `20261111120000` and `20261111130000` that way.
 
 ## Rules going forward
 
@@ -82,3 +94,16 @@ None. When a pull request adds a migration, list it here until it is applied, an
 ## Notes on `20261105131043_smartmango_research_development_access`
 
 This migration grants a 7-day, 3-run `research_dev_access` row to any confirmed `@smartmango.ai` account via a trigger on `auth.users`, and revokes it (by expiring the row) if such an account changes its email away from the domain. It is the mechanism behind "authorized development accounts" in the product copy. It should be replaced by the entitlement ledger described in `plan.md` M3 before any paid access is sold.
+
+## One-off data operations
+
+### 2026-11-11: clear every generated report; existing accounts get 10 fresh runs (owner request)
+
+Run once against production (`ndrxywlouwigawhgrtrj`) in a single transaction, after checking no run was `pending` or `running`. It follows the same rules as `delete_research_run` (decision D6), for every account:
+
+1. Detached all `research_usage` rows from their run and owner (`run_id`, `user_id` cleared; `detached_at` set by trigger), so cost accounting is kept with nothing identifying anyone: 134 rows.
+2. Deleted every `research_runs` row (8), which cascaded to opportunities (23), research_stages (168), research_evidence (254), and the (empty) saved_opportunities, report_feedback and validation_sprints.
+3. Deleted every `research_projects` (brief) no longer used by a run (8).
+4. Reset every `research_dev_access` grant: `max_runs = greatest(max_runs, 10)`, `runs_used = 0`, `runs_refunded = 0`, `expires_at = greatest(expires_at, now() + 90 days)`. No allowance went down (an account with 20 kept 20).
+
+`product_events` (12 rows, codes and counts only, no personal data) were kept. Verified afterwards: 0 runs, opportunities, evidence, stages and briefs; 134 detached usage rows; 2 grants with 0 used, expiring 2027-02-09.

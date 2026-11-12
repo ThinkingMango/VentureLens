@@ -35,8 +35,25 @@ export function EvidencePreview() {
             <span>{copy("Opportunities")}</span>
             <span>{copy("Demo score")}</span>
           </div>
+          {/* Phones: a short list of links into the demo, so the page reaches the run ledger sooner. */}
+          <ul className="grid gap-2.5 px-5 py-4 sm:hidden">
+            {opportunities.map((opportunity) => (
+              <li key={opportunity.id}>
+                <Link
+                  href={`/demo/opportunities/${opportunity.id}`}
+                  className="flex min-h-11 items-center justify-between gap-3 rounded-lg border px-4 py-3 hover:border-primary/50 hover:bg-secondary/40"
+                >
+                  <span className="min-w-0 text-sm font-medium leading-snug">{opportunity.title}</span>
+                  <span className="flex shrink-0 items-center gap-2">
+                    <span className="terminal-number text-lg text-primary">{opportunity.score}</span>
+                    <ArrowUpRight className="size-4 text-muted-foreground" aria-hidden="true" />
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
           <div
-            className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-1"
+            className="hidden gap-2.5 px-5 py-4 sm:grid sm:grid-cols-2 sm:gap-3 sm:p-4 lg:grid-cols-1"
             role="group"
             aria-label={copy("Opportunities")}
           >
@@ -47,13 +64,13 @@ export function EvidencePreview() {
                 aria-pressed={lead.id === opportunity.id}
                 aria-controls="preview-detail"
                 onClick={() => setSelectedId(opportunity.id)}
-                className={`flex min-w-0 items-start justify-between gap-3 rounded-lg border px-4 py-4 text-left hover:border-primary/50 hover:bg-secondary/40 ${lead.id === opportunity.id ? "border-primary/60 bg-secondary/60" : ""}`}
+                className={`flex min-w-0 items-start justify-between gap-3 rounded-lg border px-4 py-3 text-left sm:py-4 hover:border-primary/50 hover:bg-secondary/40 ${lead.id === opportunity.id ? "border-primary/60 bg-secondary/60" : ""}`}
               >
                 <span className="min-w-0">
                   <span className="block text-sm font-medium leading-snug">
                     {opportunity.title}
                   </span>
-                  <span className="mt-2 block text-xs text-muted-foreground">
+                  <span className="mt-2 hidden text-xs text-muted-foreground sm:block">
                     {opportunity.category}
                   </span>
                 </span>
@@ -66,7 +83,7 @@ export function EvidencePreview() {
         </div>
         <div
           id="preview-detail"
-          className="space-y-5 p-5 sm:p-6"
+          className="hidden space-y-5 p-5 sm:block sm:p-6"
           aria-live="polite"
           aria-atomic="true"
         >
@@ -101,8 +118,9 @@ export function EvidencePreview() {
           </dl>
           <dl className="grid grid-cols-3 gap-4">
             {scoreLabels.slice(0, 3).map((label, i) => (
-              <div key={label}>
-                <dt className="mb-2 text-xs text-muted-foreground">
+              <div key={label} className="flex flex-col">
+                {/* flex-1 keeps the three values on one line when a label wraps on narrow phones. */}
+                <dt className="mb-2 flex-1 text-xs text-muted-foreground">
                   {copy(label)}
                 </dt>
                 <dd className="terminal-number text-lg">

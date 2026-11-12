@@ -12,7 +12,7 @@ import { withResearchFallback } from "../lib/research-fallback-core.ts";
 import { z } from "zod";
 import * as models from "../lib/research-models.ts";
 import * as researchOptions from "../lib/research-options.ts";
-const modelDefaults = { qwenModel: models.DEFAULT_QWEN_MODEL, geminiModel: models.DEFAULT_GEMINI_MODEL, budgetUsd: 0.25 };
+const modelDefaults = { qwenModel: models.DEFAULT_QWEN_MODEL, geminiModel: models.DEFAULT_GEMINI_MODEL, claudeModel: models.DEFAULT_CLAUDE_MODEL, budgetUsd: 0.25 };
 import { errorCode } from "../lib/research-core.ts";
 import * as researchCore from "../lib/research-core.ts";
 import * as workspaceSchema from "../lib/workspace-schema.ts";
@@ -21,6 +21,7 @@ import * as budget from "../lib/research-budget.ts";
 import * as apiClient from "../lib/api-client.ts";
 import * as libraryCore from "../lib/library-core.ts";
 import * as outcomeLabels from "../lib/outcome-labels.ts";
+import * as claudeCore from "../lib/claude-core.ts";
 
 const verified = { id: "admin-test-id", email: "owner@example.org", email_confirmed_at: "2026-11-05T00:00:00.000Z", app_metadata: { role: "admin" } };
 const require = createRequire(import.meta.url);
@@ -29,16 +30,25 @@ const noObject = { isInstance: error => error?.name === "AI_NoObjectGeneratedErr
 const unparsable = usage => Object.assign(new Error("No object generated: could not parse the response."), { name: "AI_NoObjectGeneratedError", usage });
 // Modules added by the library (WP-12), for components loaded without them in their dependency list.
 const libraryMocks = {
-  "@/components/library": { ArchiveButton: () => null, DeleteRunButton: () => null, LibraryFilterBar: () => null },
+  "@/components/library": { ArchiveButton: () => null, CancelRunButton: () => null, DeleteRunButton: () => null, LibraryFilterBar: () => null },
   "@/lib/library-core": libraryCore,
 };
 // Modules added by report export (WP-11), for components loaded without them in their dependency list.
 const exportMocks = {
   "@/components/report-export": { ExportButton: () => null, PrintButton: () => null },
+  // Report links (WP-26).
+  "@/components/share-report": { ShareReportButton: () => null },
   "@/lib/report-export": { buildOpportunityExport() {}, opportunityMarkdown() {}, exportFileName() {}, reportToMarkdown() {} },
   "@/lib/outcome-labels": outcomeLabels,
   // The real next-intl (notify.ts translates with it), with a locale for components rendered outside a provider.
   get "next-intl"() { return { ...require("next-intl"), useLocale: () => "en" }; },
+  // The Claude provider, for modules loaded without it in their dependency list. Calls it never expects fail loudly.
+  "@/lib/claude-core": claudeCore,
+  "@/lib/claude-provider": {
+    generateClaudeObject: async () => { throw new Error("unexpected Claude request"); },
+    searchClaude: async () => { throw new Error("unexpected Claude search"); },
+    verifyClaudeModel: async () => { throw new Error("unexpected Claude verification"); },
+  },
 };
 function loadModule(file, dependencies, env = {}, suffix = "") {
   const source = readFileSync(new URL(file, import.meta.url), "utf8") + suffix;
@@ -196,8 +206,9 @@ test("role administrators read and update the single app_settings policy", async
   const rows = { research: stored };
   const writes = [];
   const service = storage({ rows, writes, admin: { getUserById: async () => ({ data: { user: admin }, error: null }) } });
-  assert.deepEqual((await service.administratorSettings(admin)).settings, { ...stored, qwenModel: models.DEFAULT_QWEN_MODEL, geminiModel: models.DEFAULT_GEMINI_MODEL });
-  assert.deepEqual(await service.researchProviderSettings(), { ...stored, qwenModel: models.DEFAULT_QWEN_MODEL, geminiModel: models.DEFAULT_GEMINI_MODEL });
+  // A row saved before Claude existed reads with the default Claude model and no explicit fallback choice.
+  assert.deepEqual((await service.administratorSettings(admin)).settings, { ...stored, qwenModel: models.DEFAULT_QWEN_MODEL, geminiModel: models.DEFAULT_GEMINI_MODEL, claudeModel: models.DEFAULT_CLAUDE_MODEL });
+  assert.deepEqual(await service.researchProviderSettings(), { ...stored, qwenModel: models.DEFAULT_QWEN_MODEL, geminiModel: models.DEFAULT_GEMINI_MODEL, claudeModel: models.DEFAULT_CLAUDE_MODEL });
   await service.saveProviderSettings(admin.id, { primary: "qwen", autoFallback: true, budgetUsd: 1 });
   assert.equal(writes.length, 1);
   assert.equal(writes[0].row.key, "research");
@@ -214,8 +225,8 @@ test("new runs read the app_settings policy, fall back to defaults, and surface 
   await assert.rejects(storage({ rows: { research: { primary: "other" } } }).researchProviderSettings(), /PROVIDER_CONFIGURATION/);
 });
 test("verified model choices persist and unknown or cross-provider IDs are rejected", async () => {
-  for (const qwenModel of models.qwenModelIds) for (const geminiModel of models.geminiModelIds) {
-    const input = { primary: "gemini", autoFallback: true, qwenModel, geminiModel, budgetUsd: 5 };
+  for (const qwenModel of models.qwenModelIds) for (const geminiModel of models.geminiModelIds) for (const claudeModel of models.claudeModelIds) {
+    const input = { primary: "gemini", autoFallback: true, qwenModel, geminiModel, claudeModel, budgetUsd: 5 };
     assert.deepEqual(providerSettingsSchema.parse(input), input);
     const stored = { ...input, updatedAt: verified.email_confirmed_at };
     assert.deepEqual(readStoredProviderSettings(stored), stored);
@@ -225,8 +236,10 @@ test("verified model choices persist and unknown or cross-provider IDs are rejec
     assert.deepEqual(result.settings, writes[0].row.value);
     assert.equal(result.settings.qwenModel, qwenModel);
     assert.equal(result.settings.geminiModel, geminiModel);
+    assert.equal(result.settings.claudeModel, claudeModel);
   }
-  for (const invalidChoice of [{ qwenModel: "qwen3.8-unverified" }, { qwenModel: "gemini-4-argon" }, { geminiModel: "qwen3.8-max" }, { geminiModel: "gemini-latest" }, { geminiModel: "https://attacker.test" }, { qwenModel: null }, { budgetUsd: 0 }, { budgetUsd: 50 }, { budgetUsd: "0.25" }]) {
+  for (const invalidChoice of [{ qwenModel: "qwen3.8-unverified" }, { qwenModel: "gemini-4-argon" }, { geminiModel: "qwen3.8-max" }, { geminiModel: "gemini-latest" }, { geminiModel: "https://attacker.test" }, { qwenModel: null }, { budgetUsd: 0 }, { budgetUsd: 50 }, { budgetUsd: "0.25" },
+    { claudeModel: "claude-opus-5-5-20260401" }, { claudeModel: "claude-fable-5-2" }, { claudeModel: "gemini-4-argon" }, { geminiModel: "claude-opus-5-5" }, { fallbackProvider: "openai" }, { fallbackProvider: null }, { primary: "anthropic" }]) {
     const input = { primary: "qwen", autoFallback: true, ...invalidChoice };
     assert.equal(providerSettingsSchema.safeParse(input).success, false);
     assert.equal((await route(verified).PATCH(patch(input))).status, 400);
@@ -269,7 +282,72 @@ test("the protected page and browser bundle never trust client roles or expose p
   const guard = readFileSync(new URL("../lib/admin-guard.ts", import.meta.url), "utf8");
   assert.match(guard, /if \(!isAdministrator\(user\)\) notFound\(\)/);
   const client = readFileSync(new URL("../components/admin-providers.tsx", import.meta.url), "utf8");
-  assert.doesNotMatch(client, /SUPABASE_SERVICE_ROLE_KEY|SUPABASE_SECRET_KEY|DASHSCOPE_API_KEY|GOOGLE_GENERATIVE_AI_API_KEY|localStorage/);
+  assert.doesNotMatch(client, /SUPABASE_SERVICE_ROLE_KEY|SUPABASE_SECRET_KEY|DASHSCOPE_API_KEY|GOOGLE_GENERATIVE_AI_API_KEY|ANTHROPIC_API_KEY|localStorage/);
+  assert.doesNotMatch(readFileSync(new URL("../components/provider-model-field.tsx", import.meta.url), "utf8"), /ANTHROPIC_API_KEY|process\.env/);
+});
+
+// Renders the administrator page with the real model field, translating keys to themselves.
+function renderAdmin(settings, configured = { qwen: true, gemini: true, claude: true }) {
+  const passthrough = tag => ({ children, asChild, orientation, ...props }) => createElement(tag, props, children);
+  const t = Object.assign((key, values = {}) => `${key}${Object.keys(values).length ? JSON.stringify(values) : ""}`, { has: () => true });
+  const ui = {
+    "@/components/ui/badge": { Badge: passthrough("span") },
+    "@/components/ui/button": { Button: passthrough("button") },
+    "@/components/ui/separator": { Separator: () => createElement("hr") },
+    "@/components/ui/card": Object.fromEntries(["Card", "CardContent", "CardDescription", "CardFooter", "CardHeader", "CardTitle"].map(name => [name, passthrough("div")])),
+    "@/components/ui/field": Object.fromEntries(["Field", "FieldContent", "FieldDescription", "FieldGroup"].map(name => [name, passthrough("div")]).concat([["FieldLabel", passthrough("label")]])),
+    "next-intl": { useTranslations: () => t },
+  };
+  const field = loadModule("../components/provider-model-field.tsx", { ...ui, "@/lib/research-models": models });
+  const providers = Object.fromEntries(Object.entries(configured).map(([name, ok]) => [name, { configured: ok, model: "" }]));
+  const initialData = { settings: { ...providerSettingsSchema.parse(settings), updatedAt: null }, providers };
+  const { AdminProviders } = loadModule("../components/admin-providers.tsx", {
+    ...ui,
+    "swr": { default: () => ({ data: initialData, error: undefined, mutate: async () => undefined, isValidating: false }) },
+    "sonner": { toast: { success() {} } },
+    "@/components/shared": { PageHeader: ({ title, children }) => createElement("header", null, title, children) },
+    "@/i18n/use-copy": { useFormats: () => ({ usd: value => `$${value.toFixed(2)}`, date: value => value }) },
+    "@/components/provider-model-field": field,
+    "@/components/admin-sources": { AdminSources: () => null },
+    "@/lib/provider-settings-core": settingsCore,
+    "@/lib/research-models": models,
+  });
+  return renderToStaticMarkup(createElement(AdminProviders, { initialData }));
+}
+const optionValues = html => [...html.matchAll(/<option value="([\w.-]+)"/g)].map(match => match[1]);
+const selectBody = (html, id) => html.match(new RegExp(`<select id="${id}"[^>]*>(.*?)</select>`))?.[1] ?? "";
+
+test("the administrator page offers Claude as a primary, a fallback and a model choice", () => {
+  const html = renderAdmin({ primary: "claude", autoFallback: true, claudeModel: "claude-sonnet-5-5", budgetUsd: 2 });
+  // The primary offers all three providers.
+  assert.deepEqual(optionValues(selectBody(html, "primary-provider")), ["qwen", "gemini", "claude"]);
+  // The fallback never offers the primary, and shows Claude's default partner.
+  const fallback = selectBody(html, "fallback-provider");
+  assert.deepEqual(optionValues(fallback), ["qwen", "gemini"]);
+  assert.match(fallback, /<option value="gemini" selected="">Gemini<\/option>/);
+  // The Claude model field lists the catalogue, shows the chosen model and the Anthropic endpoint.
+  const claudeModels = selectBody(html, "claude-model");
+  assert.deepEqual(optionValues(claudeModels), [...models.claudeModelIds]);
+  assert.match(claudeModels, /<option value="claude-sonnet-5-5" selected="">Claude Sonnet 5\.5 · fastReasoning<\/option>/);
+  assert.match(html, /modelLabel\{&quot;provider&quot;:&quot;Claude&quot;\}/);
+  assert.match(html, /https:\/\/api\.anthropic\.com\/v1\/messages/);
+  assert.match(html, /claudeSearch/);
+  assert.match(html, /catalogChecked\{&quot;date&quot;:&quot;2026-11-03&quot;\}/);
+  // The next-run summary and the credentials list name Claude.
+  assert.match(html, /Claude Sonnet 5\.5<svg.*?Gemini 3\.5 Flash-Lite/);
+  assert.match(html, /<dt[^>]*>Claude<span[^>]*>configured<\/span><\/dt>/);
+
+  // Without automatic fallback there is no fallback choice; a missing Claude key is shown as missing.
+  const alone = renderAdmin({ primary: "claude", autoFallback: false }, { qwen: true, gemini: true, claude: false });
+  assert.doesNotMatch(alone, /fallback-provider/);
+  assert.match(alone, /<dt[^>]*>Claude<span[^>]*>missing<\/span><\/dt>/);
+  assert.match(alone, /notConfigured/);
+  // At the $0.25 default the default Claude model (Opus) cannot finish a run, and the page says so.
+  assert.match(alone, /budgetTooLow\{&quot;model&quot;:&quot;Claude Opus 5\.5&quot;/);
+
+  // A chosen fallback is shown as chosen.
+  const chosen = renderAdmin({ primary: "gemini", autoFallback: true, fallbackProvider: "claude", budgetUsd: 5 });
+  assert.match(selectBody(chosen, "fallback-provider"), /<option value="claude" selected="">Claude<\/option>/);
 });
 
 test("research dispatches saved models, reasoning controls, usage IDs, and fallback choices", async () => {
@@ -330,14 +408,16 @@ test("research checkpoints retain the saved policy, legacy compatibility, and bo
   const source = readFileSync(new URL("../lib/research-engine.ts", import.meta.url), "utf8");
   assert.match(source, /provider_settings: providerSettings/);
   assert.match(source, /setup\.provider_settings \?\? defaultProviderSettings/);
-  assert.match(source, /\[QWEN_PROVIDER, GEMINI_PROVIDER\]\.includes/);
+  assert.match(source, /\[QWEN_PROVIDER, GEMINI_PROVIDER, CLAUDE_PROVIDER\]\.includes/);
+  assert.match(source, /claude_pricing: claudePricing/);
   assert.match(source, /checkpoint\(ctx, "setup", \{ \.\.\.setup, \.\.\.next \}\)/);
   assert.doesNotMatch(source, /active_provider: provider, fallback_pricing: pricing/);
 });
 
-function researchFixture({ settings = { primary: "gemini", autoFallback: true, qwenModel: "qwen3.8-max", geminiModel: "gemini-4-argon" }, spent = 0.051042, generate = async () => ({ output: { ok: true }, totalUsage: { inputTokens: 100, outputTokens: 25 } }), evidence = [], checkpoints = new Map(), search = {}, fetchSource, verify = {}, providerSettings, budgetUsd = 0.25, history = {} } = {}) {
+const providerIdOf = { qwen: "dashscope-beijing", gemini: "google-gemini", claude: "anthropic-claude" };
+function researchFixture({ settings = { primary: "gemini", autoFallback: true, qwenModel: "qwen3.8-max", geminiModel: "gemini-4-argon" }, spent = 0.051042, generate = async () => ({ output: { ok: true }, totalUsage: { inputTokens: 100, outputTokens: 25 } }), evidence = [], checkpoints = new Map(), search = {}, fetchSource, verify = {}, providerSettings, budgetUsd = 0.25, history = {}, claude = {}, limit = 0.25 } = {}) {
   const context = { runId: "run", userId: "user", workflowId: "workflow" };
-  const setup = { provider_settings: settings, active_provider: settings.primary === "gemini" ? "google-gemini" : "dashscope-beijing", pricing: models.researchModelPricing(settings.qwenModel), fallback_pricing: models.researchModelPricing(settings.geminiModel), brief: { ...workspaceSchema.emptyBrief, name: "Regression research" }, profile: workspaceSchema.emptyProfile };
+  const setup = { provider_settings: settings, active_provider: providerIdOf[settings.primary], pricing: models.researchModelPricing(settings.qwenModel ?? models.DEFAULT_QWEN_MODEL), fallback_pricing: models.researchModelPricing(settings.geminiModel ?? models.DEFAULT_GEMINI_MODEL), claude_pricing: models.researchModelPricing(settings.claudeModel ?? models.DEFAULT_CLAUDE_MODEL), brief: { ...workspaceSchema.emptyBrief, name: "Regression research" }, profile: workspaceSchema.emptyProfile };
   checkpoints.set("setup", setup);
   const reservations = [], calls = [], records = [];
   function from(table) {
@@ -368,12 +448,18 @@ function researchFixture({ settings = { primary: "gemini", autoFallback: true, q
     "@/lib/qwen-provider": { qwenModel: model => ({ modelId: model }), searchQwen: search.qwen, verifyQwenModel: verify.qwen },
     "@/lib/gemini-provider": { geminiModel: model => ({ modelId: model }), searchGemini: search.gemini, verifyGeminiModel: verify.gemini },
     "@/lib/qwen-core": { QWEN_PROVIDER: "dashscope-beijing" }, "@/lib/research-fallback-core": fallbackCore,
+    "@/lib/claude-core": claudeCore,
+    "@/lib/claude-provider": {
+      generateClaudeObject: async options => { calls.push({ ...options, model: { modelId: options.model }, claude: true }); if (!claude.generate) throw new Error("unexpected Claude request"); return claude.generate(options); },
+      searchClaude: claude.search ?? (async () => { throw new Error("unexpected Claude search"); }),
+      verifyClaudeModel: claude.verify ?? (async () => { throw new Error("unexpected Claude verification"); }),
+    },
     "@/lib/research-source": { fetchResearchSource: fetchSource }, "@/lib/provider-settings": { researchProviderSettings: async () => providerSettings }, "@/lib/provider-settings-core": settingsCore,
     "@/lib/research-models": models, "@/lib/research-budget": budget, "@/lib/research-options": researchOptions, "@/lib/workspace-schema": workspaceSchema, "@/lib/research-core": researchCore,
     "@/lib/supabase/admin": { createAdminClient: () => ({ from, rpc: async (_name, input) => {
       reservations.push(input);
       const committed = spent + records.reduce((sum, record) => sum + (record.status === "completed" ? record.estimated_usd : record.reserved_usd), 0);
-      if (committed + input.p_reserved > 0.25) return { data: null, error: { message: "BUDGET_EXCEEDED" } };
+      if (committed + input.p_reserved > limit) return { data: null, error: { message: "BUDGET_EXCEEDED" } };
       const id = `usage-${records.length}`;
       records.push({ id, status: "reserved", reserved_usd: input.p_reserved });
       return { data: id, error: null };
@@ -1357,4 +1443,359 @@ test("discovery queries look for evidence of the problem, not for products", () 
   assert.doesNotMatch(source, /naming the buyer, the problem, paid alternatives/, "asking for paid alternatives steered search to vendor pages");
   assert.match(source, /Do not name products or ask for tools or software\./);
   assert.match(source, /rather than for software that claims to solve it/);
+});
+
+// Source policy (breadth and depth of evidence collection), set at /admin and frozen into each run.
+const fullSources = { kinds: ["communities", "research"], sectorCommunities: true, alternativesSearch: true, vendorPages: 0, recency: "1y", candidates: 5, pagesPerIdea: 2 };
+test("the provider API accepts a complete source policy within the request limit and rejects an invalid one", async () => {
+  const calls = [];
+  const api = route(verified, async (id, settings) => { calls.push(settings); return { settings }; });
+  const body = { primary: "qwen", autoFallback: true, qwenModel: "qwen3.8-flash", geminiModel: "gemini-3.5-flash-lite", budgetUsd: 0.25, sources: { ...fullSources, kinds: [...settingsCore.sourceKinds] } };
+  assert.ok(Buffer.byteLength(JSON.stringify(body)) < 1024, "the largest valid policy fits the request limit");
+  assert.equal((await api.PATCH(patch(body))).status, 200);
+  assert.deepEqual(calls[0].sources, body.sources);
+  for (const sources of [{ ...fullSources, vendorPages: 3 }, { ...fullSources, candidates: 12 }, { ...fullSources, kinds: [] }, { ...fullSources, apiKey: "x" }]) {
+    assert.equal((await api.PATCH(patch({ ...body, sources }))).status, 400);
+  }
+  assert.equal(calls.length, 1);
+});
+test("saving keeps the stored source policy when a caller omits it, and replaces it when one is sent", async () => {
+  const rows = { research: { primary: "qwen", autoFallback: true, qwenModel: "qwen3.8-flash", geminiModel: "gemini-3.5-flash-lite", budgetUsd: 0.25, sources: fullSources, updatedAt: verified.email_confirmed_at } };
+  const writes = [];
+  const service = storage({ rows, writes, admin: { getUserById: async () => ({ data: { user: verified }, error: null }) } });
+  await service.saveProviderSettings(verified.id, { primary: "qwen", autoFallback: false });
+  assert.deepEqual(writes[0].row.value.sources, fullSources, "a routing-only save does not reset the source policy");
+  const narrower = { ...fullSources, alternativesSearch: false, candidates: 8 };
+  await service.saveProviderSettings(verified.id, { primary: "qwen", autoFallback: false, sources: narrower });
+  assert.deepEqual(writes[1].row.value.sources, narrower);
+  // No stored policy: nothing is invented, and runs keep the defaults.
+  const fresh = [];
+  await storage({ writes: fresh, admin: { getUserById: async () => ({ data: { user: verified }, error: null }) } }).saveProviderSettings(verified.id, { primary: "qwen", autoFallback: true });
+  assert.equal("sources" in fresh[0].row.value, false);
+  // The budget check uses the policy: a second search per idea is refused when the budget cannot pay for it.
+  // At the smallest budget the default depth accepts, the same save with a second search per idea is refused.
+  const refused = [];
+  const gemini = storage({ writes: refused, admin: { getUserById: async () => ({ data: { user: verified }, error: null }) } });
+  const routing = { primary: "gemini", autoFallback: false, qwenModel: "qwen3.8-flash", geminiModel: "gemini-3.5-flash-lite" };
+  const budgetUsd = settingsCore.recommendedBudget(settingsCore.runCostEstimates({ ...routing, budgetUsd: 5 }).primary.requiredUsd);
+  await assert.rejects(gemini.saveProviderSettings(verified.id, { ...routing, budgetUsd, sources: { ...settingsCore.defaultSourcePolicy, alternativesSearch: true } }), /BUDGET_TOO_LOW/);
+  assert.equal(refused.length, 0);
+  await gemini.saveProviderSettings(verified.id, { ...routing, budgetUsd, sources: settingsCore.defaultSourcePolicy });
+  assert.equal(refused.length, 1, "the default breadth fits the same budget");
+});
+test("setup freezes the source policy, and a run set up without one researches on the defaults", async () => {
+  const providerSettings = { primary: "qwen", autoFallback: false, qwenModel: "qwen3.8-flash", geminiModel: "gemini-3.5-flash-lite", budgetUsd: 0.25, sources: fullSources, updatedAt: null };
+  const fixture = researchFixture({ spent: 0, providerSettings, verify: { qwen: async () => {} } });
+  fixture.setup.profile = { ...workspaceSchema.emptyProfile, name: "Founder", skills: "Operations" };
+  fixture.checkpoints.delete("setup");
+  assert.equal(await fixture.engine.initializeResearch(fixture.context), true);
+  assert.deepEqual(fixture.checkpoints.get("setup").source_policy, fullSources);
+  const legacy = researchFixture({ spent: 0, providerSettings: { ...providerSettings, sources: undefined }, verify: { qwen: async () => {} } });
+  legacy.setup.profile = fixture.setup.profile;
+  legacy.checkpoints.delete("setup");
+  await legacy.engine.initializeResearch(legacy.context);
+  assert.deepEqual(legacy.checkpoints.get("setup").source_policy, settingsCore.defaultSourcePolicy, "with no saved policy, a new run freezes the default");
+  assert.equal(legacy.checkpoints.get("setup").source_policy.sectorCommunities, true);
+});
+function sourceRetrievalFixture(sourcePolicy, sectors = ["Healthcare"]) {
+  const checkpoints = new Map();
+  checkpoints.set("discovery", { candidates: [{ key: "c1", title: "Intake relief", buyer: "Clinic managers", pain: "Intake paperwork", solution: "Automation", advantage: "Network", query: "clinic intake paperwork survey" }] });
+  const prompts = [], fetched = [];
+  const fixture = researchFixture({ spent: 0, checkpoints, settings: { primary: "qwen", autoFallback: false, qwenModel: "qwen3.8-flash", geminiModel: "gemini-3.5-flash-lite" },
+    search: { qwen: async prompt => { prompts.push(prompt); return { sources: Array.from({ length: 8 }, (_, i) => ({ url: `https://publisher${prompts.length}-${i}.org/page` })), tokens: { inputTokens: 10, outputTokens: 10 }, searchRequests: 1 }; } },
+    fetchSource: async url => { fetched.push(url); return { url, title: "Survey", excerpt: "Practice managers report intake paperwork takes nine hours every week." }; } });
+  fixture.setup.brief = { ...fixture.setup.brief, sectors };
+  if (sourcePolicy) fixture.setup.source_policy = sourcePolicy;
+  fixture.checkpoints.set("setup", fixture.setup);
+  return { fixture, prompts, fetched, checkpoints };
+}
+test("retrieval follows the frozen policy's breadth and depth; a run set up without one keeps the original search", async () => {
+  // Set up by earlier code: no policy in the checkpoint, so the legacy policy, not today's default.
+  const legacy = sourceRetrievalFixture(undefined);
+  await legacy.fixture.engine.executeResearchStage(legacy.fixture.context, "retrieval:c1");
+  assert.equal(legacy.prompts.length, 1, "one search per idea by default");
+  assert.match(legacy.prompts[0], /surveys and research, news and analyst coverage, government or regulatory pages, and job postings\. Include at most one vendor product page\. Objective:/);
+  assert.doesNotMatch(legacy.prompts[0], /Look first where these buyers discuss/);
+  assert.equal(legacy.checkpoints.get("retrieval:c1").evidence.length, 4, "four pages per idea by default");
+
+  // A new run on the default policy: the original guidance plus the community hint, same depth.
+  const current = sourceRetrievalFixture(settingsCore.defaultSourcePolicy);
+  await current.fixture.engine.executeResearchStage(current.fixture.context, "retrieval:c1");
+  assert.equal(current.prompts.length, 1);
+  assert.match(current.prompts[0], /Include at most one vendor product page\. Look first where these buyers discuss their own work: clinician and practice-manager forums[^.]*\. Objective:/);
+  assert.equal(current.checkpoints.get("retrieval:c1").evidence.length, 4);
+
+  const custom = sourceRetrievalFixture(fullSources);
+  await custom.fixture.engine.executeResearchStage(custom.fixture.context, "retrieval:c1");
+  assert.equal(custom.prompts.length, 2, "the alternatives search adds a second search");
+  assert.match(custom.prompts[1], /alternatives these buyers already use or pay for/);
+  for (const prompt of custom.prompts) {
+    assert.match(prompt, /Prefer sources that are not selling a product in this space: buyer forums and communities and surveys and research\./);
+    assert.match(prompt, /Do not include vendor product pages\./);
+    assert.doesNotMatch(prompt, /at most one vendor/);
+    assert.match(prompt, /clinician and practice-manager forums/);
+    assert.match(prompt, /last 12 months/);
+  }
+  assert.equal(custom.checkpoints.get("retrieval:c1").evidence.length, 2, "pages per idea caps what is read");
+  assert.ok(custom.fetched.length <= 6, "and how many results are tried");
+});
+test("discovery asks for the policy's number of ideas and keeps no more than that", async () => {
+  const draft = { candidates: Array.from({ length: 8 }, (_, i) => ({ key: `c${i + 1}`, title: `Idea ${i + 1}`, buyer: "Clinic owners", pain: "Missed appointments cost money.", solution: "Reminders", advantage: "Operations", query: `clinic missed appointments survey ${i + 1}` })) };
+  const fixture = researchFixture({ spent: 0, settings: { primary: "qwen", autoFallback: true, qwenModel: "qwen3.8-flash", geminiModel: "gemini-3.5-flash-lite" }, generate: async () => ({ output: draft, totalUsage: { inputTokens: 300, outputTokens: 600 } }) });
+  fixture.setup.brief = { ...fixture.setup.brief, sectors: ["Professional services"] };
+  fixture.setup.source_policy = fullSources;
+  fixture.checkpoints.set("setup", fixture.setup);
+  const keys = await fixture.engine.executeResearchStage(fixture.context, "discovery");
+  assert.deepEqual(keys, ["c1", "c2", "c3", "c4", "c5"]);
+  const prompt = fixture.calls[0].prompt;
+  assert.match(prompt, /Generate 5 specific/);
+  assert.match(prompt, /Keys must be c1 through c5\./);
+  assert.match(prompt, /\(surveys, industry reports, forum discussions\)/);
+  assert.match(prompt, /accountants, lawyers and consultants/);
+  assert.match(prompt, /Do not name products or ask for tools or software\./, "the no-products rule is kept");
+  const defaults = await discoveryPrompt("combined", workspaceSchema.emptyProfile);
+  assert.match(defaults, /Generate 8 specific/);
+  assert.match(defaults, /\(surveys, industry reports, forum discussions, news\), naming the buyer/);
+});
+test("the source policy never touches the evidence gate", () => {
+  const engine = readFileSync(new URL("../lib/research-engine.ts", import.meta.url), "utf8");
+  assert.match(engine, /source_policy: sourcePolicy/);
+  assert.match(engine, /resolveSourcePolicy\(setup\.source_policy, legacySourcePolicy\)/, "older runs fall back to the legacy policy, not today's default");
+  const policySource = readFileSync(new URL("../lib/source-policy.ts", import.meta.url), "utf8");
+  assert.doesNotMatch(policySource, /^import .*research-core/m, "the policy module cannot reach how evidence is counted");
+  assert.deepEqual([...policySource.matchAll(/^import .* from "([^"]+)"/gm)].map(match => match[1]), ["zod"], "it depends on nothing but zod");
+  const admin = readFileSync(new URL("../components/admin-sources.tsx", import.meta.url), "utf8");
+  assert.doesNotMatch(admin, /SUPABASE_SERVICE_ROLE_KEY|SUPABASE_SECRET_KEY|DASHSCOPE_API_KEY|GOOGLE_GENERATIVE_AI_API_KEY|localStorage/);
+});
+
+// Regression for run 0373ec17 (2026-11-11): 7 of 8 candidates had 28 sources when Qwen's search for the 8th timed out,
+// and that one timeout failed the whole run.
+const eightCandidates = () => ({ candidates: Array.from({ length: 8 }, (_, i) => ({ key: `c${i + 1}`, title: `Candidate ${i + 1}`, buyer: "Accounting firm partners", pain: "Compliance checklists", solution: "Automation", advantage: "Network", query: "accounting firm compliance checklist burden survey" })) });
+const searchTimedOut = () => Object.assign(new Error("The operation was aborted due to timeout"), { name: "TimeoutError" });
+const withEvidence = { evidence: [{ source_key: "s1" }] };
+function quietly(run) { const warn = console.warn; console.warn = () => {}; return run().finally(() => { console.warn = warn; }); }
+
+test("one candidate's timed-out search is skipped and the run goes on, as an empty search already is", async () => {
+  const checkpoints = new Map([["discovery", eightCandidates()]]);
+  for (const key of ["c1", "c2", "c3", "c4", "c5", "c6", "c7"]) checkpoints.set(`retrieval:${key}`, withEvidence);
+  const timeouts = [];
+  const fixture = researchFixture({ spent: 0, checkpoints, settings: { primary: "qwen", autoFallback: false, qwenModel: "qwen3.8-flash", geminiModel: "gemini-3.5-flash-lite" },
+    search: { qwen: async (_prompt, _model, timeoutMs) => { timeouts.push(timeoutMs); throw searchTimedOut(); } } });
+  await quietly(() => fixture.engine.executeResearchStage(fixture.context, "retrieval:c8"));
+  assert.deepEqual(checkpoints.get("retrieval:c8"), { evidence: [], skipped: "TRANSIENT_PROVIDER" });
+  assert.deepEqual(fixture.records.map(record => record.status), ["unknown"], "a timed-out call may have been billed, so its reservation is kept");
+  assert.ok(timeouts[0] > 90_000 && timeouts[0] <= models.SEARCH_TIMEOUT_MS.qwen, "Qwen searches get more than the former 90 s");
+  // The outcome reports the skipped candidate as a failed search.
+  const outcome = researchCore.researchOutcome({ mode: "combined", candidates: eightCandidates().candidates, evidence: [], classifications: [], retrievalFailures: ["c8"] });
+  assert.equal(outcome.candidates[7].reason, "SEARCH_FAILED");
+});
+
+test("transient search failures still end the run when the provider looks down or nothing else has evidence", async () => {
+  const failing = { primary: "qwen", autoFallback: false, qwenModel: "qwen3.8-flash", geminiModel: "gemini-3.5-flash-lite" };
+  const search = { qwen: async () => { throw searchTimedOut(); } };
+  // Two in a row.
+  const twice = new Map([["discovery", eightCandidates()], ["retrieval:c1", withEvidence], ["retrieval:c2", { evidence: [], skipped: "TRANSIENT_PROVIDER" }]]);
+  const outage = researchFixture({ spent: 0, checkpoints: twice, settings: failing, search });
+  await quietly(() => assert.rejects(outage.engine.executeResearchStage(outage.context, "retrieval:c3"), /TimeoutError|timeout/));
+  assert.equal(twice.has("retrieval:c3"), false);
+  // A quarter of eight candidates already skipped this way.
+  const many = new Map([["discovery", eightCandidates()], ["retrieval:c1", { evidence: [], skipped: "TRANSIENT_PROVIDER" }], ["retrieval:c2", withEvidence], ["retrieval:c3", { evidence: [], skipped: "TRANSIENT_PROVIDER" }], ["retrieval:c4", withEvidence]]);
+  const capped = researchFixture({ spent: 0, checkpoints: many, settings: failing, search });
+  await quietly(() => assert.rejects(capped.engine.executeResearchStage(capped.context, "retrieval:c5"), /timeout/));
+  // The last candidate when no earlier one found anything.
+  const empty = new Map([["discovery", { candidates: eightCandidates().candidates.slice(0, 3) }], ["retrieval:c1", { evidence: [], skipped: "RETRIEVAL_UNAVAILABLE" }], ["retrieval:c2", { evidence: [], skipped: "RETRIEVAL_UNAVAILABLE" }]]);
+  const nothing = researchFixture({ spent: 0, checkpoints: empty, settings: failing, search });
+  await quietly(() => assert.rejects(nothing.engine.executeResearchStage(nothing.context, "retrieval:c3"), /timeout/));
+  // Configuration errors are never skipped.
+  const config = researchFixture({ spent: 0, checkpoints: new Map([["discovery", eightCandidates()], ["retrieval:c1", withEvidence]]), settings: failing,
+    search: { qwen: async () => { throw Object.assign(new Error("PROVIDER_CONFIGURATION"), { statusCode: 401 }); } } });
+  await quietly(() => assert.rejects(config.engine.executeResearchStage(config.context, "retrieval:c2"), /PROVIDER_CONFIGURATION/));
+});
+
+test("a verify run's single candidate is never skipped on a transient failure", async () => {
+  const candidate = { key: "c1", title: verifyIdea.title, buyer: verifyIdea.buyer, pain: verifyIdea.pain, solution: "", advantage: "", query: "physio clinic missed appointments cost", query_alt: "physio clinic appointment reminder alternatives" };
+  const fixture = verifyFixture({ settings: { primary: "qwen", autoFallback: false, qwenModel: "qwen3.8-flash", geminiModel: "gemini-3.5-flash-lite" }, search: { qwen: async () => { throw searchTimedOut(); } } });
+  fixture.checkpoints.set("discovery", { candidates: [candidate] });
+  await quietly(() => assert.rejects(fixture.engine.executeResearchStage(fixture.context, "retrieval:c1"), /timeout/));
+});
+
+test("a search is not sent when the retrieval step has too little time left, and its reservation is released", async () => {
+  const candidate = { key: "c1", title: verifyIdea.title, buyer: verifyIdea.buyer, pain: verifyIdea.pain, solution: "", advantage: "", query: "physio clinic missed appointments cost", query_alt: "physio clinic appointment reminder alternatives" };
+  const realNow = Date.now;
+  let clock = realNow();
+  Date.now = () => clock;
+  const searched = [];
+  try {
+    const fixture = verifyFixture({
+      fetchSource: async url => ({ url, title: "A", excerpt: "Physiotherapy clinic owners describe missed appointments costing them money every week." }),
+      search: {
+        // The first search runs long: 170 s of the 240 s step budget, leaving 10 s after the page-read reserve.
+        qwen: async (_prompt, _model, timeoutMs) => { searched.push(["qwen", timeoutMs]); clock += 170_000; return { sources: [{ url: "https://a.org/1" }], tokens: { inputTokens: 10, outputTokens: 10 }, searchRequests: 1 }; },
+        gemini: async () => { searched.push(["gemini"]); throw new Error("must not be sent"); },
+      },
+    });
+    fixture.checkpoints.set("discovery", { candidates: [candidate] });
+    await quietly(() => fixture.engine.executeResearchStage(fixture.context, "retrieval:c1"));
+    assert.deepEqual(searched, [["qwen", models.SEARCH_TIMEOUT_MS.qwen]], "neither the alternatives search nor its fallback is sent");
+    assert.deepEqual(fixture.checkpoints.get("retrieval:c1").evidence.map(e => e.title), ["A"], "the first search's pages are still read");
+    assert.equal(fixture.records[0].status, "completed");
+    assert.ok(fixture.records.slice(1).length >= 1);
+    for (const record of fixture.records.slice(1)) assert.deepEqual([record.status, record.estimated_usd], ["completed", 0], "unsent searches cost nothing");
+  } finally {
+    Date.now = realNow;
+  }
+});
+
+test("a run started on the fallback because the configured model does not fit records why", async () => {
+  const fixture = researchFixture({ spent: 0, providerSettings: { primary: "gemini", autoFallback: true, qwenModel: "qwen3.8-flash", geminiModel: "gemini-4-argon", budgetUsd: 0.25, updatedAt: null },
+    verify: { qwen: async () => {}, gemini: async () => {} } });
+  fixture.setup.profile = { ...workspaceSchema.emptyProfile, name: "Founder", skills: "Operations" };
+  fixture.checkpoints.delete("setup");
+  const error = console.error; const logged = []; console.error = (...args) => logged.push(args);
+  try { assert.equal(await fixture.engine.initializeResearch(fixture.context), true); } finally { console.error = error; }
+  const setup = fixture.checkpoints.get("setup");
+  assert.equal(setup.model, "qwen3.8-flash");
+  assert.equal(setup.fallback_allowed, false);
+  assert.deepEqual(setup.primary_skipped, { provider: "gemini", model: "gemini-4-argon", required_usd: budget.estimateRunCost("gemini-4-argon").requiredUsd, budget_usd: 0.25 });
+  assert.equal(setup.provider_settings.budgetUsd, 0.25, "the snapshot records the saved budget, not a schema default");
+  assert.match(String(logged[0]?.[0]), /configured primary cannot finish/);
+  // A run on its configured primary records nothing.
+  const fits = researchFixture({ spent: 0, providerSettings: { primary: "qwen", autoFallback: false, qwenModel: "qwen3.8-flash", geminiModel: "gemini-3.5-flash-lite", budgetUsd: 0.25, updatedAt: null }, verify: { qwen: async () => {} } });
+  fits.setup.profile = fixture.setup.profile;
+  fits.checkpoints.delete("setup");
+  await fits.engine.initializeResearch(fits.context);
+  assert.equal("primary_skipped" in fits.checkpoints.get("setup"), false);
+});
+
+test("Claude runs its structured stages through the Anthropic SDK at Claude prices, and falls back to Gemini by default", async () => {
+  const settings = { primary: "claude", autoFallback: true, qwenModel: "qwen3.8-flash", geminiModel: "gemini-3.5-flash-lite", claudeModel: "claude-sonnet-5-5" };
+  const fixture = researchFixture({ spent: 0, limit: 5, settings, claude: { generate: async () => ({ value: { ok: true }, tokens: { inputTokens: 900, outputTokens: 400 } }) } });
+  assert.deepEqual(await fixture.engine.structured(fixture.context, "discovery", z.object({ ok: z.boolean() }), value => value, "Prompt", fixture.setup.pricing), { ok: true });
+  assert.equal(fixture.calls.length, 1);
+  const [call] = fixture.calls;
+  assert.equal(call.claude, true, "a Claude stage never goes through the AI SDK");
+  assert.equal(call.model.modelId, "claude-sonnet-5-5");
+  assert.equal(call.maxOutputTokens, models.researchModels["claude-sonnet-5-5"].outputTokens);
+  assert.match(call.prompt, /Return a JSON object matching the supplied schema\.\nPrompt/);
+  assert.ok(call.system.length > 0, "the research policy is sent as the system prompt");
+  assert.equal(fixture.reservations[0].p_model, "claude-sonnet-5-5");
+  assert.equal(fixture.reservations[0].p_stage, "discovery:anthropic-claude:workflow");
+  assert.equal(fixture.reservations[0].p_pricing.output, models.researchModelPricing("claude-sonnet-5-5").output);
+  assert.equal(fixture.records[0].status, "completed");
+
+  // An account-level failure moves the run to Claude's default fallback, Gemini, and records the switch.
+  const failing = researchFixture({ spent: 0, limit: 5, settings, claude: { generate: async () => { throw Object.assign(new Error("PROVIDER_CREDITS_REQUIRED: credit balance is too low"), { statusCode: 402 }); } } });
+  assert.deepEqual(await failing.engine.structured(failing.context, "discovery", z.object({ ok: z.boolean() }), value => value, "Prompt", failing.setup.pricing), { ok: true });
+  assert.deepEqual(failing.calls.map(item => item.model.modelId), ["claude-sonnet-5-5", "gemini-3.5-flash-lite"]);
+  assert.equal(failing.records[0].estimated_usd, 0, "a request refused before generation releases its reservation");
+  assert.equal(failing.checkpoints.get("setup").active_provider, "google-gemini");
+});
+
+test("a chosen fallback is used in place of the default partner, in both directions", async () => {
+  // Qwen primary with Claude as its chosen fallback.
+  const toClaude = researchFixture({ spent: 0, limit: 5, settings: { primary: "qwen", autoFallback: true, fallbackProvider: "claude", qwenModel: "qwen3.8-flash", geminiModel: "gemini-3.5-flash-lite", claudeModel: "claude-haiku-5-5" },
+    generate: async () => { throw Object.assign(new Error("TRANSIENT_PROVIDER"), { statusCode: 503 }); },
+    claude: { generate: async () => ({ value: { ok: true }, tokens: { inputTokens: 10, outputTokens: 10 } }) } });
+  assert.deepEqual(await toClaude.engine.structured(toClaude.context, "discovery", z.object({ ok: z.boolean() }), value => value, "Prompt", toClaude.setup.pricing), { ok: true });
+  assert.deepEqual(toClaude.calls.map(item => item.model.modelId), ["qwen3.8-flash", "claude-haiku-5-5"]);
+  assert.equal(toClaude.reservations[1].p_pricing.input, models.researchModelPricing("claude-haiku-5-5").input, "the fallback is reserved at its own price");
+  assert.equal(toClaude.checkpoints.get("setup").active_provider, "anthropic-claude");
+
+  // A run already moved to its fallback has no fallback of its own.
+  const moved = researchFixture({ spent: 0, limit: 5, settings: { primary: "qwen", autoFallback: true, fallbackProvider: "claude", qwenModel: "qwen3.8-flash", geminiModel: "gemini-3.5-flash-lite", claudeModel: "claude-haiku-5-5" },
+    claude: { generate: async () => { throw Object.assign(new Error("TRANSIENT_PROVIDER"), { statusCode: 529 }); } } });
+  moved.setup.active_provider = "anthropic-claude";
+  await assert.rejects(moved.engine.structured(moved.context, "discovery", z.object({ ok: z.boolean() }), value => value, "Prompt", moved.setup.pricing), /TRANSIENT_PROVIDER/);
+  assert.equal(moved.calls.length, 1);
+});
+
+test("a Claude answer that does not parse is retried once and each attempt is metered", async () => {
+  let attempt = 0;
+  const settings = { primary: "claude", autoFallback: false, claudeModel: "claude-haiku-5-5" };
+  const unparsedClaude = () => { try { claudeCore.parseClaudeObject({ stop_reason: "max_tokens", content: [{ type: "text", text: "{\"ok\": tr" }], usage: { input_tokens: 500, output_tokens: 8000 } }, z.object({ ok: z.boolean() })); } catch (error) { return error; } };
+  const fixture = researchFixture({ spent: 0, limit: 5, settings, claude: { generate: async () => {
+    attempt++;
+    if (attempt === 1) throw unparsedClaude();
+    return { value: { ok: true }, tokens: { inputTokens: 500, outputTokens: 300 } };
+  } } });
+  assert.deepEqual(await fixture.engine.structured(fixture.context, "discovery", z.object({ ok: z.boolean() }), value => value, "Prompt", fixture.setup.pricing), { ok: true });
+  assert.equal(fixture.calls.length, 2);
+  assert.deepEqual(fixture.records.map(record => record.status), ["completed", "completed"], "the cut-off attempt is settled at its real usage");
+  const pricing = models.researchModelPricing("claude-haiku-5-5");
+  assert.ok(Math.abs(fixture.records[0].estimated_usd - (500 * pricing.input + 8000 * pricing.output)) < 1e-12);
+});
+
+test("a Claude search is reserved at Claude's capped search allowance and its search pricing", async () => {
+  const fixture = researchFixture({ spent: 0, limit: 5, settings: { primary: "claude", autoFallback: false, claudeModel: "claude-opus-5-5" } });
+  const executed = [];
+  await fixture.engine.providerCall(fixture.context, "retrieval:c1", "Find sources", fixture.setup.pricing, true, 0, async (provider, model) => {
+    executed.push({ provider, model });
+    return { value: "evidence", tokens: { inputTokens: 18_000, outputTokens: 600 }, searchRequests: 2 };
+  });
+  assert.deepEqual(executed, [{ provider: "anthropic-claude", model: "claude-opus-5-5" }]);
+  assert.equal(fixture.reservations[0].p_pricing.search_allowance, models.CLAUDE_SEARCH_MAX_USES);
+  assert.equal(fixture.reservations[0].p_pricing.search, 0.01);
+  const expected = budget.reservationFor("claude-opus-5-5", models.researchModelPricing("claude-opus-5-5"), { promptBytes: Buffer.byteLength("Find sources"), search: true });
+  assert.ok(Math.abs(fixture.reservations[0].p_reserved - expected.usd) < 1e-9);
+});
+
+test("setup verifies the Claude model, freezes Claude pricing and records the Claude provider", async () => {
+  const verified = [];
+  const fixture = researchFixture({ spent: 0, budgetUsd: 5, providerSettings: { primary: "claude", autoFallback: true, fallbackProvider: "qwen", qwenModel: "qwen3.8-flash", geminiModel: "gemini-3.5-flash-lite", claudeModel: "claude-haiku-5-5", budgetUsd: 5, updatedAt: null },
+    verify: { qwen: async () => {} }, claude: { verify: async model => { verified.push(model); } } });
+  fixture.setup.profile = { ...workspaceSchema.emptyProfile, name: "Founder", skills: "Operations" };
+  fixture.checkpoints.delete("setup");
+  assert.equal(await fixture.engine.initializeResearch(fixture.context), true);
+  const setup = fixture.checkpoints.get("setup");
+  assert.deepEqual(verified, ["claude-haiku-5-5"]);
+  assert.equal(setup.provider, "anthropic-claude");
+  assert.equal(setup.active_provider, "anthropic-claude");
+  assert.equal(setup.model, "claude-haiku-5-5");
+  assert.equal(setup.provider_settings.fallbackProvider, "qwen", "the chosen fallback is frozen with the run");
+  const { input, output, search, checked_at } = models.researchModelPricing("claude-haiku-5-5");
+  assert.deepEqual(setup.claude_pricing, { input, output, search, checked_at });
+  assert.equal(setup.fallback_allowed, true);
+  assert.equal(fixture.engine.providerKey("anthropic-claude"), "claude");
+  assert.equal(fixture.engine.providerKey(undefined), "qwen", "runs recorded before provider ids existed are Qwen");
+});
+
+test("the run page says which configured model was skipped and why", () => {
+  const data = { id: "run", status: "failed", stage: "retrieval", error_code: "TRANSIENT_PROVIDER", retry_count: 0, model: { provider: "dashscope-beijing", model: "qwen3.8-flash", planned: false, used: ["qwen3.8-flash"], primary_skipped: { model: "gemini-3.8-flash", required_usd: 0.5675, budget_usd: 0.55 } }, configuration: { brief: { name: "Business Ideas" } }, report: null, steps: [{ stage_key: "discovery" }], usage: { estimated_usd: 0.054, committed_usd: 0.0822, budget_usd: 0.55, uncertain_calls: 1, input_tokens: 1, output_tokens: 1, search_requests: 54 } };
+  const copy = () => (text, values = {}) => text.replace(/\{(\w+)\}/g, (_match, key) => values[key] ?? key);
+  const { ResearchRunView } = loadModule("../components/research-run.tsx", {
+    "@/components/report-feedback": { ReportRating: () => null },
+    "@/lib/research-progress": require("../lib/research-progress.ts"),
+    "next/link": { default: ({ children, ...props }) => createElement("a", props, children) },
+    "swr": { default: () => ({ data, mutate: async () => undefined }) },
+    "@/components/ui/button": { Button: ({ asChild, children, ...props }) => asChild ? cloneElement(children, props) : createElement("button", props, children) },
+    "@/components/shared": { PageHeader: ({ title }) => createElement("h1", null, title) },
+    "@/components/demo-provider": { useDemo: () => ({ refresh: async () => undefined }) },
+    "@/components/research-report": { ResearchReportView: () => null },
+    "@/components/research-outcome": { ResearchOutcomeView: () => null },
+    "@/components/model-tag": { ModelTag: () => null },
+    "@/lib/research-core": researchCore,
+    "@/lib/research-models": models,
+    "@/i18n/use-copy": { useCopy: copy, useFormats: () => ({ usd: (value, digits = 2) => `$${value.toFixed(digits)}`, number: value => String(value) }) },
+    "@/i18n/errors": { feedbackSource: (_code, fallback) => fallback },
+    "@/lib/api-client": apiClient,
+  });
+  const html = renderToStaticMarkup(createElement(ResearchRunView, { initialData: data }));
+  assert.match(html, /This run uses Qwen 3\.8 Flash because the configured Gemini 3\.8 Flash needs a budget of at least \$0\.57 and this run(&#x27;|')s budget is \$0\.55\./);
+});
+
+test("the fallback is the chosen provider, or the primary's default partner, and never the primary itself", () => {
+  const base = { autoFallback: true };
+  assert.deepEqual(providerPlan({ ...base, primary: "claude" }), { primary: "claude", fallback: "gemini" });
+  assert.deepEqual(providerPlan({ ...base, primary: "qwen" }), { primary: "qwen", fallback: "gemini" }, "rows saved before Claude keep Qwen to Gemini");
+  assert.deepEqual(providerPlan({ ...base, primary: "gemini" }), { primary: "gemini", fallback: "qwen" });
+  assert.deepEqual(providerPlan({ ...base, primary: "gemini", fallbackProvider: "claude" }), { primary: "gemini", fallback: "claude" });
+  assert.deepEqual(providerPlan({ ...base, primary: "claude", fallbackProvider: "qwen" }), { primary: "claude", fallback: "qwen" });
+  assert.deepEqual(providerPlan({ ...base, primary: "claude", fallbackProvider: "claude" }), { primary: "claude", fallback: "gemini" }, "a fallback equal to the primary resolves to the default partner");
+  assert.deepEqual(providerPlan({ primary: "claude", autoFallback: false, fallbackProvider: "qwen" }), { primary: "claude", fallback: undefined });
+  assert.deepEqual(providerPlan({ ...base, primary: "claude", fallbackProvider: "qwen" }, "qwen"), { primary: "qwen", fallback: undefined }, "a run on its fallback has no further fallback");
+  // Saving requires credentials for the primary and the chosen fallback only.
+  const providers = { qwen: { configured: false, model: "" }, gemini: { configured: true, model: "" }, claude: { configured: true, model: "" } };
+  assert.doesNotThrow(() => assertProvidersConfigured(providerSettingsSchema.parse({ primary: "claude", autoFallback: true }), providers));
+  assert.throws(() => assertProvidersConfigured(providerSettingsSchema.parse({ primary: "claude", autoFallback: true, fallbackProvider: "qwen" }), providers), /PROVIDER_NOT_CONFIGURED/);
+  assert.throws(() => assertProvidersConfigured(providerSettingsSchema.parse({ primary: "gemini", autoFallback: true, fallbackProvider: "claude" }), { ...providers, claude: { configured: false, model: "" } }), /PROVIDER_NOT_CONFIGURED/);
 });

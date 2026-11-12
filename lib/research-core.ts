@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { getDomain } from "tldts";
 import { reportLanguageSchema, profileV2Fields, type ReportLanguage } from "./workspace-schema.ts";
+import { MAX_CANDIDATES, MAX_PAGES_PER_IDEA } from "./source-policy.ts";
 
 export const RESEARCH_MODEL = "qwen3.8-flash";
 // v2: the adversarial review deducts at most 15 points and no longer deducts again for evidence gaps the evaluation
@@ -123,7 +124,14 @@ const classificationItemSchema = z.object({
   stance: z.enum(["supports", "contradicts", "neutral"]),
   quote: z.string().max(500), claim: short,
 });
-export const classificationSchema = z.object({ items: z.array(classificationItemSchema).max(32) });
+/**
+ * The most sources one run can classify: every idea at the source policy's deepest setting. A verify run (one idea,
+ * twice the pages) stays well under it. This bound was once a literal 32 (8 ideas × 4 pages); after the source policy
+ * allowed 6 pages per idea, a run with more than 32 readable pages saved its classification and then could not read it
+ * back, so it failed at evaluation as INVALID_OUTPUT, and its retry failed the same way.
+ */
+export const MAX_CLASSIFIED_SOURCES = MAX_CANDIDATES * MAX_PAGES_PER_IDEA;
+export const classificationSchema = z.object({ items: z.array(classificationItemSchema).max(MAX_CLASSIFIED_SOURCES) });
 export type Classification = z.infer<typeof classificationSchema>["items"][number];
 const dimensionsSchema = z.object({ pain: z.number().int().min(0).max(100), demand: z.number().int().min(0).max(100), economics: z.number().int().min(0).max(100), feasibility: z.number().int().min(0).max(100), advantage: z.number().int().min(0).max(100) });
 /**
@@ -186,6 +194,63 @@ export function citableSources(sources: readonly { source_key: string; stance: C
   };
 }
 
+/**
+ * Next steps (enhancement plan WP-16). Each step tests one of the candidate's assumptions and says where to go, what
+ * result completes it, and what result means change course. "where" is one of the candidate's citable supporting
+ * source keys, or null with a plain-text "where_hint" shown as a suggestion. "day" is the day of a 14-day sprint the
+ * step should be finished by; a sprint of another length scales it. Steps are compact on purpose: the evaluation call
+ * for two candidates must stay under the model's output cap, so the messages to send belong to the kits (WP-18, WP-19).
+ */
+export const STEPS_VERSION = 1;
+export const MAX_STEPS = 4;
+export const STEP_DAYS = 14;
+export const stepSchema = z.object({
+  action: z.string().min(1).max(300),
+  where: z.string().nullable(),
+  where_hint: z.string().max(200),
+  done_when: z.string().min(1).max(200),
+  stop_if: z.string().min(1).max(200),
+  tests_assumption: z.number().int().min(0).max(3).nullable(),
+  day: z.number().int().min(1).max(STEP_DAYS),
+});
+export type Step = z.infer<typeof stepSchema>;
+const stepDraftSchema = z.object({
+  action: z.string().describe("One imperative sentence: who to approach or what to do, under 300 characters."),
+  where: z.string().nullable().optional().describe("One of this candidate's citable supporting source_keys showing where these buyers gather or discuss the problem, or null."),
+  where_hint: z.string().optional().describe("When where is null: where to find these buyers, under 200 characters. Otherwise empty."),
+  done_when: z.string().describe("A countable result that completes the step, under 200 characters."),
+  stop_if: z.string().describe("The result that means change channel or drop the assumption, under 200 characters."),
+  tests_assumption: z.number().nullable().optional().describe("0-based index of the assumption this step tests."),
+  day: z.number().describe("Day of a 14-day sprint to finish by, 1–14."),
+});
+/**
+ * Server-side rules for steps, whatever the model returned: a step needs an action, a done-when and a stop-if; "where"
+ * is kept only when it is one of the candidate's supporting sources (never a contradicting one), otherwise it becomes
+ * null and only the hint is shown; a hint is dropped when a source is cited; an assumption index outside the
+ * candidate's assumptions becomes null; days are clamped to 1–14, a missing day is spread evenly, and days never go
+ * backwards; at most four steps.
+ */
+export function normalizeSteps(steps: readonly z.infer<typeof stepDraftSchema>[], supporting: readonly string[], assumptions: number): Step[] {
+  const allowed = new Set(supporting);
+  const kept = steps.flatMap(step => {
+    const action = clipText(String(step.action ?? ""), 300);
+    const done_when = clipText(String(step.done_when ?? ""), 200);
+    const stop_if = clipText(String(step.stop_if ?? ""), 200);
+    if (!action || !done_when || !stop_if) return [];
+    const key = typeof step.where === "string" ? step.where.trim() : "";
+    const where = allowed.has(key) ? key : null;
+    const index = typeof step.tests_assumption === "number" && Number.isInteger(step.tests_assumption) ? step.tests_assumption : -1;
+    return [{ action, where, where_hint: where ? "" : clipText(String(step.where_hint ?? ""), 200), done_when, stop_if, tests_assumption: index >= 0 && index < assumptions ? index : null, day: Number(step.day) }];
+  }).slice(0, MAX_STEPS);
+  let last = 1;
+  return kept.map((step, i) => {
+    const spread = Math.max(1, Math.round((STEP_DAYS * (i + 1)) / kept.length));
+    const day = Math.max(last, Number.isFinite(step.day) ? clampInt(step.day, 1, STEP_DAYS) : spread);
+    last = day;
+    return stepSchema.parse({ ...step, day });
+  });
+}
+
 const evaluationItemSchema = z.object({
   candidate_id: z.string(), description: short, category: z.string().max(100),
   revenue: short, cost: short, risk: short, assumptions: z.array(short).min(1).max(4),
@@ -194,6 +259,8 @@ const evaluationItemSchema = z.object({
   rationale: long,
   // Methodology v3 (WP-07). Evaluations checkpointed before it have none.
   claims: z.array(claimSchema).max(MAX_CLAIMS).optional(),
+  // WP-16. Evaluations checkpointed before it have none.
+  steps: z.array(stepSchema).max(MAX_STEPS).optional(),
 });
 export const evaluationSchema = z.object({ items: z.array(evaluationItemSchema).min(1).max(8) });
 export type Evaluation = z.infer<typeof evaluationSchema>["items"][number];
@@ -232,6 +299,7 @@ export const evaluationDraftSchema = z.object({ items: z.array(z.object({
   dimensions: z.object({ pain: score(100), demand: score(100), economics: score(100), feasibility: score(100), advantage: score(100) }),
   rationale: prose(2000),
   claims: z.array(claimDraftSchema).optional().describe("3–12 claims; see the prompt's rules."),
+  steps: z.array(stepDraftSchema).optional().describe("2–3 next steps; see the prompt's rules."),
 })) });
 export const reviewDraftSchema = z.object({ items: z.array(z.object({
   candidate_id: z.string(), reject: z.boolean(), critique: prose(800), penalty: score(REVIEW_MAX_PENALTY), falsification: prose(800),
@@ -261,9 +329,10 @@ function matchIds<T>(expected: string[], items: T[], id: (item: T) => string): T
   });
 }
 
-export function normalizeDiscovery(draft: z.infer<typeof discoveryDraftSchema>): z.infer<typeof discoverySchema> {
-  // Keys are positional labels, so they are assigned here rather than trusted from the model.
-  const candidates = draft.candidates.slice(0, 8).map((candidate, index) => {
+export function normalizeDiscovery(draft: z.infer<typeof discoveryDraftSchema>, max = 8): z.infer<typeof discoverySchema> {
+  // Keys are positional labels, so they are assigned here rather than trusted from the model. `max` is the number of
+  // ideas the source policy asks for (5–8); extra ideas the model returns are dropped.
+  const candidates = draft.candidates.slice(0, Math.min(8, Math.max(5, max))).map((candidate, index) => {
     const query = clipText(candidate.query, 300);
     return {
       key: `c${index + 1}`, title: clipText(candidate.title, 180),
@@ -310,14 +379,20 @@ export function normalizeClassification(draft: z.infer<typeof classificationDraf
 export function normalizeEvaluation(draft: z.infer<typeof evaluationDraftSchema>, candidateIds: string[], mode?: Mode, citable?: Record<string, CitableSources>): { items: Evaluation[] } {
   const items = matchIds(candidateIds, draft.items, item => item.candidate_id).flatMap(item => {
     const assumptions = item.assumptions.map(text => clipText(text, 800)).filter(Boolean).slice(0, 4);
-    const validation = item.validation.map(text => clipText(text, 800)).filter(Boolean).slice(0, 4);
+    // Claims and steps are kept only when the caller says which sources each candidate may cite.
+    const sources = citable ? citable[item.candidate_id] ?? { supporting: [], contradicting: [] } : null;
+    const steps = sources && item.steps ? normalizeSteps(item.steps, sources.supporting, assumptions.length) : [];
+    // A plan of one step is not a plan; the plain validation steps stand in for it.
+    const usableSteps = steps.length >= 2 ? steps : [];
+    let validation = item.validation.map(text => clipText(text, 800)).filter(Boolean).slice(0, 4);
+    if (!validation.length) validation = usableSteps.map(step => step.action);
     // Without at least one stated assumption and one validation step the evaluation is unusable; leave it out.
     if (!assumptions.length || !validation.length) return [];
     const d = item.dimensions;
-    // Claims are kept only when the caller says which sources each candidate may cite.
-    const claims = citable && item.claims ? normalizeClaims(item.claims, citable[item.candidate_id] ?? { supporting: [], contradicting: [] }) : [];
+    const claims = sources && item.claims ? normalizeClaims(item.claims, sources) : [];
     return [evaluationItemSchema.parse({
       ...(claims.length ? { claims } : {}),
+      ...(usableSteps.length ? { steps: usableSteps } : {}),
       candidate_id: item.candidate_id, description: clipText(item.description, 800), category: clipText(item.category, 100),
       revenue: clipText(item.revenue, 800), cost: clipText(item.cost, 800), risk: clipText(item.risk, 800),
       assumptions, validation, rationale: clipText(item.rationale, 2000),
@@ -602,7 +677,27 @@ export const researchErrors: Record<string, string> = {
   PROVIDER_CONFIGURATION: "Research is unavailable. The deployment configuration needs attention.",
   WORKFLOW_INTERRUPTED: "The workflow was interrupted. You can retry once within the remaining budget.",
   DISPATCH_FAILED: "The task could not start. You can retry once.",
+  CANCELLED: "You stopped this research. No new search or model request was started after that, and no report was produced.",
 };
+
+/** How long a run may wait for its workflow before it counts as never dispatched. */
+export const DISPATCH_GRACE_MS = 5 * 60_000;
+/**
+ * The longest a run may stay active. Runs take 5–10 minutes and every stage is checkpointed, so a run still active after
+ * two hours is stuck (a lost workflow, or one whose status cannot be read) and is ended so the founder can retry.
+ */
+export const MAX_ACTIVE_MS = 2 * 60 * 60_000;
+export type ActiveRun = { status: string; workflow_id: string | null; updated_at: string; created_at: string; started_at?: string | null };
+/**
+ * Why an active run should be ended, or null while it may still finish. `workflowStatus` is the durable workflow's
+ * status, or null when it could not be read: an unreadable status never ends a run on its own, only the age limit does.
+ */
+export function interruptionFor(run: ActiveRun, workflowStatus: string | null, now = Date.now()): "WORKFLOW_INTERRUPTED" | "DISPATCH_FAILED" | null {
+  if (!["pending", "running"].includes(run.status)) return null;
+  if (!run.workflow_id) return now - new Date(run.updated_at).getTime() > DISPATCH_GRACE_MS ? "DISPATCH_FAILED" : null;
+  if (workflowStatus && ["failed", "cancelled", "completed"].includes(workflowStatus)) return "WORKFLOW_INTERRUPTED";
+  return now - new Date(run.started_at ?? run.created_at).getTime() > MAX_ACTIVE_MS ? "WORKFLOW_INTERRUPTED" : null;
+}
 export function errorCode(error: unknown): string {
   const seen = new Set<unknown>();
   const failures: { message: string; status: number }[] = [];
@@ -619,6 +714,29 @@ export function errorCode(error: unknown): string {
   if (failures.some(({ status }) => [401, 402, 403].includes(status)) || /authentication|api.key|oidc/i.test(message)) return 'PROVIDER_CONFIGURATION';
   if (failures.some(({ status }) => status === 429 || status >= 500) || /timeout|abort|fetch failed/i.test(message)) return 'TRANSIENT_PROVIDER';
   return 'INVALID_OUTPUT';
+}
+
+/** How one candidate's retrieval ended, as its checkpoint records it. */
+export type RetrievalState = "evidence" | "RETRIEVAL_UNAVAILABLE" | "TRANSIENT_PROVIDER";
+/**
+ * Whether a candidate whose search failed with a transient provider error (a timeout, 429 or 5xx) can be skipped so
+ * the run goes on with the others, as a search that found nothing already is. Otherwise the failure ends the run.
+ * Before 2026-11-11 one timed-out search ended a run that already had 28 sources for its other 7 candidates.
+ * Skipping stops being safe when the provider looks down rather than slow, so a skip is refused when:
+ * - the run has only one candidate (verify mode): there is nothing to go on with;
+ * - the previous candidate was also skipped this way: two in a row looks like an outage;
+ * - a quarter of the candidates (at least one) have already been skipped this way;
+ * - this is the last candidate and no earlier one has evidence: the run would end with no evidence at all, reported
+ *   as retrieval finding nothing instead of as the provider failure (which is retryable and always refunded).
+ * `earlier` holds the states of the candidates searched before this one, in order; `remaining` counts those after it.
+ */
+export function transientSkipAllowed(earlier: RetrievalState[], remaining: number): boolean {
+  const total = earlier.length + 1 + remaining;
+  if (total < 2) return false;
+  if (earlier.at(-1) === "TRANSIENT_PROVIDER") return false;
+  if (earlier.filter(state => state === "TRANSIENT_PROVIDER").length >= Math.max(1, Math.floor(total / 4))) return false;
+  if (remaining === 0 && !earlier.includes("evidence")) return false;
+  return true;
 }
 
 /**

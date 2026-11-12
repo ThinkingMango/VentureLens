@@ -16,10 +16,17 @@ test("every event the spec names has a schema, and valid props pass unchanged", 
     claim_flagged: { reason: "outdated" },
     report_rated: { rating: 5 },
     starter_profile_used: { id: "consultant-leaving-corporate" },
+    opportunity_viewed: {},
+    evidence_logged: { kind: "deposit" },
+    kit_generated: { kind: "buyers" },
+    weekly_email_sent: {},
+    report_shared: {},
+    report_unshared: {},
   };
   assert.deepEqual(Object.keys(eventSchemas).sort(), Object.keys(valid).sort());
   for (const [event, props] of Object.entries(valid)) assert.deepEqual(eventProps(event, props), props, event);
   assert.deepEqual(eventProps("task_completed", undefined), {}, "events without props accept none");
+  assert.deepEqual(eventProps("task_completed", { origin: "checklist" }), { origin: "checklist" }, "a tick outside a sprint");
 });
 
 test("events never carry free text or personal data: unknown events and extra or malformed props are dropped", () => {
@@ -33,6 +40,11 @@ test("events never carry free text or personal data: unknown events and extra or
   assert.equal(eventProps("sprint_created", { length: 10 }), null);
   assert.equal(eventProps("starter_profile_used", { id: "Jane Doe" }), null, "template ids only");
   assert.equal(eventProps("outcome_viewed", { reasonCounts: { "a reason": 1 } }), null, "reason keys are codes");
+  assert.equal(eventProps("opportunity_viewed", { opportunity_id: "5f0c8a9e-1f6b-4f8e-9a77-1f2d3c4b5a69" }), null, "views carry no opportunity id");
+  assert.equal(eventProps("evidence_logged", { kind: "deposit", amount: 500 }), null, "evidence events carry no amounts");
+  assert.equal(eventProps("evidence_logged", { kind: "compliment" }), null);
+  assert.equal(eventProps("kit_generated", { kind: "pitch_deck" }), null);
+  assert.equal(eventProps("task_completed", { origin: "elsewhere" }), null);
 });
 
 test("props are capped at 8 KB, matching the database check", () => {
@@ -50,4 +62,12 @@ test("the server helper never throws and validates before writing", () => {
   assert.match(body, /^\s*try \{/m, "the whole body is guarded");
   assert.ok(body.indexOf("eventProps(") < body.indexOf(".insert("), "validation runs before the insert");
   assert.doesNotMatch(body, /\bthrow\b/);
+});
+
+test("daily events reset at midnight UTC", async () => {
+  const { utcDayStart, dailyEvents } = await import("../lib/events-core.ts");
+  assert.deepEqual([...dailyEvents], ["opportunity_viewed"]);
+  assert.equal(utcDayStart(new Date("2026-11-30T23:59:59.999Z")), "2026-11-30T00:00:00.000Z");
+  assert.equal(utcDayStart(new Date("2026-12-01T00:00:00.000Z")), "2026-12-01T00:00:00.000Z");
+  assert.equal(utcDayStart(new Date("2026-12-01T07:30:00+08:00")), "2026-11-30T00:00:00.000Z", "a Hong Kong morning is still the previous UTC day");
 });

@@ -209,7 +209,7 @@ export function SprintPanel({ sprint, send, busy, demo }: { sprint: Sprint; send
               <div className="flex min-w-0 flex-1 flex-col gap-1 sm:flex-row sm:items-start sm:gap-3">
               <div className="flex min-w-0 flex-1 flex-col gap-1">
                 <span className={cn("break-words font-medium", task.done_at && "text-muted-foreground line-through")}>{task.title}</span>
-                {task.detail && <span className="break-words text-sm leading-relaxed text-muted-foreground">{task.detail}</span>}
+                {task.detail && <span className="whitespace-pre-line break-words text-sm leading-relaxed text-muted-foreground">{task.detail}</span>}
                 {task.due_on && (
                   <span className={cn("flex items-center gap-1 text-xs", overdue ? "font-semibold text-destructive" : "text-muted-foreground")}>
                     <CalendarDays className="size-3.5" aria-hidden="true" />

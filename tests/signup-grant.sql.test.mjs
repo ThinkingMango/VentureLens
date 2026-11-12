@@ -17,7 +17,7 @@ const root = new URL("../", import.meta.url);
 const path = relative => fileURLToPath(new URL(relative, root));
 const psql = (url, args) => execFileSync("psql", [url, "-v", "ON_ERROR_STOP=1", "-X", "-q", "-A", "-t", ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
 
-test("one Gmail inbox gets one free run, whatever dots, case, +tags or googlemail.com it signs up with", { skip }, async t => {
+test("one Gmail inbox gets one free grant, whatever dots, case, +tags or googlemail.com it signs up with", { skip }, async t => {
   const name = `vl_signup_${process.pid}_${Date.now()}`;
   psql(server, ["-c", `create database ${name}`]);
   t.after(() => psql(server, ["-c", `drop database if exists ${name} with (force)`]));
@@ -39,6 +39,11 @@ test("one Gmail inbox gets one free run, whatever dots, case, +tags or googlemai
     return sql(`select count(*) from public.research_dev_access where user_id = '${id}'`) === "1";
   };
   assert.equal(signUp("janedoe@gmail.com"), true, "the first account for an inbox gets the free run");
+  // 20261111140000: the grant is 10 runs, valid for 90 days.
+  assert.equal(
+    sql(`select max_runs || ' ' || runs_used || ' ' || (expires_at - now() between interval '89 days 23 hours' and interval '90 days') from public.research_dev_access a join auth.users u on u.id = a.user_id where u.email = 'janedoe@gmail.com'`),
+    "10 0 true",
+  );
   for (const alias of ["jane.doe@gmail.com", "Jane.Doe+second@gmail.com", "janedoe@googlemail.com"])
     assert.equal(signUp(alias), false, `${alias} is the same inbox`);
   assert.equal(signUp("jane.doe@example.com"), true);

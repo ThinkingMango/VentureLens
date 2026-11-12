@@ -632,6 +632,8 @@ Calculated from existing tables over a chosen window (7 / 30 / 90 days):
 
 ## 6. Next and Later backlog (not in v1; brief specs to keep the design compatible)
 
+> **Triaged 2026-11-11:** see [`docs/ENHANCEMENT_PLAN.md`](./ENHANCEMENT_PLAN.md) for which items are kept, merged, deferred or dropped, and the work packages (WP-14 onwards) that build them.
+
 | # | Feature | Short spec | Priority |
 |---|---|---|---|
 | 12 | Competitor table from evidence | Evaluation outputs `competitors[] {name, url (must be a saved source URL), price_seen, observed_weakness, source_key}`; normaliser drops any entry without a matching source. Shown in the Evidence tab | Next |

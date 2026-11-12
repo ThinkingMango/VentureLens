@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
     let sprintId: string;
 
     if (input.action === "start") {
-      const { data, error } = await supabase.rpc("start_validation_sprint", { p_opportunity: input.opportunity_id, p_length: input.length, p_checklist: input.checklist });
+      const { data, error } = await supabase.rpc("start_validation_sprint", { p_opportunity: input.opportunity_id, p_length: input.length, p_checklist: input.checklist, p_labels: input.labels });
       if (error?.code === "P0002") return notFound();
       if (error?.code === "23505") return json({ code: "SPRINT_ACTIVE", error: "This opportunity already has an active sprint." }, 409);
       if (error || typeof data !== "string") throw error ?? new Error("SPRINT_NOT_STARTED");
@@ -114,7 +114,7 @@ export async function POST(request: NextRequest) {
         const { data: changed, error } = await (input.done ? update.is("done_at", null) : update.not("done_at", "is", null)).select("id");
         if (error) throw error;
         // Counted once per tick: ticking a task that is already done changes nothing and records nothing.
-        if (input.done && changed?.length) after(() => track("task_completed", { userId: user.id, props: {} }));
+        if (input.done && changed?.length) after(() => track("task_completed", { userId: user.id, props: { origin: "sprint" } }));
       } else {
         const { error } = await supabase.from("validation_tasks").delete().eq("id", input.task_id).eq("user_id", user.id);
         if (error) throw error;

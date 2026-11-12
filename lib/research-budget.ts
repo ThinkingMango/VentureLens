@@ -1,12 +1,12 @@
-import { researchModels, researchModelPricing, searchQueryAllowance, type ResearchModelId } from "./research-models.ts";
+import { researchModels, researchModelPricing, searchQueryAllowance, providerOfModel, type ResearchModelId, type ResearchProviderName } from "./research-models.ts";
 
 export type UnitPricing = { input: number; output: number; search: number };
 
 // Fixed context headroom added to every reservation for provider-side wrapping and tool instructions.
 export const RESERVATION_CONTEXT_HEADROOM = 12_000;
 
-export function providerOf(model: ResearchModelId): "qwen" | "gemini" {
-  return model.startsWith("qwen") ? "qwen" : "gemini";
+export function providerOf(model: ResearchModelId): ResearchProviderName {
+  return providerOfModel(model);
 }
 
 /**
@@ -33,11 +33,15 @@ export function reservationFor(model: ResearchModelId, pricing: UnitPricing, cal
 export const typicalRun = {
   candidates: 8,
   discovery: { inputTokens: 1_500, outputTokens: 2_000, promptBytes: 3_000 },
-  retrieval: { inputTokens: { gemini: 400, qwen: 8_000 }, queries: 2, promptBytes: 700 },
+  // Claude: not yet calibrated against the ledger. Its search results (page titles and content) are added to the
+  // search call's input; 20,000 tokens is a conservative estimate for two searches. Re-calibrate after real runs.
+  retrieval: { inputTokens: { gemini: 400, qwen: 8_000, claude: 20_000 }, queries: 2, promptBytes: 700 },
   classification: { calls: 4, inputTokens: 7_000, outputTokens: 2_500, promptBytes: 28_000 },
-  // Methodology v3 (WP-07): 3–12 claims per candidate add about 1,500 output tokens per batch of two. Re-calibrate
-  // against the usage ledger after real v3 runs.
-  evaluation: { calls: 4, inputTokens: 6_500, outputTokens: 4_500, promptBytes: 26_000 },
+  // Methodology v3 (WP-07): 3–12 claims per candidate add about 1,500 output tokens per batch of two. Next steps
+  // (WP-16): 2–3 compact steps per candidate add about 700 more (more in Chinese), and shorter validation steps save a
+  // little. A batch must stay under the model's output cap (7,000 for Qwen 3.8 Flash), so steps carry no message drafts.
+  // Re-calibrate against the usage ledger after real runs.
+  evaluation: { calls: 4, inputTokens: 6_800, outputTokens: 5_200, promptBytes: 27_500 },
   review: { calls: 4, inputTokens: 5_000, outputTokens: 1_500, promptBytes: 20_000 },
   systemBytes: 800,
   schemaBytes: 2_000,
@@ -52,7 +56,7 @@ export const typicalVerifyRun = {
   discovery: { inputTokens: 900, outputTokens: 250, promptBytes: 2_200 },
   searches: 2,
   classification: { calls: 1, inputTokens: 7_000, outputTokens: 2_500, promptBytes: 28_000 },
-  evaluation: { calls: 1, inputTokens: 3_800, outputTokens: 2_400, promptBytes: 14_000 },
+  evaluation: { calls: 1, inputTokens: 4_100, outputTokens: 2_750, promptBytes: 15_500 },
   review: { calls: 1, inputTokens: 2_800, outputTokens: 800, promptBytes: 10_000 },
 } as const;
 
@@ -74,12 +78,34 @@ export type RunCostEstimate = {
 };
 
 /**
- * Estimates what a complete run on one model costs and the budget it needs to finish. Estimates, not quotes.
- * `mode` "verify" estimates a single-idea run; every other mode runs the eight-candidate pipeline.
+ * How much a run researches, from the administrator's source policy (lib/source-policy.ts `runShape`). The default is
+ * the shape the calibration above describes: 8 ideas, 4 pages each, one search per idea.
  */
-export function estimateRunCost(model: ResearchModelId, at = new Date(), mode = "combined"): RunCostEstimate {
+export type RunShape = { candidates: number; pagesPerIdea: number; alternativesSearch: boolean };
+export const defaultRunShape: RunShape = { candidates: typicalRun.candidates, pagesPerIdea: 4, alternativesSearch: false };
+
+/** Model calls per stage for a run shape. Classification reads sources in batches of 8; evaluation and review take 2 ideas per call. */
+export function stageCalls(run: RunShape, mode = "combined") {
+  if (mode === "verify") {
+    return { searches: typicalVerifyRun.searches, classification: Math.ceil((run.pagesPerIdea * 2) / 8), evaluation: 1, review: 1 };
+  }
+  return {
+    searches: run.candidates * (run.alternativesSearch ? 2 : 1),
+    classification: Math.ceil((run.candidates * run.pagesPerIdea) / 8),
+    evaluation: Math.ceil(run.candidates / 2),
+    review: Math.ceil(run.candidates / 2),
+  };
+}
+
+/**
+ * Estimates what a complete run on one model costs and the budget it needs to finish. Estimates, not quotes.
+ * `mode` "verify" estimates a single-idea run; every other mode runs the multi-idea pipeline. `run` is the breadth and
+ * depth the source policy sets; more ideas, pages or searches cost more and need a larger budget.
+ */
+export function estimateRunCost(model: ResearchModelId, at = new Date(), mode = "combined", run: RunShape = defaultRunShape): RunCostEstimate {
   const verify = mode === "verify";
   const shape = verify ? typicalVerifyRun : typicalRun;
+  const counts = stageCalls(run, mode);
   const pricing = researchModelPricing(model, at);
   const provider = providerOf(model);
   const calls: { stage: string; reservation: number; actual: number }[] = [];
@@ -88,13 +114,15 @@ export function estimateRunCost(model: ResearchModelId, at = new Date(), mode = 
     calls.push({ stage, reservation, actual: shape.inputTokens * pricing.input + structuredOutputTokens(model, shape.outputTokens) * pricing.output });
   };
   structured("discovery", shape.discovery);
-  const searches = verify ? typicalVerifyRun.searches : typicalRun.candidates;
-  for (let i = 1; i <= searches; i++) {
+  // Searches in engine order: every idea's search, then (with the alternatives search) its second search.
+  const perIdea = !verify && run.alternativesSearch ? 2 : 1;
+  for (let i = 0; i < counts.searches; i++) {
     const reservation = reservationFor(model, pricing, { promptBytes: typicalRun.retrieval.promptBytes, search: true }).usd;
-    calls.push({ stage: verify ? (i === 1 ? "retrieval:c1" : "retrieval:c1:alt") : `retrieval:c${i}`, reservation, actual: typicalRun.retrieval.inputTokens[provider] * pricing.input + researchModels[model].searchOutputTokens * pricing.output + typicalRun.retrieval.queries * pricing.search });
+    const stage = verify ? (i === 0 ? "retrieval:c1" : "retrieval:c1:alt") : `retrieval:c${Math.floor(i / perIdea) + 1}${i % perIdea ? ":alt" : ""}`;
+    calls.push({ stage, reservation, actual: typicalRun.retrieval.inputTokens[provider] * pricing.input + researchModels[model].searchOutputTokens * pricing.output + typicalRun.retrieval.queries * pricing.search });
   }
   for (const stage of ["classification", "evaluation", "review"] as const) {
-    for (let i = 0; i < shape[stage].calls; i++) structured(`${stage}:batch:${i}`, shape[stage]);
+    for (let i = 0; i < counts[stage]; i++) structured(`${stage}:batch:${i}`, shape[stage]);
   }
   let spent = 0;
   let requiredUsd = 0;
@@ -107,6 +135,6 @@ export function estimateRunCost(model: ResearchModelId, at = new Date(), mode = 
   return { model, expectedUsd: round(spent), requiredUsd: round(requiredUsd), peakStage };
 }
 
-export function fitsBudget(model: ResearchModelId, budgetUsd: number, at = new Date(), mode = "combined") {
-  return estimateRunCost(model, at, mode).requiredUsd <= budgetUsd;
+export function fitsBudget(model: ResearchModelId, budgetUsd: number, at = new Date(), mode = "combined", run: RunShape = defaultRunShape) {
+  return estimateRunCost(model, at, mode, run).requiredUsd <= budgetUsd;
 }

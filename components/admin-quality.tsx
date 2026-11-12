@@ -7,6 +7,7 @@ import { formatDuration, modeLabel } from "@/components/admin-labels";
 import { flagReasons, type FeedbackMetrics, type FlagReason } from "@/lib/feedback-core";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { metricWindows } from "@/lib/quality-metrics";
+import { FOLLOW_DAYS, funnelSteps, type FunnelStep, type ValidationFunnel } from "@/lib/validation-funnel";
 import type { QualityReport } from "@/lib/admin-runs";
 import { cn } from "@/lib/utils";
 
@@ -104,12 +105,114 @@ export function AdminQuality({ report }: { report: QualityReport }) {
           </CardContent>
         </Card>
       </div>
+      <FunnelSection funnel={report.funnel} days={days} />
       <FeedbackSection feedback={report.feedback} />
     </div>
   );
 }
 
 type Copy = ReturnType<typeof useCopy>;
+function stepLabel(copy: Copy, step: FunnelStep) {
+  switch (step) {
+    case "viewed": return copy("Opened an opportunity");
+    case "sprint": return copy("Started a sprint");
+    case "task": return copy("Completed a task");
+    case "evidence": return copy("Logged first-hand evidence");
+    case "decision": return copy("Recorded a decision");
+  }
+}
+
+/** Validation funnel (WP-15): what founders did in the 30 days after their first report. Founder counts only. */
+function FunnelSection({ funnel, days }: { funnel: ValidationFunnel | null; days: number }) {
+  const copy = useCopy();
+  const formats = useFormats();
+  const percent = (value: number | null) => (value === null ? "—" : formats.number(value, { style: "percent", maximumFractionDigits: 0 }));
+  const share = (n: number, of: number) => (of > 0 ? percent(n / of) : "—");
+  return (
+    <section aria-labelledby="funnel-heading" className="flex flex-col gap-4">
+      <h2 id="funnel-heading" className="text-lg font-semibold">{copy("Validation funnel")}</h2>
+      {!funnel ? <p className="text-sm text-muted-foreground">{copy("Product events could not be read.")}</p> : (
+        <>
+          <p className="text-sm text-muted-foreground text-pretty">
+            {copy("{founders} founders received their first report in the last {days} days. Each step counts founders who took it within {follow} days of that report; {maturing} of them have had fewer than {follow} days so far, so later steps can still grow.", {
+              founders: funnel.founders, days, follow: FOLLOW_DAYS, maturing: funnel.maturing,
+            })}
+          </p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Metric
+              label={copy("30-day action rate")}
+              value={percent(funnel.actionRate.rate)}
+              definition={copy("Founders who completed a validation task or logged first-hand evidence within {follow} days of their first report ÷ founders whose first report was between {from} and {to}, so all of them have had the full {follow} days ({acted} of {n}).", {
+                follow: FOLLOW_DAYS, from: formats.date(funnel.actionRate.from), to: formats.date(funnel.actionRate.to), acted: funnel.actionRate.acted, n: funnel.actionRate.founders,
+              })}
+            />
+            <Metric
+              label={copy("Days to first completed task")}
+              value={funnel.medianDaysToFirstTask === null ? "—" : formats.number(funnel.medianDaysToFirstTask, { maximumFractionDigits: 1 })}
+              definition={copy("Median days from the first report to the first completed task, among founders in this window who completed one.")}
+            />
+          </div>
+          <Card>
+            <CardHeader>
+              <CardTitle>{copy("Steps after the first report")}</CardTitle>
+              <CardDescription>{copy("Founders in this window who reached each step, and their share of the window's founders. A step can be reached without the one before it.")}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <dl className="grid grid-cols-[1fr_auto_auto] gap-x-6 gap-y-2 text-sm">
+                <div className="contents">
+                  <dt>{copy("Received a first report")}</dt>
+                  <dd className="tabular-nums">{funnel.founders}</dd>
+                  <dd className="tabular-nums text-muted-foreground">{share(funnel.founders, funnel.founders)}</dd>
+                </div>
+                {funnelSteps.map(step => (
+                  <div key={step} className="contents">
+                    <dt>{stepLabel(copy, step)}</dt>
+                    <dd className="tabular-nums">{funnel.steps[step]}</dd>
+                    <dd className="tabular-nums text-muted-foreground">{share(funnel.steps[step], funnel.founders)}</dd>
+                  </div>
+                ))}
+              </dl>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>{copy("By week of first report")}</CardTitle>
+              <CardDescription>{copy("Weeks start on Monday (UTC). The action rate counts only founders who have had the full {follow} days; until then it shows a dash.", { follow: FOLLOW_DAYS })}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {funnel.weeks.length === 0 ? <p className="text-sm text-muted-foreground">{copy("No first reports in this window.")}</p> : (
+                <div className="-mx-2 overflow-x-auto px-2">
+                  <table className="w-full min-w-[36rem] text-sm">
+                    <caption className="sr-only">{copy("Validation funnel by week of first report")}</caption>
+                    <thead className="text-left text-xs text-muted-foreground">
+                      <tr>
+                        <th scope="col" className="py-2 pr-4 font-medium">{copy("Week of")}</th>
+                        <th scope="col" className="py-2 pr-4 font-medium">{copy("Founders")}</th>
+                        {funnelSteps.map(step => <th key={step} scope="col" className="py-2 pr-4 font-medium">{stepLabel(copy, step)}</th>)}
+                        <th scope="col" className="py-2 font-medium">{copy("30-day action rate")}</th>
+                      </tr>
+                    </thead>
+                    <tbody className="tabular-nums">
+                      {funnel.weeks.map(row => (
+                        <tr key={row.week} className="border-t">
+                          <th scope="row" className="py-2 pr-4 text-left font-normal">{formats.date(`${row.week}T00:00:00Z`)}</th>
+                          <td className="py-2 pr-4">{row.founders}</td>
+                          {funnelSteps.map(step => <td key={step} className="py-2 pr-4">{row.steps[step]}</td>)}
+                          <td className="py-2">{row.actionRate === null ? "—" : copy("{rate} ({acted} of {n})", { rate: percent(row.actionRate), acted: row.acted, n: row.mature })}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </>
+      )}
+    </section>
+  );
+}
+
 function reasonLabel(copy: Copy, reason: FlagReason) {
   switch (reason) {
     case "wrong": return copy("Wrong or not supported by the source");

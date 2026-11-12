@@ -82,7 +82,7 @@ test("live billing shows the same research allowance as the sidebar and never cl
     "sonner": { toast: { info: () => {} } },
     "@/components/shared": { PageHeader: ({ title, description }) => createElement("header", null, title, " ", description), DemoNote: () => null },
     "@/components/ui/button": { Button: passthrough }, "@/components/ui/badge": { Badge: passthrough },
-    "@/components/pricing": { PricingCards: () => null },
+    "@/components/pricing": { PlanTable: () => null },
     "@/components/demo-provider": { useDemo: () => ({ isDemo: false }) },
     "@/components/research-access-card": { ResearchAccessCard: () => createElement("aside", null, "ACCESS-CARD") },
   });

@@ -9,8 +9,9 @@ import { researchProviderSettings } from "@/lib/provider-settings";
 import { providerPlan } from "@/lib/provider-settings-core";
 import { selectedModel } from "@/lib/research-models";
 import { QWEN_PROVIDER } from "@/lib/qwen-core";
+import { CLAUDE_PROVIDER } from "@/lib/claude-core";
 import { GEMINI_PROVIDER } from "@/lib/research-fallback-core";
-import { outcomeSchema } from "@/lib/research-core";
+import { outcomeSchema, interruptionFor, DISPATCH_GRACE_MS, type ActiveRun } from "@/lib/research-core";
 import { PROGRESS_SOURCES, estimateMinutes, progressSource, type RunProgress } from "@/lib/research-progress";
 
 export async function dispatchResearch(id: string, userId: string) {
@@ -54,28 +55,83 @@ async function startResearchWorkflow(id: string, userId: string, retryCount: num
     return run.runId;
   }
 }
+async function workflowStatus(workflowId: string | null): Promise<string | null> {
+  if (!workflowId) return null;
+  try {
+    return await getRun(workflowId).status;
+  } catch {
+    // Observability outages must not mark a still-running durable job as failed.
+    return null;
+  }
+}
+/** Best-effort stop of a durable workflow; the run row is already final, so a failure here only costs a wasted step. */
+async function stopWorkflow(workflowId: string | null, reason: string) {
+  if (!workflowId) return;
+  try {
+    await getRun(workflowId).cancel({ cancelReason: reason });
+  } catch (error) {
+    console.warn("[research] workflow could not be cancelled", { workflowId, reason, message: error instanceof Error ? error.message : String(error) });
+  }
+}
+type RecoverableRun = ActiveRun & { id: string; user_id: string };
+/**
+ * Ends one active run that can no longer finish (see interruptionFor), and stops its workflow when it may still be
+ * alive. The update is conditional on the row not having changed since it was read, so it never overwrites a run
+ * that moved on meanwhile. The refund trigger decides quota_released in the same update, so it is read back.
+ */
+export async function recoverRun(run: RecoverableRun, now = Date.now()) {
+  const code = interruptionFor(run, await workflowStatus(run.workflow_id), now);
+  if (!code) return null;
+  const completedAt = new Date(now).toISOString();
+  const { data, error } = await createAdminClient().from("research_runs").update({ status: "failed", error_code: code, completed_at: completedAt }).eq("id", run.id).eq("user_id", run.user_id).eq("status", run.status).eq("updated_at", run.updated_at).select("id,quota_released");
+  if (error) throw new Error("WORKFLOW_INTERRUPTED");
+  if (!data?.length) return null;
+  await stopWorkflow(run.workflow_id, `stale run ended as ${code}`);
+  return { code, completedAt, quotaReleased: data[0].quota_released as boolean };
+}
+/**
+ * Stale-run cleanup: checks active runs that have not changed for the dispatch grace period, oldest first, and ends
+ * the ones that can no longer finish. With a user id it checks only that founder's runs (before starting a new run,
+ * so a stuck run never blocks the next one); without, every founder's (the scheduled cleanup).
+ */
+export async function sweepStaleRuns({ userId, limit = 100, now = Date.now() }: { userId?: string; limit?: number; now?: number } = {}) {
+  let query = createAdminClient().from("research_runs").select("id,user_id,status,workflow_id,updated_at,created_at,started_at")
+    .in("status", ["pending", "running"]).lt("updated_at", new Date(now - DISPATCH_GRACE_MS).toISOString())
+    .order("updated_at", { ascending: true }).limit(limit);
+  if (userId) query = query.eq("user_id", userId);
+  const { data, error } = await query;
+  if (error) throw new Error("WORKFLOW_INTERRUPTED");
+  const ended: { id: string; code: string }[] = [];
+  for (const run of data ?? []) {
+    try {
+      const result = await recoverRun(run as RecoverableRun, now);
+      if (result) ended.push({ id: run.id, code: result.code });
+    } catch (failure) {
+      console.error("[research] stale run could not be ended", { run: run.id, message: failure instanceof Error ? failure.message : String(failure) });
+    }
+  }
+  return { checked: data?.length ?? 0, ended };
+}
+/**
+ * The founder stops their own active run. cancel_research_run runs as the founder (auth.uid()), so it can only touch
+ * their own run; the workflow is then stopped so no further step starts. Returns false when the run is not active.
+ */
+export async function cancelResearch(supabase: Awaited<ReturnType<typeof createClient>>, id: string) {
+  const { data, error } = await supabase.rpc("cancel_research_run", { p_run: id });
+  if (error?.code === "P0002") throw new Error("NOT_FOUND");
+  if (error?.code === "55000") return false;
+  if (error) throw new Error("WORKFLOW_INTERRUPTED");
+  await stopWorkflow(typeof data === "string" ? data : null, "cancelled by the founder");
+  return true;
+}
 export async function researchDetail(supabase: Awaited<ReturnType<typeof createClient>>, userId: string, id: string): Promise<ResearchDetail | null> {
-  const result = await supabase.from("research_runs").select("id,status,stage,error_code,retry_count,configuration,report,created_at,completed_at,workflow_id,updated_at,budget_usd,quota_released").eq("id", id).eq("user_id", userId).maybeSingle();
+  const result = await supabase.from("research_runs").select("id,status,stage,error_code,retry_count,configuration,report,created_at,started_at,completed_at,workflow_id,updated_at,budget_usd,quota_released").eq("id", id).eq("user_id", userId).maybeSingle();
   if (result.error) throw new Error("WORKFLOW_INTERRUPTED");
   if (!result.data) return null;
   const run = result.data;
-  let interrupted: string | null = null;
   if (["pending", "running"].includes(run.status)) {
-    if (run.workflow_id) {
-      try {
-        const status = await getRun(run.workflow_id).status;
-        if (["failed", "cancelled", "completed"].includes(status)) interrupted = "WORKFLOW_INTERRUPTED";
-      } catch {
-        // Observability outages must not mark a still-running durable job as failed.
-      }
-    } else if (Date.now() - new Date(run.updated_at).getTime() > 300000) interrupted = "DISPATCH_FAILED";
-    if (interrupted) {
-      const completedAt = new Date().toISOString();
-      const { data: recovered, error } = await createAdminClient().from("research_runs").update({ status: "failed", error_code: interrupted, completed_at: completedAt }).eq("id", id).eq("user_id", userId).eq("status", run.status).eq("updated_at", run.updated_at).select("id,quota_released");
-      if (error) throw new Error("WORKFLOW_INTERRUPTED");
-      // The refund trigger decides quota_released in the same update, so read it back rather than assume it.
-      if (recovered?.length) { run.status = "failed"; run.error_code = interrupted; run.completed_at = completedAt; run.quota_released = recovered[0].quota_released; }
-    }
+    const recovered = await recoverRun({ ...run, user_id: userId });
+    if (recovered) { run.status = "failed"; run.error_code = recovered.code; run.completed_at = recovered.completedAt; run.quota_released = recovered.quotaReleased; }
   }
   const [steps, usage, budgetBlock, setup, outcomeRow] = await Promise.all([
     supabase.from("research_stages").select("stage_key,created_at").eq("run_id", id).eq("user_id", userId).order("created_at"),
@@ -142,14 +198,18 @@ async function typicalMinutes(mode: string): Promise<number | null> {
 // Which model a run uses: the recorded choice once the run has initialized, otherwise the configured primary.
 async function describeModel(setupOutput: unknown, usage: { provider?: string | null; model?: string | null }[]): Promise<ResearchModelInfo> {
   const used = [...new Set(usage.map(row => row.model).filter((value): value is string => typeof value === "string" && value.length > 0))];
-  const setup = setupOutput && typeof setupOutput === "object" ? setupOutput as { provider?: unknown; model?: unknown } : null;
+  const setup = setupOutput && typeof setupOutput === "object" ? setupOutput as { provider?: unknown; model?: unknown; primary_skipped?: { model?: unknown; required_usd?: unknown; budget_usd?: unknown } } : null;
   if (setup && typeof setup.model === "string") {
-    return { provider: typeof setup.provider === "string" ? setup.provider : null, model: setup.model, planned: false, used };
+    const skipped = setup.primary_skipped;
+    const primary_skipped = skipped && typeof skipped.model === "string" && Number.isFinite(skipped.required_usd) && Number.isFinite(skipped.budget_usd)
+      ? { model: skipped.model, required_usd: Number(skipped.required_usd), budget_usd: Number(skipped.budget_usd) }
+      : undefined;
+    return { provider: typeof setup.provider === "string" ? setup.provider : null, model: setup.model, planned: false, used, ...(primary_skipped ? { primary_skipped } : {}) };
   }
   try {
     const settings = await researchProviderSettings();
     const plan = providerPlan(settings);
-    return { provider: plan.primary === "gemini" ? GEMINI_PROVIDER : QWEN_PROVIDER, model: selectedModel(plan.primary, settings), planned: true, used };
+    return { provider: plan.primary === "gemini" ? GEMINI_PROVIDER : plan.primary === "claude" ? CLAUDE_PROVIDER : QWEN_PROVIDER, model: selectedModel(plan.primary, settings), planned: true, used };
   } catch {
     return { provider: null, model: null, planned: true, used };
   }

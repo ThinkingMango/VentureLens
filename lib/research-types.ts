@@ -21,6 +21,8 @@ export type ResearchModelInfo = {
   // true when the run has not initialized yet and this is the configured primary, not a recorded choice
   planned: boolean;
   used: string[];
+  /** Set when the configured primary model could not finish within the run's budget and the run started on the fallback. */
+  primary_skipped?: { model: string; required_usd: number; budget_usd: number };
 };
 export type ResearchDetail = {
   id: string;

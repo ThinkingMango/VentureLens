@@ -11,14 +11,15 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldContent, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Separator } from "@/components/ui/separator";
-import { providerPlan, runCostEstimates, parseBudgetInput, settleBudgetInput, MIN_RESEARCH_BUDGET_USD, MAX_RESEARCH_BUDGET_USD, type ProviderSettings, type ProviderSettingsResponse, type ResearchProvider } from "@/lib/provider-settings-core";
+import { providerPlan, fallbackFor, runCostEstimates, recommendedBudget, parseBudgetInput, settleBudgetInput, resolveSourcePolicy, sameSourcePolicy, MIN_RESEARCH_BUDGET_USD, MAX_RESEARCH_BUDGET_USD, type ResearchSettings, type ProviderSettingsResponse, type ResearchProvider } from "@/lib/provider-settings-core";
 import { useFormats } from "@/i18n/use-copy";
 import { ProviderModelField } from "@/components/provider-model-field";
-import { selectedModel, researchModels, qwenModelSchema, geminiModelSchema } from "@/lib/research-models";
+import { AdminSources } from "@/components/admin-sources";
+import { selectedModel, researchModels, researchProviders, qwenModelSchema, geminiModelSchema, claudeModelSchema } from "@/lib/research-models";
 
 const endpoint = "/api/admin/providers";
-const names = { qwen: "Qwen", gemini: "Gemini" };
-const providerNames = ["qwen", "gemini"] as const;
+const names: Record<ResearchProvider, string> = { qwen: "Qwen", gemini: "Gemini", claude: "Claude" };
+const providerNames = researchProviders;
 async function loadSettings(): Promise<ProviderSettingsResponse> {
   const response = await fetch(endpoint, { cache: "no-store" });
   if (!response.ok) throw new Error("SETTINGS_UNAVAILABLE");
@@ -29,21 +30,29 @@ export function AdminProviders({ initialData }: { initialData: ProviderSettingsR
   const t = useTranslations("admin");
   const formats = useFormats();
   const { data = initialData, error: loadError, mutate, isValidating } = useSWR(endpoint, loadSettings, { fallbackData: initialData });
-  const [draft, setDraft] = useState<ProviderSettings | null>(null);
+  const [draft, setDraft] = useState<ResearchSettings | null>(null);
   // The budget text while it is being typed; null shows the saved or drafted value.
   const [budgetText, setBudgetText] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<"saveFailed" | "notConfigured" | "accessExpired" | "budgetTooLowSaved" | null>(null);
   const settings = draft ?? data.settings;
-  const changed = settings.primary !== data.settings.primary || settings.autoFallback !== data.settings.autoFallback || settings.qwenModel !== data.settings.qwenModel || settings.geminiModel !== data.settings.geminiModel || settings.budgetUsd !== data.settings.budgetUsd;
+  // A stored row without a source policy researches on the defaults, so it is shown and compared as the defaults.
+  const sources = resolveSourcePolicy(settings.sources);
+  // The fallback is compared as resolved: a row saved before the choice existed has the same fallback it always had.
+  const fallbackProvider = fallbackFor(settings);
+  const changed = settings.primary !== data.settings.primary || settings.autoFallback !== data.settings.autoFallback || fallbackProvider !== fallbackFor(data.settings) || settings.qwenModel !== data.settings.qwenModel || settings.geminiModel !== data.settings.geminiModel || settings.claudeModel !== data.settings.claudeModel || settings.budgetUsd !== data.settings.budgetUsd || !sameSourcePolicy(sources, data.settings.sources);
   const plan = providerPlan(settings);
   const configured = data.providers[plan.primary].configured && (!plan.fallback || data.providers[plan.fallback].configured);
   const estimates = runCostEstimates(settings);
-  const primaryFits = estimates.primary.requiredUsd <= settings.budgetUsd;
+  // The primary must fit with headroom (BUDGET_HEADROOM), the same rule the server applies on save.
+  const primaryBudget = recommendedBudget(estimates.primary.requiredUsd);
+  const primaryFits = primaryBudget <= settings.budgetUsd;
   const fallbackFits = !estimates.fallback || estimates.fallback.requiredUsd <= settings.budgetUsd;
 
-  function change(patch: Partial<ProviderSettings>) {
-    setDraft({ primary: settings.primary, autoFallback: settings.autoFallback, qwenModel: settings.qwenModel, geminiModel: settings.geminiModel, budgetUsd: settings.budgetUsd, ...patch });
+  function change(patch: Partial<ResearchSettings>) {
+    const next = { primary: settings.primary, autoFallback: settings.autoFallback, fallbackProvider, qwenModel: settings.qwenModel, geminiModel: settings.geminiModel, claudeModel: settings.claudeModel, budgetUsd: settings.budgetUsd, sources, ...patch };
+    // A primary that takes the fallback's place moves the fallback to that primary's default partner.
+    setDraft({ ...next, fallbackProvider: fallbackFor(next) });
     setSaveError(null);
   }
 
@@ -55,7 +64,7 @@ export function AdminProviders({ initialData }: { initialData: ProviderSettingsR
     try {
       const response = await fetch(endpoint, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ primary: settings.primary, autoFallback: settings.autoFallback, qwenModel: settings.qwenModel, geminiModel: settings.geminiModel, budgetUsd: settings.budgetUsd }),
+        body: JSON.stringify({ primary: settings.primary, autoFallback: settings.autoFallback, fallbackProvider, qwenModel: settings.qwenModel, geminiModel: settings.geminiModel, claudeModel: settings.claudeModel, budgetUsd: settings.budgetUsd, sources }),
       });
       if (!response.ok) {
         const body = await response.json().catch(() => ({}));
@@ -101,6 +110,7 @@ export function AdminProviders({ initialData }: { initialData: ProviderSettingsR
                 </Field>
                 <ProviderModelField provider="qwen" model={settings.qwenModel} disabled={saving || !!loadError} onChange={model => change({ qwenModel: qwenModelSchema.parse(model) })} />
                 <ProviderModelField provider="gemini" model={settings.geminiModel} disabled={saving || !!loadError} onChange={model => change({ geminiModel: geminiModelSchema.parse(model) })} />
+                <ProviderModelField provider="claude" model={settings.claudeModel} disabled={saving || !!loadError} onChange={model => change({ claudeModel: claudeModelSchema.parse(model) })} />
                 <p className="text-sm leading-relaxed text-muted-foreground">{t("modelBudget")}</p>
                 <Field data-disabled={saving}>
                   <FieldLabel htmlFor="research-budget">{t("budget")}</FieldLabel>
@@ -127,15 +137,32 @@ export function AdminProviders({ initialData }: { initialData: ProviderSettingsR
                     <FieldDescription id="fallback-help">{t("fallbackHelp")}</FieldDescription>
                   </FieldContent>
                 </Field>
+                {settings.autoFallback && (
+                  <Field data-disabled={saving}>
+                    <FieldLabel htmlFor="fallback-provider">{t("fallbackProvider")}</FieldLabel>
+                    <select
+                      id="fallback-provider" value={fallbackProvider} disabled={saving || !!loadError}
+                      onChange={event => change({ fallbackProvider: event.target.value as ResearchProvider })}
+                      aria-describedby="fallback-provider-help"
+                      className="h-12 w-full rounded-md border bg-card px-3 text-base text-foreground md:max-w-sm"
+                    >
+                      {providerNames.filter(provider => provider !== settings.primary).map(provider => <option key={provider} value={provider}>{names[provider]}</option>)}
+                    </select>
+                    <FieldDescription id="fallback-provider-help">{t("fallbackProviderHelp")}</FieldDescription>
+                  </Field>
+                )}
+                <Separator />
+                <AdminSources policy={sources} disabled={saving || !!loadError} onChange={policy => change({ sources: policy })} />
+                <Separator />
                 <div className="flex flex-col gap-3 rounded-lg bg-background p-4 text-foreground" role="status" aria-live="polite">
                   <p className="text-sm font-medium">{t("nextRun")}</p>
                   <p className="flex flex-wrap items-center gap-2 font-medium">
                     {researchModels[selectedModel(plan.primary, settings)].name}
                     {plan.fallback ? <><ArrowRight className="size-4 text-muted-foreground" aria-hidden="true" />{researchModels[selectedModel(plan.fallback, settings)].name}</> : <span className="text-sm font-normal text-muted-foreground">· {t("noFallback")}</span>}
                   </p>
-                  <p className="text-sm text-muted-foreground">{t("costEstimate", { expected: formats.usd(estimates.primary.expectedUsd, 2), required: formats.usd(estimates.primary.requiredUsd, 2) })}</p>
+                  <p className="text-sm text-muted-foreground">{t("costEstimate", { expected: formats.usd(estimates.primary.expectedUsd, 2), required: formats.usd(primaryBudget, 2) })}</p>
                   <p className="text-sm text-muted-foreground">{t("verifyEstimate", { expected: formats.usd(estimates.verify.primary.expectedUsd, 2), required: formats.usd(estimates.verify.primary.requiredUsd, 2) })}</p>
-                  {!primaryFits && <p className="text-sm font-medium text-destructive">{t("budgetTooLow", { model: researchModels[estimates.primary.model].name, required: formats.usd(estimates.primary.requiredUsd, 2) })}</p>}
+                  {!primaryFits && <p className="text-sm font-medium text-destructive">{t("budgetTooLow", { model: researchModels[estimates.primary.model].name, required: formats.usd(primaryBudget, 2) })}</p>}
                   {primaryFits && !fallbackFits && estimates.fallback && <p className="text-sm text-muted-foreground">{t("fallbackOverBudget", { model: researchModels[estimates.fallback.model].name, required: formats.usd(estimates.fallback.requiredUsd, 2) })}</p>}
                   <p className="text-sm text-muted-foreground">{t("fallbackLimit")}</p>
                 </div>

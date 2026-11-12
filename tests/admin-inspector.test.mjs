@@ -154,3 +154,11 @@ test("usage stages, provider switches and the stage timeline", () => {
     { key: "discovery", created_at: t(2), bytes: 10 },
   ]);
 });
+
+test("the inspector tells a timed-out search apart from an empty one, and shows a skipped configured model", () => {
+  const retrieval = { c1: { evidence: [] }, c2: { evidence: [], skipped: "RETRIEVAL_UNAVAILABLE" }, c3: { evidence: [], skipped: "TRANSIENT_PROVIDER" } };
+  const diagnostics = candidateDiagnostics({ keys: ["c1", "c2", "c3"], retrieval, evidence: [], classifications: null });
+  assert.deepEqual(diagnostics.map(d => d.retrieval), ["searched", "skipped", "failed"]);
+  const setup = { model: "qwen3.8-flash", fallback_allowed: false, primary_skipped: { provider: "gemini", model: "gemini-3.8-flash", required_usd: 0.5675, budget_usd: 0.55 }, brief: { name: "Private" } };
+  assert.deepEqual(structuralSetup(setup), { model: "qwen3.8-flash", fallback_allowed: false, primary_skipped: "gemini-3.8-flash", primary_required_usd: 0.5675 });
+});

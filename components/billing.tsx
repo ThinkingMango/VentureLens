@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { PageHeader, DemoNote } from "@/components/shared";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { PricingCards } from "@/components/pricing";
+import { PlanTable } from "@/components/pricing";
 import { useDemo } from "@/components/demo-provider";
 import { ResearchAccessCard } from "@/components/research-access-card";
 export function Billing() {
@@ -114,7 +114,7 @@ export function Billing() {
             )}
           </p>
         </div>
-        <PricingCards />
+        <PlanTable bleed={false} />
       </section>
       <section className="surface overflow-hidden">
         <h2 className="border-b px-6 py-5 text-lg font-semibold">

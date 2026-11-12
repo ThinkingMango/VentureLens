@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { isAdministrator } from "@/lib/admin-access";
 import { administratorSettings, saveProviderSettings } from "@/lib/provider-settings";
-import { providerSettingsSchema } from "@/lib/provider-settings-core";
+import { researchSettingsSchema } from "@/lib/provider-settings-core";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -41,7 +41,7 @@ export async function PATCH(request: NextRequest) {
     if (Number(request.headers.get("content-length") ?? 0) > 1024) return json({ code: "INVALID_INPUT" }, 413);
     const raw = await request.text();
     if (Buffer.byteLength(raw) > 1024) return json({ code: "INVALID_INPUT" }, 413);
-    const parsed = providerSettingsSchema.safeParse(JSON.parse(raw));
+    const parsed = researchSettingsSchema.safeParse(JSON.parse(raw));
     if (!parsed.success) return json({ code: "INVALID_INPUT" }, 400);
     return json(await saveProviderSettings(user.id, parsed.data));
   } catch (error) {

@@ -69,6 +69,8 @@ function buildSections(disclosure: ProviderDisclosure): Section[] {
         ["Improve the product", "To measure, in aggregate, how research runs perform and which features are used."],
         ["Service messages", "To send sign-in codes and essential notices about your account or this policy. We do not send marketing email."],
         ["Research notifications", "To email you when a research run finishes or stops, if you leave this on in your profile. The email names the run and its outcome; your profile, briefs and reports are not included."],
+        ["Shared reports", "To show a report you choose to share to anyone who has its link, for 90 days or until you turn the link off. The shared page leaves out your profile, your brief and each score's rationale, and is not listed or indexed."],
+        ["Weekly progress emails", "While you have an active validation sprint, to email you once a week with your next task, its details and the opportunity's title, unless you turn this off in your profile or with the link in the email."],
       ],
       after: [
         "We do not sell or rent your personal information, use it for advertising, or train our own AI models on your content.",
@@ -92,7 +94,7 @@ function buildSections(disclosure: ProviderDisclosure): Section[] {
       items: [
         ["Supabase", "Database, authentication, and sign-in emails."],
         ["Vercel", "Website hosting, background research jobs, and server logs."],
-        ["Hostinger", "Research notification emails, sent from our mailbox: your email address, the run's name and its outcome."],
+        ["Hostinger", "Notification emails, sent from our mailbox: your email address, and the run's name and outcome or your next sprint task and the opportunity's title."],
         ...modelProcessors(disclosure),
       ],
       after: [
@@ -124,7 +126,8 @@ function buildSections(disclosure: ProviderDisclosure): Section[] {
       title: "How long we keep your information",
       body: [
         "We keep your account, profile, briefs, research, and saved items while your account is active, so you can return to your research history.",
-        "When your account is deleted, your profile, briefs, research runs, evidence, usage records, and saved items are deleted with it. Copies in provider backups and logs expire on those providers' schedules.",
+        "When your account is deleted, your profile, briefs, research runs, evidence, saved items, sprints, feedback and email settings are deleted with it. The cost records of your research (the model, token counts and cost of each call) are kept for our cost accounting, without any link to you. Copies in provider backups and logs expire on those providers' schedules.",
+        "If your account received free research runs, we keep a one-way code made from your email address (a SHA-256 hash, not the address itself) for 12 months after you delete it, so a new account with the same address does not receive the free runs again.",
         "Product usage events are kept to measure the product over time. When your account is deleted, they are kept without any link to you.",
         "When you delete a research run, its report, opportunities, sources and sprints are deleted. Its cost records (the model, token counts and cost of each call) are kept for our cost accounting, without any link to you or the run.",
         "We keep support emails only as long as needed to resolve your request and keep a reasonable record of it.",
@@ -135,7 +138,7 @@ function buildSections(disclosure: ProviderDisclosure): Section[] {
       title: "Your rights and choices",
       body: [
         "Depending on where you live, you may have the right to access, correct, export, or delete your personal information, to object to or restrict certain processing, and to withdraw consent. We extend these choices to every user.",
-        "You can update your founder profile in your workspace at any time. For anything else, including deleting your account, email us from the address on your account. We may need to confirm your identity, and we aim to respond within 30 days.",
+        "You can update your founder profile, download all of your data as a file, and delete your account yourself on your profile page at any time. For anything else, email us from the address on your account. We may need to confirm your identity, and we aim to respond within 30 days.",
         "If you are not satisfied with our response, you can contact your local data protection authority.",
       ],
     },
@@ -167,17 +170,19 @@ function buildSections(disclosure: ProviderDisclosure): Section[] {
 const primaryProcessing: Record<DisclosedProvider["provider"], string> = {
   qwen: "Research runs currently use {model} through Alibaba Cloud Model Studio, which processes requests in mainland China (Beijing region).",
   gemini: "Research runs currently use {model} through the Google Gemini API.",
+  claude: "Research runs currently use {model} through the Anthropic Claude API.",
 };
 const fallbackProcessing: Record<DisclosedProvider["provider"], string> = {
   qwen: "If it is unavailable, a run may fall back to {model} through Alibaba Cloud Model Studio, which processes requests in mainland China (Beijing region).",
   gemini: "If it is unavailable, a run may fall back to {model} through the Google Gemini API.",
+  claude: "If it is unavailable, a run may fall back to {model} through the Anthropic Claude API.",
 };
 
 /** The paragraphs that name the AI providers new research runs use, following the saved research policy. */
 export function modelProcessing(disclosure: ProviderDisclosure): Text[] {
   if (!disclosure.known)
   return [
-      "Research runs use Qwen through Alibaba Cloud Model Studio, which processes requests in mainland China (Beijing region), or the Google Gemini API, as chosen by an administrator.",
+      "Research runs use Qwen through Alibaba Cloud Model Studio, which processes requests in mainland China (Beijing region), the Google Gemini API, or the Anthropic Claude API, as chosen by an administrator.",
       "An administrator chooses the provider for all new runs. A run that has already started keeps the settings it started with.",
     ];
   const model = (provider: DisclosedProvider) => ({ model: provider.modelName });
@@ -200,6 +205,11 @@ const processorRoles: Record<DisclosedProvider["provider"], Record<"primary" | "
     primary: "Primary AI model (Gemini) and web search for research runs.",
     fallback: "Fallback AI model (Gemini) and web search for research runs.",
     either: "AI model (Gemini) and web search for research runs.",
+  },
+  claude: {
+    primary: "Primary AI model (Claude) and web search for research runs.",
+    fallback: "Fallback AI model (Claude) and web search for research runs.",
+    either: "AI model (Claude) and web search for research runs.",
   },
 };
 

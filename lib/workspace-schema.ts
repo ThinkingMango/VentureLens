@@ -193,6 +193,18 @@ export const opportunitySchema = z.object({
     confirm: z.string().optional(),
   })).optional(),
   methodology_version: z.number().int().optional(),
+  // WP-16: next steps, each tied to an assumption and, where possible, to one of the sources above. Older payloads have
+  // none and keep the fixed first steps. Mirrors stepSchema in lib/research-core.ts.
+  steps: z.array(z.object({
+    action: z.string(),
+    where: z.string().nullable(),
+    where_hint: z.string(),
+    done_when: z.string(),
+    stop_if: z.string(),
+    tests_assumption: z.number().int().nullable(),
+    day: z.number().int(),
+  })).max(4).optional(),
+  steps_version: z.number().int().optional(),
   // Row columns, not payload (WP-12): the run that produced it, and when the founder archived it (null when not).
   run_id: z.string().optional(),
   archived_at: z.string().nullable().optional(),
@@ -219,6 +231,8 @@ export type WorkspaceData = {
   memoryResetAt?: string | null;
   /** Whether a finished run sends a "report ready" email (WP-08). True when the preference cannot be read. */
   notifyOnComplete?: boolean;
+  /** Whether an active sprint sends a weekly progress email (WP-17). True when the preference cannot be read. */
+  notifyWeekly?: boolean;
   /** Active validation sprints for the dashboard (WP-10), newest first; empty when there are none or they cannot be read. */
   activeSprints?: import("./sprint-core").ActiveSprintSummary[];
   access: ResearchAccess;

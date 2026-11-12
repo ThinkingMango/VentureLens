@@ -55,12 +55,14 @@ test("band labels and meanings are translated in all three languages", () => {
 
 // Modules added by the library (WP-12), for components loaded without them in their dependency list.
 const libraryMocks = {
-  "@/components/library": { ArchiveButton: () => null, DeleteRunButton: () => null, LibraryFilterBar: () => null },
+  "@/components/library": { ArchiveButton: () => null, CancelRunButton: () => null, DeleteRunButton: () => null, LibraryFilterBar: () => null },
   "@/lib/library-core": libraryCore,
 };
 // Modules added by report export (WP-11), for components loaded without them in their dependency list.
 const exportMocks = {
   "@/components/report-export": { ExportButton: () => null, PrintButton: () => null },
+  // Report links (WP-26).
+  "@/components/share-report": { ShareReportButton: () => null },
   "@/lib/report-export": { buildOpportunityExport() {}, opportunityMarkdown() {}, exportFileName() {}, reportToMarkdown() {} },
   "@/lib/outcome-labels": outcomeLabels,
   // The real next-intl (notify.ts translates with it), with a locale for components rendered outside a provider.
