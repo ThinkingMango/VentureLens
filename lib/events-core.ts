@@ -36,8 +36,9 @@ export const eventSchemas = {
   // WP-17: a weekly progress email was sent (or logged, in a dry run, which records nothing).
   weekly_email_sent: z.strictObject({}),
   // WP-26: a founder made or turned off a read-only link to a report. Views of shared pages are not recorded.
-  report_shared: z.strictObject({}),
-  report_unshared: z.strictObject({}),
+  // `target` since single-opportunity links; earlier events have none and were all whole-report links.
+  report_shared: z.strictObject({ target: z.enum(["report", "opportunity"]).optional() }),
+  report_unshared: z.strictObject({ target: z.enum(["report", "opportunity"]).optional() }),
 } as const;
 
 /** Events recorded at most once per founder per UTC day (see trackDaily). */

@@ -4,16 +4,16 @@ import { Copy, Link2, Share2 } from "lucide-react";
 import { toast } from "sonner";
 import { useCopy, useFormats } from "@/i18n/use-copy";
 import { feedbackSource } from "@/i18n/errors";
-import type { ShareState } from "@/lib/share-core";
+import { shareWording, type ShareState, type ShareTarget } from "@/lib/share-core";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 /**
- * "Share" on a completed report (WP-26). Makes a read-only link anyone can open without signing in, shows it to copy,
- * and turns it off. Says plainly what the link shows and what it never shows before the founder makes it.
+ * "Share" on a completed report (WP-26) or on one opportunity. Makes a read-only link anyone can open without signing
+ * in, shows it to copy, and turns it off. A report and each of its opportunities have separate links.
  */
-export function ShareReportButton({ runId }: { runId: string }) {
+export function ShareButton({ target }: { target: ShareTarget }) {
   const copy = useCopy();
   const formats = useFormats();
   const [open, setOpen] = useState(false);
@@ -21,7 +21,8 @@ export function ShareReportButton({ runId }: { runId: string }) {
   const [busy, setBusy] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
   const linkId = useId();
-  const endpoint = `/api/research/${runId}/share`;
+  const endpoint = target.kind === "report" ? `/api/research/${target.runId}/share` : `/api/opportunities/${target.opportunityId}/share`;
+  const text = shareWording[target.kind];
 
   async function call(method: "GET" | "POST" | "DELETE") {
     setBusy(true);
@@ -65,17 +66,17 @@ export function ShareReportButton({ runId }: { runId: string }) {
           }}
         >
           <DialogHeader>
-            <DialogTitle>{copy("Share this report")}</DialogTitle>
+            <DialogTitle>{copy(text.title)}</DialogTitle>
             <DialogDescription>
-              {copy("Anyone with the link can read the report without signing in. It is not listed or indexed anywhere, it stops working after 90 days, and you can turn it off at any time.")}
+              {copy(text.description)}
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-2 text-sm">
             <p className="font-medium">{copy("The link shows")}</p>
-            <p className="text-muted-foreground">{copy("The summary, each opportunity's scores, claims, sources, economics and review, and the ideas that did not pass.")}</p>
+            <p className="text-muted-foreground">{copy(text.shows)}</p>
             <p className="font-medium">{copy("It never shows")}</p>
-            <p className="text-muted-foreground">{copy("Your profile, your brief, each score's rationale, your sprints, notes, ratings or email address.")}</p>
-            <p className="rounded-md bg-warm-soft p-3 text-foreground">{copy("Other report text can still mention your skills or background where they affected an idea. Read the report before you share it.")}</p>
+            <p className="text-muted-foreground">{copy(text.never)}</p>
+            <p className="rounded-md bg-warm-soft p-3 text-foreground">{copy(text.warning)}</p>
           </div>
           {share === undefined && busy && <p className="text-sm text-muted-foreground" role="status">{copy("Loading…")}</p>}
           {share && (
