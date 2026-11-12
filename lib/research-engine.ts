@@ -18,7 +18,7 @@ import { researchRequestSchema, profileSchema, opportunitySchema } from "@/lib/w
 import {
   methodology, STEPS_VERSION, discoveryCheckpointSchema, classificationSchema, evaluationSchema, reviewSchema,
   verifyDiscoveryDraftSchema, normalizeVerifyDiscovery, mergeSearchSources, discoveryDraftSchema, classificationDraftSchema, evaluationDraftSchema, reviewDraftSchema,
-  normalizeDiscovery, normalizeClassification, normalizeEvaluation, normalizeReview,
+  normalizeDiscovery, normalizeClassification, normalizeEvaluation, normalizeReview, sortEvidence,
   groundedClassifications, eligibleEvidence, evidenceGate, weightedScore, safeSourceUrl,
   scoringWeights, scoreParts, REVIEW_MAX_PENALTY, researchErrors, errorCode, researchPolicy, reportLanguage, reportNarrative, confidenceLevel,
   researchOutcome, transientSkipAllowed, type RetrievalState, founderContext, citableSources, METHODOLOGY_VERSION, buildHistory, historyPromptBlock, dedupeCandidates, duplicatesOutcome, historyEntrySchema, type HistoryEntry, type Candidate, type Classification, type Evidence, type Mode, type ResearchOutcome, type Review,
@@ -456,7 +456,10 @@ export async function executeResearchStage(ctx: Context, key: string): Promise<s
     }
     return [];
   }
-  const evidence = checked(await client.from("research_evidence").select("source_key,candidate_id,url,title,excerpt,retrieved_at,published_at").eq("run_id", ctx.runId).eq("user_id", ctx.userId)) as Evidence[];
+  // Classification batches are checkpointed by position, and classifying rewrites these rows, which can change the
+  // order the database returns them in. Sort them the same way on every read (c1-s2 before c1-s10) so a resumed stage
+  // sees each batch exactly as it was checkpointed.
+  const evidence = sortEvidence(checked(await client.from("research_evidence").select("source_key,candidate_id,url,title,excerpt,retrieved_at,published_at").eq("run_id", ctx.runId).eq("user_id", ctx.userId)) as Evidence[]);
   if (!evidence.length) throw new Error("RETRIEVAL_UNAVAILABLE");
   if (key === "classification") {
     const classified: z.infer<typeof classificationSchema>["items"] = [];

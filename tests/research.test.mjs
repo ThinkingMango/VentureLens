@@ -210,3 +210,24 @@ test('the classifier is told that associations, trade press and news are indepen
   assert.match(source, /"secondary" = independent reporting or analysis \(news outlets, trade publications, professional bodies and industry associations/);
   assert.match(source, /"vendor" = a company marketing a product or service that solves this specific pain/);
 });
+
+test("evidence is always read in one order, numbers compared as numbers, so resumed classification batches line up", async () => {
+  const { sortEvidence } = await import("../lib/research-core.ts");
+  const keys = ["c2-s1", "c1-s10", "c1-s2", "c1-s1", "c10-s1"];
+  const sorted = sortEvidence(keys.map(source_key => ({ source_key }))).map(e => e.source_key);
+  assert.deepEqual(sorted, ["c1-s1", "c1-s2", "c1-s10", "c2-s1", "c10-s1"]);
+  assert.deepEqual(sortEvidence([...keys].reverse().map(source_key => ({ source_key }))).map(e => e.source_key), sorted, "the same order whatever the database returned");
+  const engine = (await import("node:fs")).readFileSync(new URL("../lib/research-engine.ts", import.meta.url), "utf8");
+  assert.match(engine, /const evidence = sortEvidence\(checked\(await client\.from\("research_evidence"\)/);
+});
+
+test("unsaving clears the flag instead of deleting progress, and a tick never saves", async () => {
+  const { readFileSync } = await import("node:fs");
+  const route = readFileSync(new URL("../app/api/workspace/route.ts", import.meta.url), "utf8");
+  assert.doesNotMatch(route, /from\("saved_opportunities"\)\s*\.delete\(\)/, "unsaving never deletes the row");
+  assert.match(route, /\.update\(\{ saved: false \}\)/);
+  assert.match(route, /insert\(\{ user_id: user\.id, opportunity_id: input\.id, completed_tasks, saved: false \}\)/);
+  assert.match(route, /if \(error\?\.code === "23505"\) \(\{ error \} = await update\(\)\);/);
+  const loader = readFileSync(new URL("../lib/workspace.ts", import.meta.url), "utf8");
+  assert.match(loader, /\.filter\(\(s\) => s\.saved !== false\)/);
+});
