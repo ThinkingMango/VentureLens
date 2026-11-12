@@ -128,7 +128,8 @@ export async function readWorkspace(
       .order("score", { ascending: false }),
     supabase
       .from("saved_opportunities")
-      .select("opportunity_id,completed_tasks")
+      // "*" so this still reads before the saved-flag migration is applied; a row without the flag is saved.
+      .select("*")
       .eq("user_id", user.id),
     supabase
       .from("research_dev_access")
@@ -204,7 +205,8 @@ export async function readWorkspace(
     projects: projectsResult.data ?? [],
     runs: runsResult.data ?? [],
     opportunities,
-    saved: (savesResult.data ?? []).map((s) => s.opportunity_id),
+    // Rows can hold checklist progress for an opportunity the founder has not saved (or has unsaved).
+    saved: (savesResult.data ?? []).filter((s) => s.saved !== false).map((s) => s.opportunity_id),
     completed: (savesResult.data ?? []).flatMap((s) => s.completed_tasks),
   };
 }

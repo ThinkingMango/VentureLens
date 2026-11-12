@@ -357,6 +357,14 @@ export function normalizeVerifyDiscovery(draft: z.infer<typeof verifyDiscoveryDr
     query_alt: alt.length >= 10 ? alt : clipText(idea.pain, 300),
   }] });
 }
+/**
+ * Evidence in one fixed order, whatever order the database returned it in: by source key, comparing the numbers in it
+ * as numbers (c1-s2 before c1-s10, c2-s1 after c1-s12). Classification batches are checkpointed by position, so every
+ * read of a run's evidence must give the same order.
+ */
+export function sortEvidence<T extends { source_key: string }>(evidence: T[]): T[] {
+  return [...evidence].sort((a, b) => a.source_key.localeCompare(b.source_key, "en", { numeric: true }));
+}
 /** Joins the source lists of several searches, keeping the first copy of each safe URL, in search order. */
 export function mergeSearchSources<T extends { url: string }>(...lists: T[][]): T[] {
   const seen = new Set<string>();

@@ -160,18 +160,19 @@ export async function POST(request: NextRequest) {
           404,
         );
       if (input.action === "save") {
+        // Saving sets the flag and unsaving clears it; neither touches the checklist progress kept on the same row.
         if (input.saved) {
           const { error } = await supabase
             .from("saved_opportunities")
             .upsert(
-              { user_id: user.id, opportunity_id: input.id },
-              { onConflict: "user_id,opportunity_id", ignoreDuplicates: true },
+              { user_id: user.id, opportunity_id: input.id, saved: true },
+              { onConflict: "user_id,opportunity_id" },
             );
           if (error) throw error;
         } else {
           const { error } = await supabase
             .from("saved_opportunities")
-            .delete()
+            .update({ saved: false })
             .eq("user_id", user.id)
             .eq("opportunity_id", input.id);
           if (error) throw error;
@@ -189,12 +190,17 @@ export async function POST(request: NextRequest) {
         const completed_tasks = input.completed
           ? Array.from(new Set([...current, taskKey]))
           : current.filter((key) => key !== taskKey);
-        const { error } = await supabase
+        // A tick records progress without saving the opportunity: update the row if there is one, otherwise add an
+        // unsaved row. If another request added the row first (23505), update it instead.
+        const update = () => supabase
           .from("saved_opportunities")
-          .upsert(
-            { user_id: user.id, opportunity_id: input.id, completed_tasks },
-            { onConflict: "user_id,opportunity_id" },
-          );
+          .update({ completed_tasks })
+          .eq("user_id", user.id)
+          .eq("opportunity_id", input.id);
+        let { error } = saved
+          ? await update()
+          : await supabase.from("saved_opportunities").insert({ user_id: user.id, opportunity_id: input.id, completed_tasks, saved: false });
+        if (error?.code === "23505") ({ error } = await update());
         if (error) throw error;
         // A first step ticked outside a sprint is a validation action too (WP-15); a re-tick or an untick is not.
         if (input.completed && !current.includes(taskKey)) {
