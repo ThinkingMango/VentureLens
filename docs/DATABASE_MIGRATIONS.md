@@ -62,7 +62,7 @@ These were merged to `main`, and the Supabase integration normally applies a mig
 
 | Version | Name | File | Pull request | What it does |
 | --- | --- | --- | --- | --- |
-| `20261112160000` | `research_no_budget` | `supabase/migrations/20261112160000_research_no_budget.sql` | *(this pull request)* | "No budget" for research runs: `research_runs.budget_usd` may be null, `research_budget_usd()` returns null for `"budgetUsd": null`, and `reserve_research_usage` stops such a run only at the $25 safety ceiling. See the notes below. |
+| `20261112160000` | `research_no_budget` | `supabase/migrations/20261112160000_research_no_budget.sql` | [#81](https://github.com/ThinkingMango/VentureLens/pull/81) | "No budget" for research runs: `research_runs.budget_usd` may be null, `research_budget_usd()` returns null for `"budgetUsd": null`, and `reserve_research_usage` stops such a run only at the $25 safety ceiling. See the notes below. |
 
 When a pull request adds a migration, list it here until it is applied, and apply it only with the owner's approval. If `apply_migration` assigns a different version, rename the file to that version before merging. Merging to `main` can apply a migration to production: the Supabase integration applied `20261109150000`, `20261109160000`, `20261110120000`, `20261110130000`, `20261110140000`, `20261110150000`, `20261110160000`, `20261110170000`, `20261110180000`, `20261111120000`, `20261111130000`, `20261111140000`, `20261111150000`, `20261112100000`, `20261112110000`, `20261112120000`, `20261112130000`, `20261112140000` and `20261112150000` that way.
 
