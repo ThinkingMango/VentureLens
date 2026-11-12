@@ -26,9 +26,11 @@ import { Field, FieldLabel, FieldGroup } from "@/components/ui/field";
 import { ProfileChoice } from "@/components/profile-choice";
 import {
   founderRoles,
+  founderRoleHints,
   founderIndustries,
   founderIndustryHints,
   founderGoals,
+  founderGoalHints,
   skillSuggestions,
   interestSuggestions,
 } from "@/lib/profile-options";
@@ -379,6 +381,7 @@ export function Onboarding({ editing = false }: { editing?: boolean }) {
                   label="Where are you in your founder journey?"
                   value={draft.role}
                   options={founderRoles}
+                  hints={founderRoleHints}
                   maxLength={100}
                   disabled={busy}
                   onChange={(value) => update("role", value)}
@@ -478,6 +481,7 @@ export function Onboarding({ editing = false }: { editing?: boolean }) {
                   label="What are you working toward?"
                   value={draft.goal}
                   options={founderGoals}
+                  hints={founderGoalHints}
                   maxLength={150}
                   disabled={busy}
                   onChange={(value) => update("goal", value)}
