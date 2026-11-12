@@ -29,13 +29,13 @@ async function context(params: Promise<{ id: string }>) {
 }
 const link = (request: NextRequest, token: string) => new URL(sharePath(token), request.nextUrl.origin).toString();
 
-/** The report's live link (WP-26), or null when it has none. */
+/** The report's live link (WP-26), or null when it has none or it has expired. */
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const ctx = await context(params);
   if ("error" in ctx) return ctx.error;
   try {
     const share = await readShare(ctx.supabase, ctx.user.id, ctx.id);
-    return json({ share: share ? { url: link(request, share.token), created_at: share.created_at } : null });
+    return json({ share: share ? { url: link(request, share.token), created_at: share.created_at, expires_at: share.expires_at } : null });
   } catch {
     return json({ code: "SAVE_FAILED", error: "Please try again." }, 503);
   }
@@ -51,7 +51,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (!result.ok && result.code === "NOT_FOUND") return json({ code: "NOT_FOUND", error: "Research task not found." }, 404);
     if (!result.ok) throw new Error(result.code);
     after(() => track("report_shared", { userId: ctx.user.id, props: {} }));
-    return json({ share: { url: link(request, result.token), created_at: result.created_at } });
+    return json({ share: { url: link(request, result.token), created_at: result.created_at, expires_at: result.expires_at } });
   } catch {
     return json({ code: "SAVE_FAILED", error: "Your change could not be saved. Please try again." }, 503);
   }

@@ -11,8 +11,8 @@ export async function generateMetadata() {
 
 /**
  * A report shared by its founder (WP-26). Anyone with the link can read it; nothing else is shown: no brief, no
- * profile, no score rationale (it draws on the founder's background), no sprints, ratings or notes. A link that was
- * turned off, or whose report was deleted, shows a plain notice.
+ * profile, no score rationale (it draws on the founder's background), no sprints, ratings or notes. A link that has
+ * expired (after 90 days), was turned off, or whose report was deleted shows a plain notice.
  */
 export default async function Page({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
@@ -21,7 +21,7 @@ export default async function Page({ params }: { params: Promise<{ token: string
     return (
       <article>
         <h1>{copy("This link is no longer available")}</h1>
-        <p className="text-muted-foreground">{copy("The person who shared this report has turned the link off, or deleted the report.")}</p>
+        <p className="text-muted-foreground">{copy("Links last 90 days. This one has expired, or the person who shared it turned it off or deleted the report.")}</p>
       </article>
     );
   }

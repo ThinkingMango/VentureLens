@@ -69,7 +69,7 @@ function buildSections(disclosure: ProviderDisclosure): Section[] {
         ["Improve the product", "To measure, in aggregate, how research runs perform and which features are used."],
         ["Service messages", "To send sign-in codes and essential notices about your account or this policy. We do not send marketing email."],
         ["Research notifications", "To email you when a research run finishes or stops, if you leave this on in your profile. The email names the run and its outcome; your profile, briefs and reports are not included."],
-        ["Shared reports", "To show a report you choose to share to anyone who has its link, until you turn the link off. The shared page leaves out your profile, your brief and each score's rationale, and is not listed or indexed."],
+        ["Shared reports", "To show a report you choose to share to anyone who has its link, for 90 days or until you turn the link off. The shared page leaves out your profile, your brief and each score's rationale, and is not listed or indexed."],
         ["Weekly progress emails", "While you have an active validation sprint, to email you once a week with your next task, its details and the opportunity's title, unless you turn this off in your profile or with the link in the email."],
       ],
       after: [
