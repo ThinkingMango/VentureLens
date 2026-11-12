@@ -33,6 +33,8 @@ export const eventSchemas = {
   // Recorded from WP-20 (first-hand evidence) and WP-18 (kits); the schemas exist now so the funnel can count them.
   evidence_logged: z.strictObject({ kind: z.enum(["interview", "signup", "loi", "deposit", "payment", "pilot", "rejection"]) }),
   kit_generated: z.strictObject({ kind: z.enum(["buyers", "interview", "offer"]) }),
+  // WP-17: a weekly progress email was sent (or logged, in a dry run, which records nothing).
+  weekly_email_sent: z.strictObject({}),
 } as const;
 
 /** Events recorded at most once per founder per UTC day (see trackDaily). */
