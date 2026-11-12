@@ -194,10 +194,13 @@ test("the demo shows its synthetic sources and illustrative score without a scor
   assert.doesNotMatch(html, /href="http/, "synthetic sources are never linked");
   assert.doesNotMatch(page, /How this score was reached/);
   const validation = text(render("DemoOpportunityDetail", { opportunity: o, initialTab: "validation" }).html);
-  // The demo shows one fixed example sprint (WP-10) in place of the checklist.
-  assert.match(validation, /14-day validation sprint Day 4 of 14 · started .* 2 of 5 tasks done Example sprint · Ticks reset on refresh/);
-  assert.doesNotMatch(validation, /Demo checklist/);
-  assert.ok(validation.includes(researchReports[o.id].firstTest));
+  // The demo shows one fixed example sprint (WP-10) in place of the checklist, made from its next steps (WP-16).
+  assert.match(validation, /14-day validation sprint Day 4 of 14 · started .* 2 of 3 tasks done Example sprint · Ticks reset on refresh/);
+  assert.doesNotMatch(validation, /Demo checklist|Write down the riskiest assumption/);
+  assert.match(validation, /Ask five likely buyers how they handled this problem the last time it came up\./);
+  assert.match(validation, /Where: .+ Done when: Five conversations held Stop if: Fewer than two describe the problem without prompting/);
+  // The report's own first test still leads the page header.
+  assert.ok(text(render("DemoOpportunityDetail", { opportunity: o }).html).includes(researchReports[o.id].firstTest));
   assert.deepEqual(missing, []);
 });
 
@@ -256,4 +259,27 @@ test("the rating form offers five labelled stars and shows a saved rating", () =
     }
     assert.deepEqual(missing, [], locale);
   }
+});
+
+test("next steps (WP-16) replace the fixed first steps, with where, done-when, stop-if and the assumption tested", () => {
+  const v4 = { ...v3, steps_version: 1, steps: [
+    { action: "Ask five owners how they book", where: "c1-s1", where_hint: "", done_when: "Five conversations held", stop_if: "Fewer than two confirm", tests_assumption: 0, day: 5 },
+    { action: "Offer a paid pilot", where: null, where_hint: "Local practice managers' group", done_when: "One clinic pays", stop_if: "None pay", tests_assumption: null, day: 14 },
+  ] };
+  for (const locale of locales) {
+    const { html, missing } = render("LiveOpportunityDetail", { opportunity: v4, initialTab: "validation" }, { locale });
+    assert.deepEqual(missing, [], locale);
+    if (locale !== "en") continue;
+    const page = text(html);
+    assert.match(page, /Next steps 1 of 2 steps complete/, "ticks are still read by position");
+    assert.match(page, /Ask five owners how they book Where \[1\] Title c1-s1 · example\.org Done when Five conversations held Stop if Fewer than two confirm Tests Clinics renew Aim for Day 5 of 14/);
+    assert.match(page, /Offer a paid pilot Where Local practice managers' group Suggestion Done when One clinic pays/);
+    assert.match(html, /href="https:\/\/www\.example\.org\/c1-s1"[^>]*rel="noopener noreferrer"/);
+    assert.doesNotMatch(page, /Write down the riskiest assumption|Next validation steps|Interview ten clinics/, "no fixed first steps or plain validation steps");
+    assert.equal(page.match(/What to test first/g)?.length, 1, "the header names the first step; the tab does not repeat it");
+    assert.match(page, /What to test first Ask five owners how they book/);
+    assert.match(page, /How to falsify this opportunity Pilot fails/);
+  }
+  // A report made before next steps keeps its fixed first steps (checked in the economics/validation test above).
+  assert.match(text(render("LiveOpportunityDetail", { opportunity: v3, initialTab: "validation" }).html), /Checklist 1 of 4 steps complete Write down|Write down the riskiest assumption/);
 });

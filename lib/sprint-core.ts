@@ -93,6 +93,9 @@ export const sprintRequestSchema = z.discriminatedUnion("action", [
     action: z.literal("start"), opportunity_id: z.uuid(), length: z.union([z.literal(7), z.literal(14), z.literal(30)]),
     // The page's fixed first steps, in the founder's language, so the sprint keeps their earlier ticks.
     checklist: z.array(z.string().trim().max(300)).max(4).default([]),
+    // WP-16: the field labels for tasks made from a report's next steps, in the founder's language: where, where to
+    // look (a suggestion), done when, stop if. The database writes the task details with them.
+    labels: z.array(z.string().trim().max(40)).max(4).default([]),
   }),
   z.strictObject({ action: z.literal("criteria"), sprint_id: z.uuid(), go_criteria: z.string().trim().max(1000) }),
   z.strictObject({ action: z.literal("decide"), sprint_id: z.uuid(), decision: z.enum(sprintDecisions), note: z.string().trim().max(1000).default("") }),
@@ -130,13 +133,14 @@ export function toSprint(row: Record<string, unknown>, tasks: Record<string, unk
  * The demo's one fixed example sprint: 14 days, started four days ago, the first two tasks done. Built from the demo
  * opportunity's own (translated) steps, so it reads like a real sprint.
  */
-export function demoSprint(opportunityId: string, titles: string[], goCriteria: string, now = new Date()): Sprint {
+/** `details`: each task's detail, by position (WP-16 next steps carry where, done when and stop if). */
+export function demoSprint(opportunityId: string, titles: string[], goCriteria: string, now = new Date(), details: string[] = []): Sprint {
   const startedOn = addDays(now.toISOString().slice(0, 10), -3);
   const due = spreadDueDates(titles.length, 14, startedOn);
   return {
     id: `demo-sprint-${opportunityId}`, opportunity_id: opportunityId, length_days: 14, started_on: startedOn, go_criteria: goCriteria,
     status: "active", decision: null, decision_note: "",
-    tasks: titles.map((title, i) => ({ id: `demo-task-${i}`, title, detail: "", due_on: due[i], done_at: i < 2 ? now.toISOString() : null, position: i, origin: "report" as const })),
+    tasks: titles.map((title, i) => ({ id: `demo-task-${i}`, title, detail: details[i] ?? "", due_on: due[i], done_at: i < 2 ? now.toISOString() : null, position: i, origin: "report" as const })),
   };
 }
 

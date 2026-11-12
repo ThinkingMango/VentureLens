@@ -194,6 +194,63 @@ export function citableSources(sources: readonly { source_key: string; stance: C
   };
 }
 
+/**
+ * Next steps (enhancement plan WP-16). Each step tests one of the candidate's assumptions and says where to go, what
+ * result completes it, and what result means change course. "where" is one of the candidate's citable supporting
+ * source keys, or null with a plain-text "where_hint" shown as a suggestion. "day" is the day of a 14-day sprint the
+ * step should be finished by; a sprint of another length scales it. Steps are compact on purpose: the evaluation call
+ * for two candidates must stay under the model's output cap, so the messages to send belong to the kits (WP-18, WP-19).
+ */
+export const STEPS_VERSION = 1;
+export const MAX_STEPS = 4;
+export const STEP_DAYS = 14;
+export const stepSchema = z.object({
+  action: z.string().min(1).max(300),
+  where: z.string().nullable(),
+  where_hint: z.string().max(200),
+  done_when: z.string().min(1).max(200),
+  stop_if: z.string().min(1).max(200),
+  tests_assumption: z.number().int().min(0).max(3).nullable(),
+  day: z.number().int().min(1).max(STEP_DAYS),
+});
+export type Step = z.infer<typeof stepSchema>;
+const stepDraftSchema = z.object({
+  action: z.string().describe("One imperative sentence: who to approach or what to do, under 300 characters."),
+  where: z.string().nullable().optional().describe("One of this candidate's citable supporting source_keys showing where these buyers gather or discuss the problem, or null."),
+  where_hint: z.string().optional().describe("When where is null: where to find these buyers, under 200 characters. Otherwise empty."),
+  done_when: z.string().describe("A countable result that completes the step, under 200 characters."),
+  stop_if: z.string().describe("The result that means change channel or drop the assumption, under 200 characters."),
+  tests_assumption: z.number().nullable().optional().describe("0-based index of the assumption this step tests."),
+  day: z.number().describe("Day of a 14-day sprint to finish by, 1–14."),
+});
+/**
+ * Server-side rules for steps, whatever the model returned: a step needs an action, a done-when and a stop-if; "where"
+ * is kept only when it is one of the candidate's supporting sources (never a contradicting one), otherwise it becomes
+ * null and only the hint is shown; a hint is dropped when a source is cited; an assumption index outside the
+ * candidate's assumptions becomes null; days are clamped to 1–14, a missing day is spread evenly, and days never go
+ * backwards; at most four steps.
+ */
+export function normalizeSteps(steps: readonly z.infer<typeof stepDraftSchema>[], supporting: readonly string[], assumptions: number): Step[] {
+  const allowed = new Set(supporting);
+  const kept = steps.flatMap(step => {
+    const action = clipText(String(step.action ?? ""), 300);
+    const done_when = clipText(String(step.done_when ?? ""), 200);
+    const stop_if = clipText(String(step.stop_if ?? ""), 200);
+    if (!action || !done_when || !stop_if) return [];
+    const key = typeof step.where === "string" ? step.where.trim() : "";
+    const where = allowed.has(key) ? key : null;
+    const index = typeof step.tests_assumption === "number" && Number.isInteger(step.tests_assumption) ? step.tests_assumption : -1;
+    return [{ action, where, where_hint: where ? "" : clipText(String(step.where_hint ?? ""), 200), done_when, stop_if, tests_assumption: index >= 0 && index < assumptions ? index : null, day: Number(step.day) }];
+  }).slice(0, MAX_STEPS);
+  let last = 1;
+  return kept.map((step, i) => {
+    const spread = Math.max(1, Math.round((STEP_DAYS * (i + 1)) / kept.length));
+    const day = Math.max(last, Number.isFinite(step.day) ? clampInt(step.day, 1, STEP_DAYS) : spread);
+    last = day;
+    return stepSchema.parse({ ...step, day });
+  });
+}
+
 const evaluationItemSchema = z.object({
   candidate_id: z.string(), description: short, category: z.string().max(100),
   revenue: short, cost: short, risk: short, assumptions: z.array(short).min(1).max(4),
@@ -202,6 +259,8 @@ const evaluationItemSchema = z.object({
   rationale: long,
   // Methodology v3 (WP-07). Evaluations checkpointed before it have none.
   claims: z.array(claimSchema).max(MAX_CLAIMS).optional(),
+  // WP-16. Evaluations checkpointed before it have none.
+  steps: z.array(stepSchema).max(MAX_STEPS).optional(),
 });
 export const evaluationSchema = z.object({ items: z.array(evaluationItemSchema).min(1).max(8) });
 export type Evaluation = z.infer<typeof evaluationSchema>["items"][number];
@@ -240,6 +299,7 @@ export const evaluationDraftSchema = z.object({ items: z.array(z.object({
   dimensions: z.object({ pain: score(100), demand: score(100), economics: score(100), feasibility: score(100), advantage: score(100) }),
   rationale: prose(2000),
   claims: z.array(claimDraftSchema).optional().describe("3–12 claims; see the prompt's rules."),
+  steps: z.array(stepDraftSchema).optional().describe("2–3 next steps; see the prompt's rules."),
 })) });
 export const reviewDraftSchema = z.object({ items: z.array(z.object({
   candidate_id: z.string(), reject: z.boolean(), critique: prose(800), penalty: score(REVIEW_MAX_PENALTY), falsification: prose(800),
@@ -319,14 +379,20 @@ export function normalizeClassification(draft: z.infer<typeof classificationDraf
 export function normalizeEvaluation(draft: z.infer<typeof evaluationDraftSchema>, candidateIds: string[], mode?: Mode, citable?: Record<string, CitableSources>): { items: Evaluation[] } {
   const items = matchIds(candidateIds, draft.items, item => item.candidate_id).flatMap(item => {
     const assumptions = item.assumptions.map(text => clipText(text, 800)).filter(Boolean).slice(0, 4);
-    const validation = item.validation.map(text => clipText(text, 800)).filter(Boolean).slice(0, 4);
+    // Claims and steps are kept only when the caller says which sources each candidate may cite.
+    const sources = citable ? citable[item.candidate_id] ?? { supporting: [], contradicting: [] } : null;
+    const steps = sources && item.steps ? normalizeSteps(item.steps, sources.supporting, assumptions.length) : [];
+    // A plan of one step is not a plan; the plain validation steps stand in for it.
+    const usableSteps = steps.length >= 2 ? steps : [];
+    let validation = item.validation.map(text => clipText(text, 800)).filter(Boolean).slice(0, 4);
+    if (!validation.length) validation = usableSteps.map(step => step.action);
     // Without at least one stated assumption and one validation step the evaluation is unusable; leave it out.
     if (!assumptions.length || !validation.length) return [];
     const d = item.dimensions;
-    // Claims are kept only when the caller says which sources each candidate may cite.
-    const claims = citable && item.claims ? normalizeClaims(item.claims, citable[item.candidate_id] ?? { supporting: [], contradicting: [] }) : [];
+    const claims = sources && item.claims ? normalizeClaims(item.claims, sources) : [];
     return [evaluationItemSchema.parse({
       ...(claims.length ? { claims } : {}),
+      ...(usableSteps.length ? { steps: usableSteps } : {}),
       candidate_id: item.candidate_id, description: clipText(item.description, 800), category: clipText(item.category, 100),
       revenue: clipText(item.revenue, 800), cost: clipText(item.cost, 800), risk: clipText(item.risk, 800),
       assumptions, validation, rationale: clipText(item.rationale, 2000),

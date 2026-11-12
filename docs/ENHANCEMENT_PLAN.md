@@ -255,6 +255,15 @@ Compare founders whose first report came after WP-16 with the WP-15 baseline coh
 
 **Files:** `lib/research-core.ts` (schemas, normaliser, prompt), `lib/research-budget.ts`, `lib/opportunity-view.ts`, `components/opportunity-detail.tsx`, `components/validation-sprint.tsx`, `lib/sprint-core.ts`, a new migration, `lib/demo-data.ts`, messages.
 
+**As built (2026-11-12):**
+- **No `artifact` field.** An evaluation batch of two ideas was estimated at ~4,500 output tokens against a 7,000-token cap on Qwen 3.8 Flash; message drafts for every step could push Chinese reports over the cap and fail runs. Steps carry action, where, done-when, stop-if, the assumption tested and a day; the messages to send belong to WP-18 and WP-19. Validation steps are now asked for under 200 characters each to offset the extra output.
+- **2–3 steps** are requested (at most 4 are kept, so ticks stay within the page's four positions). An evaluation with fewer than two usable steps keeps the plain validation steps.
+- **One checklist, by position.** For a report with steps, the steps replace the fixed first steps on the page and are ticked in the same `completed_tasks` positions, so a sprint carries those ticks over; WP-15 records each tick. The page header's "What to test first" becomes the first step.
+- **Labels from the page.** The sprint function takes `p_labels` (where, where to look, done when, stop if) in the founder's language and writes the task details with them; English is the fallback. The old three-argument signature is replaced, not overloaded.
+- **Demo:** fixed, illustrative steps (`demoSteps`) drive the demo page, its example sprint and the demo dashboard.
+- **Export:** Markdown and print list each step with where, done-when and stop-if.
+- **Cost:** `typicalRun.evaluation` re-estimated (6,800 in / 5,200 out per batch); Gemini 3.8 Flash's required budget rises from $0.5675 to $0.5789, still under the $0.63 a budget saved with headroom holds.
+
 **Tests:**
 - normaliser: unknown `where` dropped; `day` clamped; `validation` derived when empty; old payloads without `steps` unchanged;
 - SQL: sprint from an opportunity with steps seeds them (no first steps) with scaled dates; without steps behaves as before; earlier ticks still carried over;

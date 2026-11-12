@@ -29,6 +29,20 @@ export type ViewSource = {
   /** Demo only: a synthetic record, with how it would be interpreted and its limits. */
   synthetic: { type: string; detail: string; interpretation: string; limitation: string } | null;
 };
+/**
+ * A next step (WP-16), ready to display. `source` is the card the step points to, when it cites one of the listed
+ * sources; otherwise `hint` says where to look and is shown as a suggestion. `assumption` is the text of the
+ * assumption the step tests, when it names one.
+ */
+export type ViewStep = {
+  action: string;
+  source: Pick<ViewSource, "key" | "number" | "title" | "url" | "domain"> | null;
+  hint: string | null;
+  doneWhen: string;
+  stopIf: string;
+  assumption: string | null;
+  day: number;
+};
 export type OpportunityView = {
   kind: "live" | "demo";
   id: string;
@@ -55,6 +69,8 @@ export type OpportunityView = {
   /** Assumption claims and what would confirm them. */
   confirmations: { claim: string; confirm: string | null }[];
   validation: string[];
+  /** Next steps (WP-16); empty for reports made before them, which keep the fixed first steps. */
+  steps: ViewStep[];
   firstTest: string | null;
   rationale: string | null;
   critique: string | null;
@@ -96,9 +112,27 @@ function liveSources(evidence: WorkspaceOpportunity["evidence"], numbers: Map<st
   }
   return cards;
 }
+/** A stored opportunity's next steps, each pointing at its listed source card when it cites one. */
+export function liveSteps(item: Pick<WorkspaceOpportunity, "steps" | "assumptions">, sources: ViewSource[]): ViewStep[] {
+  return (item.steps ?? []).map((step) => {
+    const card = step.where ? sources.find((source) => source.key === step.where) : undefined;
+    return {
+      action: step.action,
+      source: card ? { key: card.key, number: card.number, title: card.title, url: card.url, domain: card.domain } : null,
+      // A cited source that is no longer listed falls back to the hint, which is empty when a source was cited.
+      hint: card ? null : step.where_hint || null,
+      doneWhen: step.done_when,
+      stopIf: step.stop_if,
+      assumption: step.tests_assumption === null ? null : item.assumptions?.[step.tests_assumption] ?? null,
+      day: step.day,
+    };
+  });
+}
 export function liveOpportunityView(item: WorkspaceOpportunity): OpportunityView {
   const numbers = citationNumbers(item.evidence);
   const claims = (item.claims ?? []).map((claim, index) => ({ ...claim, key: claimKey(index) }));
+  const sources = liveSources(item.evidence, numbers);
+  const steps = liveSteps(item, sources);
   return {
     kind: "live",
     id: item.id,
@@ -115,13 +149,15 @@ export function liveOpportunityView(item: WorkspaceOpportunity): OpportunityView
     breakdown: scoreBreakdown(item),
     methodologyVersion: methodologyVersion(item),
     claims,
-    sources: liveSources(item.evidence, numbers),
+    sources,
     revenue: item.revenue,
     cost: item.cost,
     assumptions: item.assumptions ?? [],
     confirmations: claims.filter((claim) => claim.kind === "assumption").map((claim) => ({ claim: claim.text, confirm: claim.confirm ?? null })),
     validation: item.validation ?? [],
-    firstTest: item.validation?.[0] ?? null,
+    steps,
+    // With next steps (WP-16), the first one is what to test first.
+    firstTest: steps[0]?.action ?? item.validation?.[0] ?? null,
     rationale: item.rationale ?? null,
     critique: item.critique ?? null,
     falsification: item.falsification ?? null,
@@ -131,10 +167,50 @@ export function liveOpportunityView(item: WorkspaceOpportunity): OpportunityView
 }
 
 /**
+ * The demo's next steps (WP-16): fixed, illustrative text citing its synthetic sources. The opportunity page, its
+ * example sprint and the demo dashboard all use these, so the demo matches what a real report now shows.
+ */
+export function demoSteps(copy: (text: string, values?: Record<string, string | number>) => string, sources: ViewSource[]): ViewStep[] {
+  const cite = (index: number) => {
+    const card = sources[index];
+    return card ? { key: card.key, number: card.number, title: card.title, url: null, domain: null } : null;
+  };
+  const pays = copy("The outcome is valuable enough to support a subscription.");
+  return [
+    {
+      action: copy("Ask five likely buyers how they handled this problem the last time it came up."),
+      source: cite(0), hint: null,
+      doneWhen: copy("Five conversations held"),
+      stopIf: copy("Fewer than two describe the problem without prompting"),
+      assumption: copy("Buyers encounter the problem repeatedly, not just once."), day: 5,
+    },
+    {
+      action: copy("Ask the same buyers what they spend on their current workaround, in time or money."),
+      source: null, hint: copy("The same conversations: no new outreach needed"),
+      doneWhen: copy("A spend figure from at least three buyers"),
+      stopIf: copy("Nobody can name a cost"),
+      assumption: pays, day: 9,
+    },
+    {
+      action: copy("Offer a small paid pilot of the manual version to the buyers with the clearest pain."),
+      source: cite(1), hint: null,
+      doneWhen: copy("One buyer agrees to pay"),
+      stopIf: copy("No buyer agrees at any price you can sustain"),
+      assumption: pays, day: 14,
+    },
+  ];
+}
+
+/**
  * The demo's fixed sample, as a view. `o` and `report` arrive translated (useDemoContent); `copy` translates the few
  * fixed demo lines kept here so the component holds no demo-only text.
  */
 export function demoOpportunityView(o: Opportunity, report: DemoReport, copy: (text: string, values?: Record<string, string | number>) => string): OpportunityView {
+  const sources: ViewSource[] = report.sources.map((source, index) => ({
+    key: `demo-${index + 1}`, number: index + 1, title: source.title, url: null, domain: null,
+    quote: source.observation, reliability: null, stance: null, retrievedAt: null, publishedAt: null,
+    synthetic: { type: source.type, detail: source.detail, interpretation: source.implication, limitation: source.limitation },
+  }));
   return {
     kind: "demo",
     id: o.id,
@@ -151,11 +227,7 @@ export function demoOpportunityView(o: Opportunity, report: DemoReport, copy: (t
     breakdown: null,
     methodologyVersion: null,
     claims: [],
-    sources: report.sources.map((source, index) => ({
-      key: `demo-${index + 1}`, number: index + 1, title: source.title, url: null, domain: null,
-      quote: source.observation, reliability: null, stance: null, retrievedAt: null, publishedAt: null,
-      synthetic: { type: source.type, detail: source.detail, interpretation: source.implication, limitation: source.limitation },
-    })),
+    sources,
     revenue: o.revenue,
     cost: o.cost,
     assumptions: [
@@ -165,8 +237,9 @@ export function demoOpportunityView(o: Opportunity, report: DemoReport, copy: (t
       copy("Acquisition cost, churn, taxes, and support still need to be modeled."),
     ],
     confirmations: [],
-    // The demo's validation plan is the shared checklist plus its first test; it has no research-generated steps.
+    // The demo shows next steps (WP-16) with fixed, illustrative text, citing its synthetic sources.
     validation: [],
+    steps: demoSteps(copy, sources),
     firstTest: report.firstTest,
     rationale: null,
     critique: null,
@@ -198,4 +271,13 @@ export function topClaims<C extends Claim>(claims: C[], count = 3): C[] {
 export function initialTab(requested: string | undefined, available: OpportunityTabId[]): OpportunityTabId {
   const tab = opportunityTabIds.find((id) => id === requested?.toLowerCase());
   return tab && available.includes(tab) ? tab : "overview";
+}
+
+/** A next step's task detail, as the database writes it when a sprint starts (WP-16): where, done when, stop if. */
+export function stepTaskDetail(step: ViewStep, labels: { where: string; hint: string; done: string; stop: string }): string {
+  return [
+    step.source ? `${labels.where}: ${step.source.title}` : step.hint ? `${labels.hint}: ${step.hint}` : null,
+    `${labels.done}: ${step.doneWhen}`,
+    `${labels.stop}: ${step.stopIf}`,
+  ].filter(Boolean).join("\n");
 }

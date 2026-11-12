@@ -110,12 +110,14 @@ test('a saved budget keeps headroom over the estimate, so a re-calibration canno
   // Production 2026-11-11: $0.55 was saved for Gemini 3.8 Flash at $0.5435; WP-07 raised the estimate to $0.5675 and
   // the next run started on Qwen. With headroom, that budget is refused and $0.63 is asked for instead.
   const live = { primary: 'gemini', autoFallback: true, qwenModel: 'qwen3.8-flash', geminiModel: 'gemini-3.8-flash', budgetUsd: 0.55 };
+  // WP-16's next steps raised the estimate again, to $0.5789; the $0.63 that WP-07's headroom asked for still covers it.
   const required = estimateRunCost('gemini-3.8-flash', november).requiredUsd;
-  assert.equal(required, 0.5675);
-  assert.throws(() => assertBudgetFits(live, november), error => error.message === 'BUDGET_TOO_LOW' && error.requiredUsd === 0.63);
-  assert.doesNotThrow(() => assertBudgetFits({ ...live, budgetUsd: 0.63 }, november));
-  // A budget the old estimate accepted with headroom still fits the new one.
-  assert.ok(recommendedBudget(0.5435) >= required);
+  assert.equal(required, 0.5789);
+  assert.throws(() => assertBudgetFits(live, november), error => error.message === 'BUDGET_TOO_LOW' && error.requiredUsd === 0.64);
+  assert.doesNotThrow(() => assertBudgetFits({ ...live, budgetUsd: 0.64 }, november));
+  // A budget an older estimate accepted with headroom still fits the new one at run start, which checks without headroom.
+  assert.ok(recommendedBudget(0.5435) >= 0.5675);
+  assert.ok(recommendedBudget(0.5675) >= required, "the budget saved after WP-07 still starts runs on the primary model");
   for (const model of [...qwenModelIds, ...geminiModelIds]) {
     const { requiredUsd } = estimateRunCost(model, november);
     const recommended = recommendedBudget(requiredUsd);
