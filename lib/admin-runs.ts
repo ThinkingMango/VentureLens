@@ -4,6 +4,7 @@ import { isAdministrator } from "@/lib/admin-access";
 import { classificationSchema, type Evidence } from "@/lib/research-core";
 import { qualityMetrics, type MetricOpportunity, type MetricRun, type MetricSource, type MetricUsage, type MetricWindow } from "@/lib/quality-metrics";
 import { feedbackMetrics, runModel, type FeedbackMetrics } from "@/lib/feedback-core";
+import { FOLLOW_DAYS, stepEvents, validationFunnel, type FunnelEvent, type FunnelReport, type ValidationFunnel } from "@/lib/validation-funnel";
 import {
   RUNS_PAGE_SIZE, candidateDiagnostics, filterRange, providerSwitches, runListRow, stageTimeline,
   structuralBudgetBlock, structuralFailure, structuralSetup, usageStage, type RunFilters,
@@ -128,7 +129,30 @@ export async function qualityReport(user: Identity, days: MetricWindow, now = ne
     days, since,
     metrics: qualityMetrics({ runs: runs.map(run => ({ ...run, preflight_blocked: preflight.has(run.id) })), usage, sources, opportunities, detachedUsage }),
     feedback: await feedbackReport(client, since),
+    funnel: await funnelReport(client, days, now),
   };
+}
+
+/**
+ * The validation funnel (WP-15) from product events. Reads every founder's completed-run events up to now, to find each
+ * founder's first report, and the step events since the earliest first report the funnel can use (the action-rate
+ * cohort starts `days + 30` days ago). Null when events cannot be read, so the rest of the page still loads.
+ */
+async function funnelReport(client: ReturnType<typeof createAdminClient>, days: MetricWindow, now: Date): Promise<ValidationFunnel | null> {
+  try {
+    const earliest = new Date(now.getTime() - (days + FOLLOW_DAYS) * 86_400_000).toISOString();
+    const [reports, events] = await Promise.all([
+      readAll<FunnelReport>((from, to) => client.from("product_events").select("user_id,created_at")
+        .eq("event", "run_finished").eq("props->>status", "completed").not("user_id", "is", null)
+        .lte("created_at", now.toISOString()).order("created_at").order("id").range(from, to)),
+      readAll<FunnelEvent>((from, to) => client.from("product_events").select("user_id,event,created_at")
+        .in("event", Object.values(stepEvents)).not("user_id", "is", null)
+        .gte("created_at", earliest).lte("created_at", now.toISOString()).order("created_at").order("id").range(from, to)),
+    ]);
+    return validationFunnel({ reports, events, days, now });
+  } catch {
+    return null;
+  }
 }
 
 /**

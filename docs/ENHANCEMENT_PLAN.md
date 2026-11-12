@@ -202,6 +202,13 @@ Compare founders whose first report came after WP-16 with the WP-15 baseline coh
 
 **Files:** `lib/events-core.ts`, `lib/events.ts`, `lib/quality-metrics.ts`, `components/admin-quality.tsx`, the opportunity page data loader, a migration only if `product_events` has a check on event names (**VERIFY** `20261110120000_product_events.sql`).
 
+**As built (2026-11-11):**
+- `opportunity_viewed` is recorded at most once per founder per UTC **day**, not per opportunity per day, so the event needs no opportunity id. The funnel counts founders, so nothing is lost.
+- Ticking one of the fixed first steps outside a sprint now records `task_completed { origin: "checklist" }`; sprint ticks record `origin: "sprint"`. Before this, only sprint ticks were recorded, which would have understated the 30-day action rate.
+- The funnel lives in its own module, `lib/validation-funnel.ts`, rather than in `lib/quality-metrics.ts`.
+- The 30-day action rate uses founders whose first report is between `days + 30` and 30 days old, so every founder counted has had the full 30 days.
+- No migration was needed: `product_events` has no list of event names.
+
 **Tests:** event schemas; funnel maths on fixtures (empty, one founder, cohort boundaries); 30-day window edges.
 
 **Acceptance**

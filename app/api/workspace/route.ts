@@ -188,6 +188,10 @@ export async function POST(request: NextRequest) {
             { onConflict: "user_id,opportunity_id" },
           );
         if (error) throw error;
+        // A first step ticked outside a sprint is a validation action too (WP-15); a re-tick or an untick is not.
+        if (input.completed && !current.includes(taskKey)) {
+          after(() => track("task_completed", { userId: user.id, props: { origin: "checklist" } }));
+        }
       }
     }
     return json(await readWorkspace(supabase, user));

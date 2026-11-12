@@ -155,6 +155,7 @@ test("the quality page shows flag counts by reason, flagged domains and ratings 
   const { createTranslator } = await import("next-intl");
   const { messageKey, locales } = await import("../i18n/config.ts");
   const quality = await import("../lib/quality-metrics.ts");
+  const funnelCore = await import("../lib/validation-funnel.ts");
   const pass = tag => ({ children, ...props }) => createElement(tag, props, children);
   const feedback = feedbackMetrics({
     flags: [{ target: "source", target_key: "c1-s1", reason: "outdated", evidence: payload.evidence }],
@@ -173,9 +174,15 @@ test("the quality page shows flag counts by reason, flagged domains and ratings 
       "@/components/shared": { PageHeader: ({ title, children }) => createElement("header", null, title, children) },
       "@/components/admin-nav": { AdminNav: () => null }, "@/components/admin-labels": labels,
       "@/components/ui/card": { Card: pass("div"), CardContent: pass("div"), CardDescription: pass("p"), CardHeader: pass("div"), CardTitle: pass("h3") },
-      "@/lib/quality-metrics": quality, "@/lib/feedback-core": core, "@/lib/utils": { cn: (...c) => c.filter(Boolean).join(" ") },
+      "@/lib/quality-metrics": quality, "@/lib/validation-funnel": funnelCore, "@/lib/feedback-core": core, "@/lib/utils": { cn: (...c) => c.filter(Boolean).join(" ") },
     });
-    const page = value => renderToStaticMarkup(createElement(AdminQuality, { report: { days: 30, since: "2026-10-11", metrics, feedback: value } })).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+    const DAY = 86_400_000, now = new Date("2026-11-30T12:00:00Z"), ago = d => new Date(now.getTime() - d * DAY).toISOString();
+    const funnel = funnelCore.validationFunnel({
+      reports: [{ user_id: "a", created_at: ago(45) }, { user_id: "b", created_at: ago(40) }, { user_id: "c", created_at: ago(5) }],
+      events: [{ user_id: "a", event: "opportunity_viewed", created_at: ago(44) }, { user_id: "a", event: "task_completed", created_at: ago(42) }],
+      days: 30, now,
+    });
+    const page = (value, funnelValue = funnel) => renderToStaticMarkup(createElement(AdminQuality, { report: { days: 30, since: "2026-10-11", metrics, feedback: value, funnel: funnelValue } })).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
     const html = page(feedback);
     if (locale === "en") {
       assert.match(html, /1 flags \(0 claims, 1 sources\) and 1 ratings in this window\. Average rating: 4\.0\./);
@@ -184,6 +191,10 @@ test("the quality page shows flag counts by reason, flagged domains and ratings 
       assert.match(html, /Average rating by mode .* Idea check 4\.0 from 1 ratings/);
       assert.match(html, /Average rating by model .* qwen\/qwen-plus 4\.0 from 1 ratings/);
       assert.match(page(null), /Report feedback could not be read\./, "the rest of the page still loads when feedback cannot be read");
+      assert.match(html, /1 founders received their first report in the last 30 days\./);
+      assert.match(html, /30-day action rate 50%/);
+      assert.match(html, /\(1 of 2\)/);
+      assert.match(page(feedback, null), /Product events could not be read\./, "the rest of the page still loads when events cannot be read");
     }
     assert.deepEqual(missing, [], locale);
   }
