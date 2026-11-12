@@ -14,4 +14,6 @@ export function isShareToken(value: unknown): value is string {
 export function sharePath(token: string): string {
   return `/s/${token}`;
 }
-export type ShareState = { url: string; created_at: string } | null;
+/** How long a link lasts. The database sets each link's expiry (report_shares.expires_at default); keep them equal. */
+export const SHARE_DAYS = 90;
+export type ShareState = { url: string; created_at: string; expires_at: string } | null;

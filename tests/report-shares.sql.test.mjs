@@ -59,6 +59,12 @@ test("report links: one live link per own completed report, turned off for good,
   as(user, share(user, mine, token("g")));
   assert.equal(sql(`select string_agg(left(token, 1) || ':' || (revoked_at is null)::text, ',' order by created_at, token) from public.report_shares`), "a:false,g:true", "turning it on again makes a new link");
 
+  // Links expire 90 days after they are made; the founder cannot choose a later expiry or an earlier creation time.
+  assert.equal(sql(`select (expires_at - created_at = interval '90 days')::text from public.report_shares where token = '${token("g")}'`), "true");
+  asFails(user, `insert into public.report_shares (user_id, run_id, token, expires_at) values ('${user}', '${running}', '${token("h")}', now() + interval '10 years')`, /permission denied/, "no custom expiry");
+  asFails(user, `insert into public.report_shares (user_id, run_id, token, created_at) values ('${user}', '${running}', '${token("i")}', now())`, /permission denied/, "no custom creation time");
+  asFails(user, `update public.report_shares set expires_at = now() + interval '10 years' where run_id = '${mine}'`, /permission denied/, "an expiry never moves");
+
   sql(`delete from public.research_runs where id = '${mine}'`);
   assert.equal(sql(`select count(*) from public.report_shares`), "0", "deleting the report deletes its links");
 });

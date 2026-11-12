@@ -2,7 +2,7 @@
 import { useId, useRef, useState } from "react";
 import { Copy, Link2, Share2 } from "lucide-react";
 import { toast } from "sonner";
-import { useCopy } from "@/i18n/use-copy";
+import { useCopy, useFormats } from "@/i18n/use-copy";
 import { feedbackSource } from "@/i18n/errors";
 import type { ShareState } from "@/lib/share-core";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
  */
 export function ShareReportButton({ runId }: { runId: string }) {
   const copy = useCopy();
+  const formats = useFormats();
   const [open, setOpen] = useState(false);
   const [share, setShare] = useState<ShareState | undefined>(undefined);
   const [busy, setBusy] = useState(false);
@@ -66,7 +67,7 @@ export function ShareReportButton({ runId }: { runId: string }) {
           <DialogHeader>
             <DialogTitle>{copy("Share this report")}</DialogTitle>
             <DialogDescription>
-              {copy("Anyone with the link can read the report without signing in. It is not listed or indexed anywhere, and you can turn it off at any time.")}
+              {copy("Anyone with the link can read the report without signing in. It is not listed or indexed anywhere, it stops working after 90 days, and you can turn it off at any time.")}
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-2 text-sm">
@@ -86,6 +87,7 @@ export function ShareReportButton({ runId }: { runId: string }) {
                   <Copy />
                 </Button>
               </div>
+              <p className="text-sm text-muted-foreground">{copy("Works until {date}. After that, share again for a new link.", { date: formats.date(share.expires_at) })}</p>
             </div>
           )}
           <DialogFooter className="mt-2 gap-2">
