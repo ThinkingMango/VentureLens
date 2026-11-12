@@ -62,7 +62,7 @@ These were merged to `main`, and the Supabase integration normally applies a mig
 
 | Version | Name | File | Pull request | What it does |
 | --- | --- | --- | --- | --- |
-| *(none: all merged migrations were checked on 2026-11-12)* | | | | |
+| `20261112160000` | `opportunity_shares` | `supabase/migrations/20261112160000_opportunity_shares.sql` | (this PR) | Adds `report_shares.opportunity_id` (null for whole-report links, so existing links are unchanged), a unique `(id, run_id, user_id)` on `opportunities` and a foreign key so an opportunity link always names the founder's own opportunity from its own report (deleted with it), splits the one-live-link index into one per report and one per opportunity, and lets founders insert `opportunity_id`. |
 
 When a pull request adds a migration, list it here until it is applied, and apply it only with the owner's approval. If `apply_migration` assigns a different version, rename the file to that version before merging. Merging to `main` can apply a migration to production: the Supabase integration applied `20261109150000`, `20261109160000`, `20261110120000`, `20261110130000`, `20261110140000`, `20261110150000`, `20261110160000`, `20261110170000`, `20261110180000`, `20261111120000`, `20261111130000`, `20261111140000`, `20261111150000`, `20261112100000`, `20261112110000`, `20261112120000`, `20261112130000`, `20261112140000` and `20261112150000` that way.
 

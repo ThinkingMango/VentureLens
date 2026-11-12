@@ -14,7 +14,7 @@ import { ReportRating } from "@/components/report-feedback";
 import { CancelRunButton, DeleteRunButton } from "@/components/library";
 import { canDeleteRun } from "@/lib/library-core";
 import { ExportButton } from "@/components/report-export";
-import { ShareReportButton } from "@/components/share-report";
+import { ShareButton } from "@/components/share-report";
 import { exportFileName, reportToMarkdown } from "@/lib/report-export";
 import { useLocale } from "next-intl";
 import { pollInterval, retrievalProgress } from "@/lib/research-progress";
@@ -179,7 +179,7 @@ export function ResearchRunView({
                 return { fileName: exportFileName(includeBrief ? data.configuration.brief.name : copy("VentureLens research report"), generatedAt), text };
               }}
             />
-            <ShareReportButton runId={data.id} />
+            <ShareButton target={{ kind: "report", runId: data.id }} />
           </div>
         )}
       </PageHeader>
