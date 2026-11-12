@@ -37,7 +37,7 @@ const libraryMocks = {
 const exportMocks = {
   "@/components/report-export": { ExportButton: () => null, PrintButton: () => null },
   // Report links (WP-26).
-  "@/components/share-report": { ShareReportButton: () => null },
+  "@/components/share-report": { ShareButton: () => null },
   "@/lib/report-export": { buildOpportunityExport() {}, opportunityMarkdown() {}, exportFileName() {}, reportToMarkdown() {} },
   "@/lib/outcome-labels": outcomeLabels,
   // The real next-intl (notify.ts translates with it), with a locale for components rendered outside a provider.
@@ -1844,7 +1844,7 @@ test("the safety ceiling sits far above every run any model and source policy ca
   assert.ok(worst > 4 && worst < 6, `the costliest run needs about $4.52, estimated ${worst}`);
   assert.ok(NO_BUDGET_CEILING_USD >= worst * 4, `ceiling $${NO_BUDGET_CEILING_USD} must stay well above the costliest run ($${worst})`);
   // The database enforces the same figure.
-  const sql = readFileSync(new URL("../supabase/migrations/20261112160000_research_no_budget.sql", import.meta.url), "utf8");
+  const sql = readFileSync(new URL("../supabase/migrations/20261112170000_research_no_budget.sql", import.meta.url), "utf8");
   assert.equal(Number(/coalesce\(r\.budget_usd,(\d+(?:\.\d+)?)\)/.exec(sql)?.[1]), NO_BUDGET_CEILING_USD);
 });
 

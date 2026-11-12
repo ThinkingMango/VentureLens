@@ -13,6 +13,7 @@ import { SprintPanel, SprintStarter, useSprintActions } from "@/components/valid
 import { ArchiveButton } from "@/components/library";
 import { ExportButton } from "@/components/report-export";
 import { buildOpportunityExport, exportFileName, opportunityMarkdown } from "@/lib/report-export";
+import { ShareButton } from "@/components/share-report";
 import { demoSprint, firstSteps, type Sprint } from "@/lib/sprint-core";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -154,6 +155,7 @@ export function OpportunityDetail({ view, initialTab, sprint, source }: { view: 
               <Bookmark className={isSaved ? "fill-primary/15 text-primary" : ""} />
               {isSaved ? copy("Saved opportunity") : copy("Save opportunity")}
             </Button>
+            {view.kind === "live" && <ShareButton target={{ kind: "opportunity", opportunityId: view.id }} />}
             {view.kind === "live" && <ArchiveButton opportunity={{ id: view.id, title: view.title }} />}
             <ExportButton
               kind="opportunity"

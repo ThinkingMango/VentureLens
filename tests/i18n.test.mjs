@@ -240,7 +240,9 @@ test("labels and messages passed to copy() through variables are translated in e
   // The literal-call test above cannot see these: they reach copy() as variables, and useCopy falls back silently.
   const { stageLabels, researchErrors } = await import("../lib/research-core.ts");
   const { feedback } = await import("../i18n/errors.ts");
-  const dynamic = { ...stageLabels, ...researchErrors, ...feedback };
+  const { shareWording } = await import("../lib/share-core.ts");
+  const shareText = Object.fromEntries(Object.entries(shareWording).flatMap(([kind, text]) => Object.entries(text).map(([part, source]) => [`share.${kind}.${part}`, source])));
+  const dynamic = { ...stageLabels, ...researchErrors, ...feedback, ...shareText };
   for (const [name, source] of Object.entries(dynamic))
     for (const locale of locales)
       assert.ok(catalogs[locale].ui[messageKey(source)], `${locale}: ${name} → ${source}`);

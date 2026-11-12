@@ -22,7 +22,7 @@ export const MAX_RESEARCH_BUDGET_USD = 5;
  * fallback or stopped because of a configured budget; this ceiling only catches a runaway (a pipeline bug, a provider
  * billing far above its published price). It is about five times the most expensive run any model and source policy
  * can be configured for (Claude Opus 5.5 at the widest policy needs ≈ $4.52), so a working run never reaches it.
- * public.reserve_research_usage applies the same figure (migration 20261112160000); a test keeps the two equal.
+ * public.reserve_research_usage applies the same figure (migration 20261112170000); a test keeps the two equal.
  */
 export const NO_BUDGET_CEILING_USD = 25;
 export const providerSettingsSchema = z.strictObject({

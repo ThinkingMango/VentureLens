@@ -62,7 +62,8 @@ These were merged to `main`, and the Supabase integration normally applies a mig
 
 | Version | Name | File | Pull request | What it does |
 | --- | --- | --- | --- | --- |
-| `20261112160000` | `research_no_budget` | `supabase/migrations/20261112160000_research_no_budget.sql` | [#81](https://github.com/ThinkingMango/VentureLens/pull/81) | "No budget" for research runs: `research_runs.budget_usd` may be null, `research_budget_usd()` returns null for `"budgetUsd": null`, and `reserve_research_usage` stops such a run only at the $25 safety ceiling. See the notes below. |
+| `20261112160000` | `opportunity_shares` | `supabase/migrations/20261112160000_opportunity_shares.sql` | (this PR) | Adds `report_shares.opportunity_id` (null for whole-report links, so existing links are unchanged), a unique `(id, run_id, user_id)` on `opportunities` and a foreign key so an opportunity link always names the founder's own opportunity from its own report (deleted with it), splits the one-live-link index into one per report and one per opportunity, and lets founders insert `opportunity_id`. |
+| `20261112170000` | `research_no_budget` | `supabase/migrations/20261112170000_research_no_budget.sql` | [#81](https://github.com/ThinkingMango/VentureLens/pull/81) | "No budget" for research runs: `research_runs.budget_usd` may be null, `research_budget_usd()` returns null for `"budgetUsd": null`, and `reserve_research_usage` stops such a run only at the $25 safety ceiling. See the notes below. |
 
 When a pull request adds a migration, list it here until it is applied, and apply it only with the owner's approval. If `apply_migration` assigns a different version, rename the file to that version before merging. Merging to `main` can apply a migration to production: the Supabase integration applied `20261109150000`, `20261109160000`, `20261110120000`, `20261110130000`, `20261110140000`, `20261110150000`, `20261110160000`, `20261110170000`, `20261110180000`, `20261111120000`, `20261111130000`, `20261111140000`, `20261111150000`, `20261112100000`, `20261112110000`, `20261112120000`, `20261112130000`, `20261112140000` and `20261112150000` that way.
 
@@ -74,7 +75,7 @@ When a pull request adds a migration, list it here until it is applied, and appl
 4. **Keep RLS invariants.** New tables use `enable` + `force row level security`, composite `(id, user_id)` foreign keys, `revoke all … from anon, authenticated`, and explicit `grant` statements, as in the existing files.
 5. **Business parameters live in `public.app_settings`, not in check constraints.** The per-run budget is read by `public.research_budget_usd()` from the `research` row (bounded 0.05–5 USD, or `null` for "No budget", which `reserve_research_usage` caps at a $25 safety ceiling). `research_dev_access.max_runs` is bounded 1–100 by a check constraint (raised from 3 on 2026-11-06); the grant size itself is set per account by an operator until the entitlement ledger exists.
 
-## Notes on `20261112160000_research_no_budget`
+## Notes on `20261112170000_research_no_budget`
 
 - Lets the administrator choose **No budget** on the admin page. The `research` row then stores `"budgetUsd": null`.
 - `research_runs.budget_usd` becomes nullable. The check is now `budget_usd is null or (budget_usd > 0 and budget_usd <= 5)`, so a numeric budget keeps its old bounds.
@@ -82,6 +83,7 @@ When a pull request adds a migration, list it here until it is applied, and appl
 - `public.reserve_research_usage` compares spend with `coalesce(r.budget_usd, 25)`. The $25 safety ceiling is `NO_BUDGET_CEILING_USD` in `lib/provider-settings-core.ts`, and a test keeps the two equal. It is about five times the costliest configurable run (Claude Opus 5.5 at the widest source policy needs about $4.52), so it stops only a runaway. The function is otherwise unchanged from `20261104141647_research_engine`.
 - **Apply it before or with the app change.** Without it, a policy saved as No budget reads as the 0.25 default, so runs are capped at $0.25 while the admin page says No budget. Runs already in flight keep the budget they started with.
 - Rollback: set a numeric `budgetUsd` on the admin page first, so no new run starts without a budget. Rows already holding a null budget must be finished or given a number before the old check constraint can be restored.
+- Written as `20261112160000` and renamed to `20261112170000` before merging, because `20261112160000_opportunity_shares` (#80) took that version first.
 
 ## Notes on `20261106141806_research_dev_access_max_runs_limit`
 
