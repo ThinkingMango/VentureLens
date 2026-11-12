@@ -35,6 +35,8 @@ Read from `supabase_migrations.schema_migrations` on the live project:
 | `20261112130000` | `report_shares` | `supabase/migrations/20261112130000_report_shares.sql` | identical (applied by the Supabase integration after #75 merged, under the file's own version; stored one statement per element, keeping the file's `begin` and `commit`; checked 2026-11-12) |
 | `20261112140000` | `report_share_expiry` | `supabase/migrations/20261112140000_report_share_expiry.sql` | identical (applied by the Supabase integration after #76 merged, under the file's own version; stored one statement per element, keeping the file's `begin` and `commit`; checked 2026-11-12) |
 | `20261112150000` | `saved_opportunity_flag` | `supabase/migrations/20261112150000_saved_opportunity_flag.sql` | identical (applied by the Supabase integration after #78 merged, under the file's own version; stored one statement per element, keeping the file's `begin` and `commit`; checked 2026-11-12) |
+| `20261112160000` | `opportunity_shares` | `supabase/migrations/20261112160000_opportunity_shares.sql` | identical (applied by the Supabase integration after #80 merged, under the file's own version; stored one statement per element, keeping the file's `begin` and `commit`; checked 2026-11-12) |
+| `20261112170000` | `research_no_budget` | `supabase/migrations/20261112170000_research_no_budget.sql` | identical (applied by the Supabase integration after #81 merged, under the file's own version; stored one statement per element, keeping the file's `begin` and `commit`; checked 2026-11-12) |
 
 "Identical" means the MD5 of the SQL with all whitespace removed matches between the repository file and the `statements` column of the applied migration.
 
@@ -62,10 +64,9 @@ These were merged to `main`, and the Supabase integration normally applies a mig
 
 | Version | Name | File | Pull request | What it does |
 | --- | --- | --- | --- | --- |
-| `20261112160000` | `opportunity_shares` | `supabase/migrations/20261112160000_opportunity_shares.sql` | (this PR) | Adds `report_shares.opportunity_id` (null for whole-report links, so existing links are unchanged), a unique `(id, run_id, user_id)` on `opportunities` and a foreign key so an opportunity link always names the founder's own opportunity from its own report (deleted with it), splits the one-live-link index into one per report and one per opportunity, and lets founders insert `opportunity_id`. |
-| `20261112170000` | `research_no_budget` | `supabase/migrations/20261112170000_research_no_budget.sql` | [#81](https://github.com/ThinkingMango/VentureLens/pull/81) | "No budget" for research runs: `research_runs.budget_usd` may be null, `research_budget_usd()` returns null for `"budgetUsd": null`, and `reserve_research_usage` stops such a run only at the $25 safety ceiling. See the notes below. |
+| *(none: all merged migrations were checked on 2026-11-12)* | | | | |
 
-When a pull request adds a migration, list it here until it is applied, and apply it only with the owner's approval. If `apply_migration` assigns a different version, rename the file to that version before merging. Merging to `main` can apply a migration to production: the Supabase integration applied `20261109150000`, `20261109160000`, `20261110120000`, `20261110130000`, `20261110140000`, `20261110150000`, `20261110160000`, `20261110170000`, `20261110180000`, `20261111120000`, `20261111130000`, `20261111140000`, `20261111150000`, `20261112100000`, `20261112110000`, `20261112120000`, `20261112130000`, `20261112140000` and `20261112150000` that way.
+When a pull request adds a migration, list it here until it is applied, and apply it only with the owner's approval. If `apply_migration` assigns a different version, rename the file to that version before merging. Merging to `main` can apply a migration to production: the Supabase integration applied `20261109150000`, `20261109160000`, `20261110120000`, `20261110130000`, `20261110140000`, `20261110150000`, `20261110160000`, `20261110170000`, `20261110180000`, `20261111120000`, `20261111130000`, `20261111140000`, `20261111150000`, `20261112100000`, `20261112110000`, `20261112120000`, `20261112130000`, `20261112140000`, `20261112150000`, `20261112160000` and `20261112170000` that way.
 
 ## Rules going forward
 
@@ -84,6 +85,7 @@ When a pull request adds a migration, list it here until it is applied, and appl
 - **Apply it before or with the app change.** Without it, a policy saved as No budget reads as the 0.25 default, so runs are capped at $0.25 while the admin page says No budget. Runs already in flight keep the budget they started with.
 - Rollback: set a numeric `budgetUsd` on the admin page first, so no new run starts without a budget. Rows already holding a null budget must be finished or given a number before the old check constraint can be restored.
 - Written as `20261112160000` and renamed to `20261112170000` before merging, because `20261112160000_opportunity_shares` (#80) took that version first.
+- Applied by the Supabase integration when #81 merged (checked 2026-11-12): `budget_usd` is nullable with the new check, `reserve_research_usage` uses the $25 ceiling, and `research_budget_usd()` has the JSON-null branch. The live policy still holds a numeric budget ($3), so nothing runs without a budget until an administrator ticks No budget.
 
 ## Notes on `20261106141806_research_dev_access_max_runs_limit`
 
