@@ -2,7 +2,7 @@
 
 Supabase project: **VentureLens** (`ndrxywlouwigawhgrtrj`, ap-southeast-1).
 
-## Applied history (as of 2026-11-11)
+## Applied history (as of 2026-11-12)
 
 Read from `supabase_migrations.schema_migrations` on the live project:
 
@@ -27,10 +27,18 @@ Read from `supabase_migrations.schema_migrations` on the live project:
 | `20261110180000` | `run_notifications` | `supabase/migrations/20261110180000_run_notifications.sql` | identical (applied from the repository file after #55 merged, under the file's own version; stored one statement per element without the final semicolons; checked 2026-11-11) |
 | `20261111120000` | `validation_sprints` | `supabase/migrations/20261111120000_validation_sprints.sql` | identical (applied from the repository file after #56 merged, under the file's own version; stored one statement per element without the final semicolons; checked 2026-11-11) |
 | `20261111130000` | `library` | `supabase/migrations/20261111130000_library.sql` | identical (applied after #59 merged, under the file's own version; stored one statement per element without the final semicolons; checked 2026-11-11) |
+| `20261111140000` | `signup_grant_ten_runs` | `supabase/migrations/20261111140000_signup_grant_ten_runs.sql` | identical (applied by the Supabase integration after #65 merged, under the file's own version; stored one statement per element, keeping the file's `begin` and `commit`; checked 2026-11-12) |
+| `20261111150000` | `cancel_research_run` | `supabase/migrations/20261111150000_cancel_research_run.sql` | identical (applied by the Supabase integration after #67 merged, under the file's own version; stored one statement per element, keeping the file's `begin` and `commit`; checked 2026-11-12) |
+| `20261112100000` | `sprint_next_steps` | `supabase/migrations/20261112100000_sprint_next_steps.sql` | identical (applied by the Supabase integration after #72 merged, under the file's own version; stored one statement per element, keeping the file's `begin` and `commit`; checked 2026-11-12) |
+| `20261112110000` | `weekly_progress_email` | `supabase/migrations/20261112110000_weekly_progress_email.sql` | identical (applied by the Supabase integration after #73 merged, under the file's own version; stored one statement per element, keeping the file's `begin` and `commit`; checked 2026-11-12) |
+| `20261112120000` | `account_deletion` | `supabase/migrations/20261112120000_account_deletion.sql` | identical (applied by the Supabase integration after #74 merged, under the file's own version; stored one statement per element, keeping the file's `begin` and `commit`; checked 2026-11-12) |
+| `20261112130000` | `report_shares` | `supabase/migrations/20261112130000_report_shares.sql` | identical (applied by the Supabase integration after #75 merged, under the file's own version; stored one statement per element, keeping the file's `begin` and `commit`; checked 2026-11-12) |
+| `20261112140000` | `report_share_expiry` | `supabase/migrations/20261112140000_report_share_expiry.sql` | identical (applied by the Supabase integration after #76 merged, under the file's own version; stored one statement per element, keeping the file's `begin` and `commit`; checked 2026-11-12) |
+| `20261112150000` | `saved_opportunity_flag` | `supabase/migrations/20261112150000_saved_opportunity_flag.sql` | identical (applied by the Supabase integration after #78 merged, under the file's own version; stored one statement per element, keeping the file's `begin` and `commit`; checked 2026-11-12) |
 
 "Identical" means the MD5 of the SQL with all whitespace removed matches between the repository file and the `statements` column of the applied migration.
 
-Migrations applied with `apply_migration` store the whole file as one element of `statements`. Migrations applied by the Supabase CLI (as `20261109150000` and `20261109160000` were, under their file versions) store one element per statement without its terminating semicolon, so compare those with the statements rejoined: `md5(regexp_replace(array_to_string(statements, ';') || ';', '\s+', '', 'g'))`.
+Migrations applied with `apply_migration` store the whole file as one element of `statements`. Migrations applied by the Supabase CLI (as `20261109150000` and `20261109160000` were, under their file versions) store one element per statement without its terminating semicolon, so compare those with the statements rejoined: `md5(regexp_replace(array_to_string(statements, ';') || ';', '\s+', '', 'g'))`. From `20261111140000` on, the integration also keeps the file's `begin;` and `commit;` lines as their own elements; those were compared with whitespace and semicolons removed on both sides: `md5(regexp_replace(array_to_string(statements, ''), '\s|;', '', 'g'))` against the whole file.
 
 ## Reconciliation performed on 2026-11-05
 
@@ -54,16 +62,9 @@ These were merged to `main`, and the Supabase integration normally applies a mig
 
 | Version | Name | File | Pull request | What it does |
 | --- | --- | --- | --- | --- |
-| `20261111140000` | `signup_grant_ten_runs` | `supabase/migrations/20261111140000_signup_grant_ten_runs.sql` | [#65](https://github.com/ThinkingMango/VentureLens/pull/65) | Replaces `grant_signup_research_run()`: a newly confirmed account gets **10** runs valid for **90 days** (was 1 run for 30 days). Who qualifies is unchanged (once per normalised email; `smartmango.ai` granted by hand). Existing grants are not touched. |
-| `20261111150000` | `cancel_research_run` | `supabase/migrations/20261111150000_cancel_research_run.sql` | [#67](https://github.com/ThinkingMango/VentureLens/pull/67) | Adds `cancel_research_run(p_run)`, callable by founders for their own pending or running run. It ends the run as `failed` / `CANCELLED`, so the existing triggers refund it (always when nothing was spent, otherwise against the refund allowance) and record `run_finished`; `reserve_research_usage` and `finish_research` then refuse the workflow. No table changes. |
-| `20261112100000` | `sprint_next_steps` | `supabase/migrations/20261112100000_sprint_next_steps.sql` | [#72](https://github.com/ThinkingMango/VentureLens/pull/72) | Replaces `start_validation_sprint` with a four-argument version (`p_labels`): a report with next steps seeds one task per step with labelled details, scaled due dates, carried ticks and prefilled go criteria; the three-argument version is dropped. |
-| `20261112110000` | `weekly_progress_email` | `supabase/migrations/20261112110000_weekly_progress_email.sql` | [#73](https://github.com/ThinkingMango/VentureLens/pull/73) | Adds `founder_profiles.notify_weekly` (default true) and the service-only `weekly_emails` table (one row per founder per week). |
-| `20261112120000` | `account_deletion` | `supabase/migrations/20261112120000_account_deletion.sql` | [#74](https://github.com/ThinkingMango/VentureLens/pull/74) | Adds the service-only `deleted_signup_grants` table, `signup_email_hash()`, `prepare_account_deletion()` (authenticated only), and one extra check in `grant_signup_research_run()`. |
-| `20261112130000` | `report_shares` | `supabase/migrations/20261112130000_report_shares.sql` | [#75](https://github.com/ThinkingMango/VentureLens/pull/75) | Adds `report_shares` (owner-only RLS; one live link per completed run; deleted with the run). |
-| `20261112140000` | `report_share_expiry` | `supabase/migrations/20261112140000_report_share_expiry.sql` | [#76](https://github.com/ThinkingMango/VentureLens/pull/76) | Adds `report_shares.expires_at` (default 90 days, backfilled from `created_at`) and limits founders' inserts to `user_id`, `run_id` and `token`. |
-| `20261112150000` | `saved_opportunity_flag` | `supabase/migrations/20261112150000_saved_opportunity_flag.sql` | [#78](https://github.com/ThinkingMango/VentureLens/pull/78) | Adds `saved_opportunities.saved` (default true; existing rows stay saved) and a partial index for saved rows, and re-creates `start_validation_sprint` so starting a sprint marks the opportunity saved. |
+| *(none: all merged migrations were checked on 2026-11-12)* | | | | |
 
-When a pull request adds a migration, list it here until it is applied, and apply it only with the owner's approval. If `apply_migration` assigns a different version, rename the file to that version before merging. Merging to `main` can apply a migration to production: the Supabase integration applied `20261109150000`, `20261109160000`, `20261110120000`, `20261110130000`, `20261110140000`, `20261110150000`, `20261110160000`, `20261110170000`, `20261110180000`, `20261111120000` and `20261111130000` that way.
+When a pull request adds a migration, list it here until it is applied, and apply it only with the owner's approval. If `apply_migration` assigns a different version, rename the file to that version before merging. Merging to `main` can apply a migration to production: the Supabase integration applied `20261109150000`, `20261109160000`, `20261110120000`, `20261110130000`, `20261110140000`, `20261110150000`, `20261110160000`, `20261110170000`, `20261110180000`, `20261111120000`, `20261111130000`, `20261111140000`, `20261111150000`, `20261112100000`, `20261112110000`, `20261112120000`, `20261112130000`, `20261112140000` and `20261112150000` that way.
 
 ## Rules going forward
 
