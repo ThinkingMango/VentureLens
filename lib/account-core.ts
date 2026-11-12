@@ -20,6 +20,7 @@ export const ownTables = [
   "report_feedback",
   "research_dev_access",
   "research_usage",
+  "report_shares",
 ] as const;
 /** Founder rows only the service role can read; the export reads them filtered to the founder's id. */
 export const serviceTables = ["product_events", "weekly_emails"] as const;

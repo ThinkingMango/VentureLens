@@ -20,6 +20,8 @@ test("every event the spec names has a schema, and valid props pass unchanged", 
     evidence_logged: { kind: "deposit" },
     kit_generated: { kind: "buyers" },
     weekly_email_sent: {},
+    report_shared: {},
+    report_unshared: {},
   };
   assert.deepEqual(Object.keys(eventSchemas).sort(), Object.keys(valid).sort());
   for (const [event, props] of Object.entries(valid)) assert.deepEqual(eventProps(event, props), props, event);

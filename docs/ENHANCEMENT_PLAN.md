@@ -516,6 +516,12 @@ Compare founders whose first report came after WP-16 with the WP-15 baseline coh
 **Acceptance**
 - [ ] A shared link shows no profile, brief, interview or evidence data unless the founder opted in, and can be revoked.
 
+**As built (2026-11-12):**
+- **Report-level links** from a completed report's page ("Share"): one live link per report, a 43-character random token, unlisted. Turning a link off is final; sharing again makes a new link, so an old one never comes back. Deleting the report or the account deletes its links.
+- **The public page** `/s/<token>` renders the report with the print document: summary, opportunities with scores, claims, sources, economics and review, and the ideas that did not pass. It never shows the profile, the brief or **each score's rationale**, because the rationale explains the founder-advantage score from the founder's own background. The share dialog warns that other report text can still mention the founder's skills. First-hand evidence and interviews (WP-19, WP-20) are not built yet and are not part of the report.
+- **No leaks through links:** the shared pages send no Referer (so a source site never sees the link) and are `noindex, nofollow, nocache`. Views are not counted; making and turning off a link record `report_shared` / `report_unshared`.
+- **Footer:** "Researched with VentureLens" with a link to start research. There is no public listing, so moderation is not needed yet.
+
 ---
 
 ## 7. Deferred and dropped
