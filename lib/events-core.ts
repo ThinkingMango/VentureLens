@@ -35,6 +35,9 @@ export const eventSchemas = {
   kit_generated: z.strictObject({ kind: z.enum(["buyers", "interview", "offer"]) }),
   // WP-17: a weekly progress email was sent (or logged, in a dry run, which records nothing).
   weekly_email_sent: z.strictObject({}),
+  // WP-26: a founder made or turned off a read-only link to a report. Views of shared pages are not recorded.
+  report_shared: z.strictObject({}),
+  report_unshared: z.strictObject({}),
 } as const;
 
 /** Events recorded at most once per founder per UTC day (see trackDaily). */

@@ -16,7 +16,7 @@ const orderBy: Record<ExportTable, string[]> = {
   founder_profiles: ["user_id"], research_projects: ["id"], research_runs: ["id"], research_evidence: ["id"],
   opportunities: ["id"], saved_opportunities: ["opportunity_id"], validation_sprints: ["id"], validation_tasks: ["id"],
   report_feedback: ["id"], research_dev_access: ["user_id"], research_usage: ["id"], product_events: ["id"],
-  weekly_emails: ["week"], research_stages: ["run_id", "stage_key"],
+  weekly_emails: ["week"], research_stages: ["run_id", "stage_key"], report_shares: ["id"],
 };
 /** All rows of one query, page by page: PostgREST returns at most 1,000 rows per request. */
 async function readAll(page: (from: number, to: number) => Page): Promise<unknown[]> {

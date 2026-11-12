@@ -268,3 +268,17 @@ test("the print view puts each opportunity on its own page, links sources and qu
   const toolbar = renderToStaticMarkup(createElement(PrintToolbar, { backHref: "/research/x", backLabel: "Back", hint: "Hint" }));
   assert.ok(toolbar.includes('class="print-hide') && toolbar.includes("PRINT"), "the toolbar is hidden on paper");
 });
+
+test("a shared report (WP-26) never shows the brief or any score rationale, whatever the caller asks", () => {
+  const { copy } = copyFor("en");
+  const opportunity = { ...v3, rationale: "Advantage 80: the founder ran a clinic in Ohio for ten years." };
+  const shared = buildReportExport(run([opportunity]), { copy, locale: "en", generatedAt: AT, brief, includeBrief: true, shared: true });
+  assert.equal(shared.brief, null);
+  assert.equal(shared.title, "VentureLens research report", "the brief's name is not the title");
+  assert.equal(shared.opportunities[0].rationale, null);
+  const markdown = reportMarkdown(shared);
+  assert.doesNotMatch(markdown, /Ohio|Dr Lee/);
+  assert.match(markdown, /Managers spend hours on billing\./, "the evidence and claims are still there");
+  const own = buildReportExport(run([opportunity]), { copy, locale: "en", generatedAt: AT, brief, includeBrief: true });
+  assert.match(own.opportunities[0].rationale, /Ohio/, "the founder's own export keeps the rationale");
+});
