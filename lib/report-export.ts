@@ -178,7 +178,15 @@ export function buildOpportunityExport(op: WorkspaceOpportunity, ctx: ExportCont
       ],
     },
     risk: { heading: copy("Key risk to validate"), text: view.risk, review },
-    validation: view.validation.length ? { heading: copy("Next validation steps"), items: view.validation } : null,
+    // Next steps (WP-16) export as one line each, with where, done-when and stop-if; older reports keep plain steps.
+    validation: view.steps.length
+      ? { heading: copy("Next steps"), items: view.steps.map((step) => [
+          step.action,
+          step.source ? `${copy("Where")}: [${step.source.number}] ${step.source.title}` : step.hint ? `${copy("Where to look (suggestion)")}: ${step.hint}` : null,
+          `${copy("Done when")}: ${step.doneWhen}`,
+          `${copy("Stop if")}: ${step.stopIf}`,
+        ].filter(Boolean).join(" · ")) }
+      : view.validation.length ? { heading: copy("Next validation steps"), items: view.validation } : null,
     sources: view.sources.length
       ? {
           heading: copy("Sources"),

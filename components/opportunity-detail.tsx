@@ -2,7 +2,7 @@
 import { useCopy, useFormats } from "@/i18n/use-copy";
 import { useLocale } from "next-intl";
 import Link from "@/components/workspace-link";
-import { useRef, useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { ArrowLeft, ArrowRight, Bookmark, BookOpen, ChevronDown, Link2 } from "lucide-react";
 import type { Opportunity } from "@/lib/demo-data";
 import type { WorkspaceOpportunity } from "@/lib/workspace-schema";
@@ -30,6 +30,8 @@ import {
   type OpportunityTabId,
   type OpportunityView,
   type ViewSource,
+  type ViewStep,
+  stepTaskDetail,
 } from "@/lib/opportunity-view";
 
 type Copy = ReturnType<typeof useCopy>;
@@ -44,8 +46,9 @@ export function DemoOpportunityDetail({ opportunity, initialTab }: { opportunity
   const copy = useCopy();
   const content = useDemoContent();
   const view = demoOpportunityView(content.opportunity(opportunity), content.report(opportunity.id), copy);
-  // One fixed example sprint (WP-10): the page's first steps and the report's first test, a few days in.
-  const sprint = demoSprint(view.id, [...checklist.map((title) => copy(title)), ...(view.firstTest ? [view.firstTest] : [])], copy("Example: at least 3 of 10 owners I interview describe this problem unprompted, and 2 agree to a paid pilot."));
+  // One fixed example sprint (WP-10), a few days in, made from the demo's next steps (WP-16) as a real sprint would be.
+  const labels = { where: copy("Where"), hint: copy("Where to look (suggestion)"), done: copy("Done when"), stop: copy("Stop if") };
+  const sprint = demoSprint(view.id, view.steps.map((step) => step.action), copy("Example: at least 3 of 10 owners I interview describe this problem unprompted, and 2 agree to a paid pilot."), undefined, view.steps.map((step) => stepTaskDetail(step, labels)));
   return <OpportunityDetail view={view} initialTab={initialTab} sprint={sprint} />;
 }
 
@@ -609,7 +612,12 @@ function ValidationTab({ view, sprint }: { view: OpportunityView; sprint?: Sprin
     copy("Ask about the last time this happened, their existing workaround, and what it costs them. Avoid pitching."),
     copy("Offer a manual version of the outcome for a small fee before building software."),
   ];
-  const done = checklist.filter((_, i) => completed.includes(`${view.id}-${i}`)).length;
+  // Reports with next steps (WP-16) tick those; older reports keep the fixed first steps. Both are stored by position.
+  const steps = view.steps;
+  const titles = steps.length ? steps.map((step) => step.action) : checklist.map((title) => copy(title));
+  const done = titles.filter((_, i) => completed.includes(`${view.id}-${i}`)).length;
+  // Field labels for the sprint tasks the steps become, in the founder's language (the database stores plain text).
+  const stepLabels = [copy("Where"), copy("Where to look (suggestion)"), copy("Done when"), copy("Stop if")];
   return (
     <section className="report-section" aria-labelledby="validation-heading">
       <h2 id="validation-heading" className="text-xl font-semibold">{copy("Your first validation sprint")}</h2>
@@ -617,16 +625,16 @@ function ValidationTab({ view, sprint }: { view: OpportunityView; sprint?: Sprin
         <SprintStarter
           busy={actions.busy}
           previous={current}
-          onStart={(length) => void actions.send({ action: "start", opportunity_id: view.id, length, checklist: checklist.map((title) => copy(title)) })}
+          onStart={(length) => void actions.send({ action: "start", opportunity_id: view.id, length, checklist: steps.length ? [] : titles, labels: stepLabels })}
         />
       )}
-      {view.firstTest && (
+      {!steps.length && view.firstTest && (
         <div className="flex flex-col gap-2">
           <h3 className="font-semibold">{copy("What to test first")}</h3>
           <p className="max-w-prose leading-relaxed">{view.firstTest}</p>
         </div>
       )}
-      {!activeSprint && view.validation.length > 1 && (
+      {!steps.length && !activeSprint && view.validation.length > 1 && (
         <div className="flex flex-col gap-2">
           <h3 className="font-semibold">{copy("Next validation steps")}</h3>
           <ol className="flex list-decimal flex-col gap-2 pl-5 text-sm leading-relaxed">
@@ -648,12 +656,17 @@ function ValidationTab({ view, sprint }: { view: OpportunityView; sprint?: Sprin
       {!activeSprint && (<>
       <div className="flex flex-col gap-3 border-t pt-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h3 className="font-semibold">{copy("Checklist")}</h3>
+          <h3 className="font-semibold">{steps.length ? copy("Next steps") : copy("Checklist")}</h3>
           <span className="text-sm text-muted-foreground" aria-live="polite">
-            {copy("{count} of {total} steps complete", { count: done, total: checklist.length })}
+            {copy("{count} of {total} steps complete", { count: done, total: titles.length })}
           </span>
         </div>
-        <progress className="h-2 w-full accent-primary" value={done} max={checklist.length} aria-label={copy("Validation steps complete")} />
+        <progress className="h-2 w-full accent-primary" value={done} max={titles.length} aria-label={copy("Validation steps complete")} />
+        {steps.length > 0 && (
+          <p className="max-w-prose text-sm leading-relaxed text-muted-foreground">
+            {copy("Each step tests one assumption from this report. When a step is done, the result tells you whether to keep going or change course.")}
+          </p>
+        )}
         <p className="text-sm text-muted-foreground">
           {view.kind === "demo"
             ? copy("Demo checklist · Changes reset on refresh. No interviews are scheduled or messages sent.")
@@ -661,16 +674,17 @@ function ValidationTab({ view, sprint }: { view: OpportunityView; sprint?: Sprin
         </p>
       </div>
       <div className="flex flex-col">
-        {checklist.map((title, i) => {
+        {titles.map((title, i) => {
           const checked = completed.includes(`${view.id}-${i}`);
+          const step = steps[i];
           return (
-            <label key={title} className="flex cursor-pointer items-start gap-4 border-b py-5 last:border-0">
-              <input type="checkbox" checked={checked} disabled={busy} onChange={() => toggleTask(`${view.id}-${i}`)} className="mt-1 size-5 shrink-0" />
-              <span className="flex flex-col gap-2">
-                <span className={cn("font-medium", checked && "text-muted-foreground line-through")}>{copy(title)}</span>
-                <span className="text-sm leading-relaxed text-muted-foreground">{notes[i]}</span>
-              </span>
-            </label>
+            <div key={`${i}-${title}`} className="flex items-start gap-4 border-b py-5 last:border-0">
+              <input id={`step-${view.id}-${i}`} type="checkbox" checked={checked} disabled={busy} onChange={() => toggleTask(`${view.id}-${i}`)} className="mt-1 size-5 shrink-0" />
+              <div className="flex min-w-0 flex-col gap-2">
+                <label htmlFor={`step-${view.id}-${i}`} className={cn("cursor-pointer font-medium", checked && "text-muted-foreground line-through")}>{title}</label>
+                {step ? <StepDetails step={step} /> : <span className="text-sm leading-relaxed text-muted-foreground">{notes[i]}</span>}
+              </div>
+            </div>
           );
         })}
       </div>
@@ -682,6 +696,35 @@ function ValidationTab({ view, sprint }: { view: OpportunityView; sprint?: Sprin
         </blockquote>
       </div>
     </section>
+  );
+}
+
+/** Where a next step happens, what completes it, and what means change course (WP-16). */
+function StepDetails({ step }: { step: ViewStep }) {
+  const copy = useCopy();
+  const row = (label: string, value: ReactNode) => (
+    <div className="flex flex-col gap-0.5 sm:flex-row sm:gap-2">
+      <dt className="shrink-0 font-medium text-foreground sm:w-28">{label}</dt>
+      <dd className="min-w-0 break-words">{value}</dd>
+    </div>
+  );
+  return (
+    <dl className="flex flex-col gap-1.5 text-sm leading-relaxed text-muted-foreground">
+      {step.source && row(copy("Where"), (
+        <span>
+          <span className="tabular-nums">[{step.source.number}] </span>
+          {step.source.url
+            ? <a href={step.source.url} target="_blank" rel="noopener noreferrer" className="text-primary underline-offset-2 hover:underline">{step.source.title}</a>
+            : step.source.title}
+          {step.source.domain && <span> · {step.source.domain}</span>}
+        </span>
+      ))}
+      {!step.source && step.hint && row(copy("Where"), <span>{step.hint} <span className="rounded bg-warm-soft px-1.5 py-0.5 text-xs font-semibold text-foreground">{copy("Suggestion")}</span></span>)}
+      {row(copy("Done when"), step.doneWhen)}
+      {row(copy("Stop if"), step.stopIf)}
+      {step.assumption && row(copy("Tests"), step.assumption)}
+      {row(copy("Aim for"), copy("Day {day} of 14", { day: step.day }))}
+    </dl>
   );
 }
 

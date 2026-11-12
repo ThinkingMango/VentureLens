@@ -123,7 +123,7 @@ test("starting a sprint calls the seeding function with the page's first steps a
   const { post, calls } = route();
   const response = await post({ action: "start", opportunity_id: ID(1), length: 30, checklist: ["Step one", "Step two"] });
   assert.equal(response.status, 200);
-  assert.deepEqual(calls.rpc, [{ name: "start_validation_sprint", args: { p_opportunity: ID(1), p_length: 30, p_checklist: ["Step one", "Step two"] } }]);
+  assert.deepEqual(calls.rpc, [{ name: "start_validation_sprint", args: { p_opportunity: ID(1), p_length: 30, p_checklist: ["Step one", "Step two"], p_labels: [] } }]);
   assert.deepEqual(calls.events, [{ event: "sprint_created", userId: "u1", props: { length: 30 } }]);
   assert.deepEqual((await route({ rpc: { data: null, error: { code: "23505" } } }).post({ action: "start", opportunity_id: ID(1), length: 7 })).body.code, "SPRINT_ACTIVE");
   assert.equal((await route({ rpc: { data: null, error: { code: "P0002" } } }).post({ action: "start", opportunity_id: ID(1), length: 7 })).status, 404);

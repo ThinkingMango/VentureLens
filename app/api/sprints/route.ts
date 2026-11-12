@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
     let sprintId: string;
 
     if (input.action === "start") {
-      const { data, error } = await supabase.rpc("start_validation_sprint", { p_opportunity: input.opportunity_id, p_length: input.length, p_checklist: input.checklist });
+      const { data, error } = await supabase.rpc("start_validation_sprint", { p_opportunity: input.opportunity_id, p_length: input.length, p_checklist: input.checklist, p_labels: input.labels });
       if (error?.code === "P0002") return notFound();
       if (error?.code === "23505") return json({ code: "SPRINT_ACTIVE", error: "This opportunity already has an active sprint." }, 409);
       if (error || typeof data !== "string") throw error ?? new Error("SPRINT_NOT_STARTED");

@@ -37,9 +37,11 @@ export const typicalRun = {
   // search call's input; 20,000 tokens is a conservative estimate for two searches. Re-calibrate after real runs.
   retrieval: { inputTokens: { gemini: 400, qwen: 8_000, claude: 20_000 }, queries: 2, promptBytes: 700 },
   classification: { calls: 4, inputTokens: 7_000, outputTokens: 2_500, promptBytes: 28_000 },
-  // Methodology v3 (WP-07): 3–12 claims per candidate add about 1,500 output tokens per batch of two. Re-calibrate
-  // against the usage ledger after real v3 runs.
-  evaluation: { calls: 4, inputTokens: 6_500, outputTokens: 4_500, promptBytes: 26_000 },
+  // Methodology v3 (WP-07): 3–12 claims per candidate add about 1,500 output tokens per batch of two. Next steps
+  // (WP-16): 2–3 compact steps per candidate add about 700 more (more in Chinese), and shorter validation steps save a
+  // little. A batch must stay under the model's output cap (7,000 for Qwen 3.8 Flash), so steps carry no message drafts.
+  // Re-calibrate against the usage ledger after real runs.
+  evaluation: { calls: 4, inputTokens: 6_800, outputTokens: 5_200, promptBytes: 27_500 },
   review: { calls: 4, inputTokens: 5_000, outputTokens: 1_500, promptBytes: 20_000 },
   systemBytes: 800,
   schemaBytes: 2_000,
@@ -54,7 +56,7 @@ export const typicalVerifyRun = {
   discovery: { inputTokens: 900, outputTokens: 250, promptBytes: 2_200 },
   searches: 2,
   classification: { calls: 1, inputTokens: 7_000, outputTokens: 2_500, promptBytes: 28_000 },
-  evaluation: { calls: 1, inputTokens: 3_800, outputTokens: 2_400, promptBytes: 14_000 },
+  evaluation: { calls: 1, inputTokens: 4_100, outputTokens: 2_750, promptBytes: 15_500 },
   review: { calls: 1, inputTokens: 2_800, outputTokens: 800, promptBytes: 10_000 },
 } as const;
 
