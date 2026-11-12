@@ -497,6 +497,11 @@ Compare founders whose first report came after WP-16 with the WP-15 baseline coh
 - [ ] Export contains every user-owned table added by this plan.
 - [ ] Deletion removes all of them (SQL test across every table).
 
+**As built (2026-11-12):**
+- **Export** (`GET /api/account/export`, "Download my data" on the profile): one JSON file with every row of every founder table, read with the founder's own session (row-level security), plus `product_events` and `weekly_emails` read with the service role filtered to them. Paged past PostgREST's 1,000-row limit. `research_stages` is listed by stage and time only: its working copies are often megabytes per run, and the brief, evidence and report are exported from their own tables. A test fails if a migration adds a table with `user_id` that the export misses.
+- **Deletion** (`DELETE /api/account`, "Delete my account" with the typed word): `prepare_account_deletion()` refuses while research is running, detaches the founder's usage rows (D6, as for a deleted run; before this, account deletion deleted them), and records a SHA-256 hash of the normalised address if the account had the sign-up grant; then the admin API deletes the auth user and the cascades remove every founder table. The session is signed out.
+- **Abuse guard (new):** without it, deleting an account and signing up again would grant ten more free runs, because repeat sign-ups were blocked only by matching live accounts. `grant_signup_research_run` now also refuses an address whose granted account was deleted in the last 12 months. Only the hash is kept, for 12 months, and the privacy notice says so.
+
 ---
 
 ### WP-26 — Share a report (#34)

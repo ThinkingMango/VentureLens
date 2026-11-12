@@ -125,7 +125,8 @@ function buildSections(disclosure: ProviderDisclosure): Section[] {
       title: "How long we keep your information",
       body: [
         "We keep your account, profile, briefs, research, and saved items while your account is active, so you can return to your research history.",
-        "When your account is deleted, your profile, briefs, research runs, evidence, usage records, and saved items are deleted with it. Copies in provider backups and logs expire on those providers' schedules.",
+        "When your account is deleted, your profile, briefs, research runs, evidence, saved items, sprints, feedback and email settings are deleted with it. The cost records of your research (the model, token counts and cost of each call) are kept for our cost accounting, without any link to you. Copies in provider backups and logs expire on those providers' schedules.",
+        "If your account received free research runs, we keep a one-way code made from your email address (a SHA-256 hash, not the address itself) for 12 months after you delete it, so a new account with the same address does not receive the free runs again.",
         "Product usage events are kept to measure the product over time. When your account is deleted, they are kept without any link to you.",
         "When you delete a research run, its report, opportunities, sources and sprints are deleted. Its cost records (the model, token counts and cost of each call) are kept for our cost accounting, without any link to you or the run.",
         "We keep support emails only as long as needed to resolve your request and keep a reasonable record of it.",
@@ -136,7 +137,7 @@ function buildSections(disclosure: ProviderDisclosure): Section[] {
       title: "Your rights and choices",
       body: [
         "Depending on where you live, you may have the right to access, correct, export, or delete your personal information, to object to or restrict certain processing, and to withdraw consent. We extend these choices to every user.",
-        "You can update your founder profile in your workspace at any time. For anything else, including deleting your account, email us from the address on your account. We may need to confirm your identity, and we aim to respond within 30 days.",
+        "You can update your founder profile, download all of your data as a file, and delete your account yourself on your profile page at any time. For anything else, email us from the address on your account. We may need to confirm your identity, and we aim to respond within 30 days.",
         "If you are not satisfied with our response, you can contact your local data protection authority.",
       ],
     },
