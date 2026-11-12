@@ -43,5 +43,5 @@ export type ResearchDetail = {
   steps: { stage_key: string; created_at: string }[];
   /** Live progress while the run is pending or running (WP-08); absent once it has finished. */
   progress?: RunProgress;
-  usage: { estimated_usd: number; committed_usd: number; uncertain_calls: number; input_tokens: number; output_tokens: number; search_requests: number; budget_usd: number };
+  usage: { estimated_usd: number; committed_usd: number; uncertain_calls: number; input_tokens: number; output_tokens: number; search_requests: number; /** null: started with "No budget" (only the safety ceiling applies). */ budget_usd: number | null };
 };

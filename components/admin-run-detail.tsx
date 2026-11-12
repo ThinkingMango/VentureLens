@@ -53,7 +53,7 @@ export function AdminRunDetail({ inspection }: { inspection: RunInspection }) {
             [copy("Finished"), date(run.completed_at)],
             [copy("Duration"), formatDuration(copy, run.durationMs)],
             [copy("Committed cost"), formats.usd(run.committedUsd, 4)],
-            [copy("Run budget"), formats.usd(run.budget_usd, 2)],
+            [copy("Run budget"), run.budget_usd === null ? copy("No budget") : formats.usd(run.budget_usd, 2)],
             [copy("Run slot returned"), run.status === "failed" ? (run.quota_released ? copy("Yes") : copy("No")) : "—"],
             [copy("Opportunities"), run.opportunities],
             [copy("Model"), mono(setup.model)],

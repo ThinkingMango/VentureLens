@@ -1799,3 +1799,104 @@ test("the fallback is the chosen provider, or the primary's default partner, and
   assert.throws(() => assertProvidersConfigured(providerSettingsSchema.parse({ primary: "claude", autoFallback: true, fallbackProvider: "qwen" }), providers), /PROVIDER_NOT_CONFIGURED/);
   assert.throws(() => assertProvidersConfigured(providerSettingsSchema.parse({ primary: "gemini", autoFallback: true, fallbackProvider: "claude" }), { ...providers, claude: { configured: false, model: "" } }), /PROVIDER_NOT_CONFIGURED/);
 });
+
+// ---------------------------------------------------------------------------------------------------------------
+// "No budget": the administrator can run research without a per-run cap. Only a fixed safety ceiling applies.
+// ---------------------------------------------------------------------------------------------------------------
+test("No budget is stored as null, round-trips, and never fails the save check", async () => {
+  const { NO_BUDGET_CEILING_USD, effectiveBudget, assertBudgetFits, MAX_RESEARCH_BUDGET_USD } = settingsCore;
+  const input = { primary: "gemini", autoFallback: true, qwenModel: "qwen3.8-max", geminiModel: "gemini-4-argon", claudeModel: "claude-opus-5-5", budgetUsd: null };
+  assert.deepEqual(providerSettingsSchema.parse(input), input);
+  assert.equal(readStoredProviderSettings({ ...input, updatedAt: verified.email_confirmed_at }).budgetUsd, null);
+  // A row saved before the option existed, without the key, keeps the 0.25 default; a number is still bounded.
+  assert.equal(providerSettingsSchema.parse({ primary: "qwen", autoFallback: true }).budgetUsd, 0.25);
+  for (const budgetUsd of [0, 50, "0.25", "none"]) assert.equal(providerSettingsSchema.safeParse({ ...input, budgetUsd }).success, false, String(budgetUsd));
+  // The most expensive policy there is (Claude Opus at the widest sources) cannot be saved at $1, but it can with no budget.
+  const widest = { ...input, primary: "claude", sources: { ...settingsCore.defaultSourcePolicy, candidates: settingsCore.MAX_CANDIDATES, pagesPerIdea: settingsCore.MAX_PAGES_PER_IDEA, alternativesSearch: true } };
+  assert.doesNotThrow(() => assertBudgetFits(widest));
+  assert.throws(() => assertBudgetFits({ ...widest, budgetUsd: 1 }), /BUDGET_TOO_LOW/);
+  const writes = [];
+  const service = storage({ writes, admin: { getUserById: async () => ({ data: { user: verified }, error: null }) } });
+  const saved = await service.saveProviderSettings(verified.id, input);
+  assert.equal(writes[0].row.value.budgetUsd, null, "null is written, not dropped, so the database reads it as No budget");
+  assert.equal(saved.settings.budgetUsd, null);
+  // The API route accepts it and hands the null on to be saved.
+  const received = [];
+  const response = await route(verified, async (_id, body) => { received.push(body); return { settings: { ...body, updatedAt: null }, providers: {} }; }).PATCH(patch(input));
+  assert.equal(response.status, 200);
+  assert.equal(received[0].budgetUsd, null);
+  assert.equal(effectiveBudget(null), NO_BUDGET_CEILING_USD);
+  assert.equal(effectiveBudget(undefined), NO_BUDGET_CEILING_USD);
+  assert.equal(effectiveBudget("0.40"), 0.4);
+  assert.ok(NO_BUDGET_CEILING_USD > MAX_RESEARCH_BUDGET_USD);
+});
+
+test("the safety ceiling sits far above every run any model and source policy can be configured for", () => {
+  const { NO_BUDGET_CEILING_USD, MAX_CANDIDATES, MAX_PAGES_PER_IDEA } = settingsCore;
+  const widest = { candidates: MAX_CANDIDATES, pagesPerIdea: MAX_PAGES_PER_IDEA, alternativesSearch: true };
+  let worst = 0;
+  // Today and after every scheduled price change the pricing table knows about.
+  for (const at of [new Date("2026-11-12T00:00:00Z"), new Date("2027-06-01T00:00:00Z")]) {
+    for (const model of [...models.qwenModelIds, ...models.geminiModelIds, ...models.claudeModelIds]) {
+      for (const mode of ["combined", "verify"]) worst = Math.max(worst, budget.estimateRunCost(model, at, mode, widest).requiredUsd);
+    }
+  }
+  assert.ok(worst > 4 && worst < 6, `the costliest run needs about $4.52, estimated ${worst}`);
+  assert.ok(NO_BUDGET_CEILING_USD >= worst * 4, `ceiling $${NO_BUDGET_CEILING_USD} must stay well above the costliest run ($${worst})`);
+  // The database enforces the same figure.
+  const sql = readFileSync(new URL("../supabase/migrations/20261112170000_research_no_budget.sql", import.meta.url), "utf8");
+  assert.equal(Number(/coalesce\(r\.budget_usd,(\d+(?:\.\d+)?)\)/.exec(sql)?.[1]), NO_BUDGET_CEILING_USD);
+});
+
+test("a run started with no budget uses the configured models, however expensive, and keeps its fallback", async () => {
+  const verified = [];
+  const providerSettings = { primary: "gemini", autoFallback: true, qwenModel: "qwen3.8-max", geminiModel: "gemini-4-argon", budgetUsd: null, updatedAt: null };
+  // The same policy at $0.25 stops before any request (see the test above); with no budget it starts on Argon.
+  const fixture = researchFixture({ spent: 0, budgetUsd: null, providerSettings, verify: { qwen: async () => { verified.push("qwen"); }, gemini: async () => { verified.push("gemini"); } } });
+  fixture.setup.profile = { ...workspaceSchema.emptyProfile, name: "Founder", skills: "Operations" };
+  fixture.checkpoints.delete("setup");
+  assert.equal(await fixture.engine.initializeResearch(fixture.context), true);
+  assert.deepEqual(verified, ["gemini"]);
+  const setup = fixture.checkpoints.get("setup");
+  assert.equal(setup.model, "gemini-4-argon");
+  assert.equal(setup.fallback_allowed, true);
+  assert.equal(setup.primary_skipped, undefined);
+  assert.equal(fixture.checkpoints.get("budget_block"), undefined);
+});
+
+test("research detail shows No budget and measures what remains against the safety ceiling", async () => {
+  const run = { id: "run", status: "failed", stage: "retrieval", error_code: "BUDGET_EXCEEDED", retry_count: 0, budget_usd: null, configuration: { brief: {} }, report: null };
+  function from(table) {
+    const query = {
+      select: () => query, eq: () => query, order: () => query,
+      maybeSingle: async () => ({ data: table === "research_runs" ? run : { output: { model: "claude-opus-5-5", required_usd: 0.9 } }, error: null }),
+      then: resolve => resolve({ data: table === "research_usage" ? [{ status: "completed", input_tokens: 1, output_tokens: 1, search_requests: 0, estimated_usd: 24.5, reserved_usd: 24.5 }] : [], error: null }),
+    };
+    return query;
+  }
+  const service = loadModule("../lib/research-service.ts", { "@/lib/research-progress": require("../lib/research-progress.ts"), "server-only": {}, "@/lib/research-core": researchCore, "workflow/api": {}, "workflow/errors": {}, "@/workflows/research": {}, "@/lib/provider-settings": { researchProviderSettings: async () => ({ primary: "qwen", autoFallback: true }) }, "@/lib/provider-settings-core": settingsCore, "@/lib/research-models": models, "@/lib/qwen-core": { QWEN_PROVIDER: "dashscope-beijing" }, "@/lib/research-fallback-core": fallbackCore, "@/lib/supabase/admin": {} });
+  const detail = await service.researchDetail({ from }, "owner", "run");
+  assert.equal(detail.usage.budget_usd, null, "not $0.00");
+  assert.ok(Math.abs(detail.budget_block.remaining_usd - (settingsCore.NO_BUDGET_CEILING_USD - 24.5)) < 1e-9);
+});
+
+test("the administrator page offers No budget and drops the too-low warning while it is on", () => {
+  const capped = renderAdmin({ primary: "claude", autoFallback: false, claudeModel: "claude-opus-5-5", budgetUsd: 1 });
+  const box = html => html.match(/<input id="no-budget"[^>]*>/)?.[0] ?? "";
+  assert.ok(box(capped) && !/checked/.test(box(capped)));
+  assert.match(capped, /budgetTooLow/);
+  const open = renderAdmin({ primary: "claude", autoFallback: false, claudeModel: "claude-opus-5-5", budgetUsd: null });
+  assert.match(box(open), /checked=""/);
+  assert.match(capped, /<input id="research-budget"/);
+  assert.doesNotMatch(open, /id="research-budget"/, "no amount field to fill in while No budget is on");
+  // The notice sits above the estimates it describes.
+  assert.ok(open.indexOf("noBudgetActive") < open.indexOf("costEstimate"));
+  assert.match(open, /noBudgetActive\{&quot;ceiling&quot;:&quot;\$25\.00&quot;\}/);
+  assert.match(open, /noBudgetHelp/);
+  assert.doesNotMatch(open, /budgetTooLow/);
+  // Every key the page uses exists in all three catalogues, with the ceiling in the text that names it.
+  for (const locale of ["en", "zh-Hans", "zh-Hant"]) {
+    const admin = JSON.parse(readFileSync(new URL(`../messages/${locale}.json`, import.meta.url), "utf8")).admin;
+    for (const key of ["noBudget", "noBudgetHelp", "noBudgetActive"]) assert.match(admin[key] ?? "", key === "noBudget" ? /./ : /\{ceiling\}/, `${locale}.${key}`);
+  }
+});

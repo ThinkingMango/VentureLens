@@ -6,7 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import type { createClient } from "@/lib/supabase/server";
 import type { ResearchDetail, ResearchModelInfo } from "@/lib/research-types";
 import { researchProviderSettings } from "@/lib/provider-settings";
-import { providerPlan } from "@/lib/provider-settings-core";
+import { providerPlan, effectiveBudget } from "@/lib/provider-settings-core";
 import { selectedModel } from "@/lib/research-models";
 import { QWEN_PROVIDER } from "@/lib/qwen-core";
 import { CLAUDE_PROVIDER } from "@/lib/claude-core";
@@ -152,10 +152,10 @@ export async function researchDetail(supabase: Awaited<ReturnType<typeof createC
   }), { estimated_usd: 0, committed_usd: 0, uncertain_calls: 0, input_tokens: 0, output_tokens: 0, search_requests: 0 });
   const blocked = budgetBlock.data?.output;
   const budget_block = run.status === "failed" && run.error_code === "BUDGET_EXCEEDED" && blocked && typeof blocked.model === "string" && Number.isFinite(blocked.required_usd)
-    ? { model: blocked.model, required_usd: Number(blocked.required_usd), remaining_usd: Math.max(0, Number(run.budget_usd) - totals.committed_usd), kind: blocked.kind === "estimate" ? "estimate" as const : "reservation" as const }
+    ? { model: blocked.model, required_usd: Number(blocked.required_usd), remaining_usd: Math.max(0, effectiveBudget(run.budget_usd) - totals.committed_usd), kind: blocked.kind === "estimate" ? "estimate" as const : "reservation" as const }
     : undefined;
   const progress = ["pending", "running"].includes(run.status) ? await runProgress(supabase, userId, id, run.configuration?.brief?.discovery_mode) : undefined;
-  return { ...(progress ? { progress } : {}), id: run.id, status: run.status, stage: run.stage, model, error_code: run.error_code, retry_count: run.retry_count, quota_released: run.quota_released, configuration: { brief: run.configuration.brief }, report: run.report, outcome: parsedOutcome?.success ? parsedOutcome.data : null, created_at: run.created_at, completed_at: run.completed_at, steps: steps.data ?? [], usage: { ...totals, budget_usd: Number(run.budget_usd) }, ...(budget_block ? { budget_block } : {}) };
+  return { ...(progress ? { progress } : {}), id: run.id, status: run.status, stage: run.stage, model, error_code: run.error_code, retry_count: run.retry_count, quota_released: run.quota_released, configuration: { brief: run.configuration.brief }, report: run.report, outcome: parsedOutcome?.success ? parsedOutcome.data : null, created_at: run.created_at, completed_at: run.completed_at, steps: steps.data ?? [], usage: { ...totals, budget_usd: run.budget_usd === null ? null : Number(run.budget_usd) }, ...(budget_block ? { budget_block } : {}) };
 }
 
 /**
