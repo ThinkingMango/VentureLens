@@ -335,3 +335,37 @@ test("the landing page leads with one action, repeated at the close, and backs i
   assert.match(landing, /"@type": "FAQPage"/);
   assert.match(landing, /replace\(\/<\/g, "\\\\u003c"\)/);
 });
+
+test("project instructions keep the existing design ahead of the landing-page-design skill's visual rules", () => {
+  const agents = read("AGENTS.md");
+  // The note sits after next dev's managed block, which next dev rewrites on its own.
+  const end = agents.indexOf("<!-- END:nextjs-agent-rules -->");
+  const note = agents.indexOf("## Design system");
+  assert.ok(end !== -1 && note > end);
+  assert.match(agents, /takes precedence over the visual rules \(Part B\) of the `landing-page-design` skill/);
+  for (const kept of ["Newsreader", "lucide-react", "--ease-out", "150–250ms"]) assert.ok(agents.includes(kept), kept);
+  // The skill the note refers to is installed.
+  assert.match(read(".claude/skills/landing-page-design/SKILL.md"), /^name: landing-page-design$/m);
+});
+
+test("motion follows the skill's gate: transform-only progress, short accordions, and reveals only when opened", async () => {
+  const css = read("app/globals.css");
+  // Progress bars move with transform; width is never animated.
+  assert.match(css, /\.progress-fill \{[^}]*transition: transform 250ms var\(--ease-in-out\);/s);
+  assert.doesNotMatch(css, /transition:[^;]*\bwidth\b/);
+  const { progressFill } = await import("../lib/utils.ts");
+  assert.deepEqual(progressFill(80), { transform: "translateX(-20%)" });
+  assert.deepEqual(progressFill(150), { transform: "translateX(0%)" });
+  assert.deepEqual(progressFill(Number.NaN), { transform: "translateX(-100%)" });
+  for (const file of ["live-workspace", "research-access-card", "evidence-preview", "onboarding", "active-sprint-card", "opportunity-detail", "billing", "app-shell"])
+    assert.doesNotMatch(read(`components/${file}.tsx`), /progress-fill[^>]*w-4\/5|style=\{\{\s*width:/, file);
+  // FAQ answers ease open (200ms) and close faster (150ms), only where interpolate-size exists.
+  assert.match(css, /@supports \(interpolate-size: allow-keywords\)/);
+  assert.match(css, /\.accordion::details-content \{[^}]*block-size 150ms var\(--ease-out\)/s);
+  assert.match(css, /\.accordion\[open\]::details-content \{[^}]*transition-duration: 200ms;/s);
+  for (const file of ["landing", "pricing", "support"]) assert.match(read(`components/${file}.tsx`), /accordion group/, file);
+  // Toggled panels fade in only when opened, so always-visible wide-screen panels never fade on load.
+  assert.match(css, /@starting-style \{\s*\.reveal\[data-open="true"\]/);
+  assert.match(read("components/mobile-disclosure.tsx"), /data-open=\{open\}/);
+  assert.match(read("components/opportunity-detail.tsx"), /data-open=\{detailsOpen\}/);
+});

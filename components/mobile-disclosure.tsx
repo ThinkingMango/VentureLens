@@ -29,10 +29,10 @@ export function MobileDisclosure({
       >
         {title}
         <ChevronDown
-          className={cn("transition-transform", open && "rotate-180")}
+          className={cn("transition-transform duration-200 ease-[var(--ease-out)]", open && "rotate-180")}
         />
       </Button>
-      <div id={id} className={cn("mt-3 md:mt-0", !open && "hidden md:block")}>
+      <div id={id} data-open={open} className={cn("reveal mt-3 md:mt-0", !open && "hidden md:block")}>
         {children}
       </div>
     </div>

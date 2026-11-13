@@ -482,12 +482,12 @@ export function Landing() {
             </div>
             <div className="border-y">
               {faqs.map((faq) => (
-                <details key={faq.q} className="faq-item group">
+                <details key={faq.q} className="faq-item accordion group">
                   <summary className="flex min-h-11 items-center justify-between gap-4 py-4 font-medium">
                     {copy(faq.q)}
                     <Plus
                       aria-hidden="true"
-                      className="size-4 shrink-0 text-primary transition-transform group-open:rotate-45"
+                      className="size-4 shrink-0 text-primary transition-transform duration-200 ease-[var(--ease-out)] group-open:rotate-45"
                     />
                   </summary>
                   <p className="max-w-2xl pb-5 leading-relaxed text-muted-foreground">{faqAnswer(faq)}</p>

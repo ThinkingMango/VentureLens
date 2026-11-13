@@ -109,7 +109,7 @@ test("cards and the opportunity page show the rating and every step of the score
     "@/components/ui/card": new Proxy({}, { get: (_, name) => name === "__esModule" ? false : pass("div") }),
     "@/components/ui/button": { Button: pass("button") }, "@/components/shared": { Confidence: ({ level }) => createElement("span", null, level) },
     "@/lib/report-presentation": presentation, "@/components/demo-provider": { useDemo: () => ({ saved: [], toggleSave: () => {}, isDemo: false, busy: false }) },
-    "@/lib/utils": { cn: (...c) => c.filter(Boolean).join(" ") }, "@/i18n/use-copy": { useCopy: () => copy },
+    "@/lib/utils": { cn: (...c) => c.filter(Boolean).join(" "), progressFill: (p) => ({ transform: `translateX(${p - 100}%)` }) }, "@/i18n/use-copy": { useCopy: () => copy },
   });
   const opportunity = { id: "o1", title: "Clinic billing assistant", category: "Healthcare", description: "d", buyer: "Clinics", pain: "Billing", score: 57, confidence: "moderate", revenue: "r", cost: "c", risk: "k", scores: [80, 68, 78, 72, 58], icon: "workflow", penalty: 15, evidence: [], validation: ["Interview ten clinics"] };
   assert.match(text(renderToStaticMarkup(createElement(card.OpportunityCard, { opportunity }))), /57 \/100 moderate Promising/);
@@ -125,7 +125,7 @@ test("cards and the opportunity page show the rating and every step of the score
     "@/components/report-feedback": { FlagProvider: ({ children }) => children, FlagButton: () => null },
     "@/components/validation-sprint": { SprintPanel: () => null, SprintStarter: () => null, useSprintActions: () => ({ send: async () => false, busy: false }) },
     "@/lib/sprint-core": require("../lib/sprint-core.ts"),
-    "@/lib/opportunity-view": require("../lib/opportunity-view.ts"), "@/lib/utils": { cn: (...c) => c.filter(Boolean).join(" ") },
+    "@/lib/opportunity-view": require("../lib/opportunity-view.ts"), "@/lib/utils": { cn: (...c) => c.filter(Boolean).join(" "), progressFill: (p) => ({ transform: `translateX(${p - 100}%)` }) },
   });
   const detail = text(renderToStaticMarkup(createElement(live.LiveOpportunityDetail, { opportunity })));
   assert.match(detail, /Promising/);

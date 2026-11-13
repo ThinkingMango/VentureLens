@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { PlanTable } from "@/components/pricing";
 import { useDemo } from "@/components/demo-provider";
 import { ResearchAccessCard } from "@/components/research-access-card";
+import { progressFill } from "@/lib/utils";
 export function Billing() {
   const copy = useCopy();
   const { isDemo } = useDemo();
@@ -70,7 +71,7 @@ export function Billing() {
             </span>
           </p>
           <div className="progress-track">
-            <div className="progress-fill w-4/5" />
+            <div className="progress-fill" style={progressFill(80)} />
           </div>
           <p className="text-sm text-muted-foreground">
             {copy(
