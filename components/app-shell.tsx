@@ -26,6 +26,7 @@ import {
 import { Brand } from "@/components/shared";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { Button } from "@/components/ui/button";
+import { signupHref } from "@/lib/signup-source";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
@@ -232,7 +233,7 @@ export function AppShell({
               </button>
             )}
             {isDemo && (
-              <Link className="nav-link" href="/signup">
+              <Link className="nav-link" href={signupHref("demo")}>
                 {copy("Create a real account")}
                 <ArrowRight className="ml-auto size-4" />
               </Link>

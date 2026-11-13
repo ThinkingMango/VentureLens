@@ -7,6 +7,7 @@ import { Menu, X, ArrowUpRight } from "lucide-react";
 import { Brand } from "@/components/shared";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { Button } from "@/components/ui/button";
+import { signupHref } from "@/lib/signup-source";
 import { mailto, supportEmail } from "@/lib/contact";
 // In the order the sections appear on the landing page.
 const links = [
@@ -59,7 +60,7 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
               {copy("Log in")}
             </Link>
             <Button asChild>
-              <Link href="/signup">
+              <Link href={signupHref("header")}>
                 {copy("Get started")}
                 <ArrowUpRight />
               </Link>
@@ -97,7 +98,7 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
             ))}
             <Link href="/login">{copy("Log in")}</Link>
             <Button asChild className="mt-2 justify-center">
-              <Link href="/signup">{copy("Get started")}</Link>
+              <Link href={signupHref("mobile_menu")}>{copy("Get started")}</Link>
             </Button>
             <div className="pt-2 sm:hidden"><LanguageSwitcher /></div>
           </nav>
@@ -151,7 +152,7 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
               {copy("Log in")}
             </Link>
             <Link
-              href="/signup"
+              href={signupHref("footer")}
               className="py-1.5 text-muted-foreground hover:text-primary md:py-0"
             >
               {copy("Create a free account")}
@@ -221,7 +222,7 @@ function MobileCtaBar() {
   return (
     <div className="mobile-cta flex gap-3 lg:hidden" data-visible={visible} inert={!visible}>
       <Button asChild className="flex-1">
-        <Link href="/signup">{copy("Get started")}</Link>
+        <Link href={signupHref("mobile_bar")}>{copy("Get started")}</Link>
       </Button>
       <Button asChild variant="outline" className="flex-1">
         <Link href="/demo/dashboard">{copy("Try the demo")}</Link>

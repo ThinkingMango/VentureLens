@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/field";
 import { createClient } from "@/lib/supabase/client";
 import { safeReturnPath } from "@/lib/workspace-schema";
+import { parseSignupSource } from "@/lib/signup-source";
 
 export function AuthScreen() {
   const copy = useCopy();
@@ -96,6 +97,8 @@ export function AuthScreen() {
         createClient(),
         parsed.data,
         redirect.toString(),
+        // The call to action that led here (?from=…), kept with a new account for sign-up attribution.
+        parseSignupSource(new URLSearchParams(window.location.search).get("from")),
       );
       if (error) {
         setError(emailAuthError(error));

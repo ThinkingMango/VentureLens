@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
+import { SIGNUP_SOURCE_KEY, type SignupSource } from "./signup-source.ts";
 
 export const emailSchema = z.string().trim().max(254).pipe(z.email());
 export const emailCodeMinLength = 6;
@@ -35,14 +36,23 @@ export function emailAuthError(error: { code?: string; status?: number }) {
   return "Authentication is temporarily unavailable. Please try again.";
 }
 
+/**
+ * Sends the sign-in code and link. `source` is the call to action that led here (lib/signup-source.ts); Supabase stores
+ * it as account metadata only when this request creates the account, so a returning founder's login never changes it.
+ */
 export function requestEmailCode(
   client: Pick<SupabaseClient, "auth">,
   email: string,
   redirect: string,
+  source: SignupSource | null = null,
 ) {
   return client.auth.signInWithOtp({
     email: emailSchema.parse(email),
-    options: { shouldCreateUser: true, emailRedirectTo: redirect },
+    options: {
+      shouldCreateUser: true,
+      emailRedirectTo: redirect,
+      ...(source ? { data: { [SIGNUP_SOURCE_KEY]: source } } : {}),
+    },
   });
 }
 
