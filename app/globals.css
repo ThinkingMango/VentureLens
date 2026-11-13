@@ -65,6 +65,9 @@
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
   --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  /* Height of the sticky workspace header (app-shell.tsx: min-h-16, py-3 around 44px controls, 1px border), so
+     sticky elements below it line up instead of sliding underneath. */
+  --workspace-header-h: 4.4375rem;
 }
 
 * {
@@ -447,6 +450,26 @@ progress::-moz-progress-bar {
   transition: transform 160ms var(--ease-out);
 }
 
+/* Loading placeholders (components/skeletons.tsx). A slow opacity breath, never a moving shimmer; the screen fades in
+   only after 150ms, so a quick navigation goes straight to the page without a flash of grey blocks. */
+.skeleton {
+  border-radius: 0.5rem;
+  background: var(--secondary);
+  animation: skeleton-breathe 1.6s ease-in-out infinite;
+}
+
+.skeleton-screen {
+  animation: skeleton-reveal 200ms ease-out 150ms both;
+}
+
+@keyframes skeleton-breathe {
+  50% { opacity: 0.55; }
+}
+
+@keyframes skeleton-reveal {
+  from { opacity: 0; }
+}
+
 /* Research brief (research-config.tsx): numbered steps divided by hairlines, not boxes inside a box. */
 .step-number {
   display: inline-flex;
@@ -763,6 +786,10 @@ html:lang(zh-Hant) :is(.landing-title, .landing-heading) {
 section[id],
 main[id] {
   scroll-margin-top: 96px;
+}
+
+#opportunity-panel [id] {
+  scroll-margin-top: 3.5rem;
 }
 
 @media (min-width: 768px) {

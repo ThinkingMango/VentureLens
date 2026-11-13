@@ -127,7 +127,7 @@ export function OpportunityDetail({ view, initialTab, sprint, source }: { view: 
   }
   function goTo(next: OpportunityTabId) {
     select(next, "none");
-    document.getElementById("opportunity-tabs")?.scrollIntoView({ block: "start", behavior: "smooth" });
+    panel.current?.scrollIntoView({ block: "start", behavior: "smooth" });
     panel.current?.focus({ preventScroll: true });
   }
 
@@ -144,13 +144,16 @@ export function OpportunityDetail({ view, initialTab, sprint, source }: { view: 
           <div className="flex max-w-3xl flex-col gap-3">
             <h1 className="page-heading text-balance">{view.title}</h1>
             <p className="text-base leading-relaxed text-muted-foreground">{view.description}</p>
-            <p className="text-sm text-muted-foreground">{copy("{category} · Opportunity hypothesis", { category: view.category })}</p>
+            <div className="flex flex-wrap items-center gap-x-4 text-sm text-muted-foreground">
+              <span>{copy("{category} · Opportunity hypothesis", { category: view.category })}</span>
+              {/* Reference material, not an action on the opportunity, so it reads as a link beside the category. */}
+              <Button ref={guideButton} variant="link" className="h-auto min-h-11 px-0 font-medium" onClick={() => setGuideOpen(true)}>
+                <BookOpen data-icon="inline-start" />
+                {copy("How to read this report")}
+              </Button>
+            </div>
           </div>
           <div className="flex shrink-0 flex-wrap gap-2">
-            <Button ref={guideButton} variant="outline" onClick={() => setGuideOpen(true)}>
-              <BookOpen data-icon="inline-start" />
-              {copy("How to read this report")}
-            </Button>
             <Button variant="outline" disabled={busy} onClick={() => toggleSave(view.id)} aria-pressed={isSaved}>
               <Bookmark className={isSaved ? "fill-primary/15 text-primary" : ""} />
               {isSaved ? copy("Saved opportunity") : copy("Save opportunity")}
@@ -174,27 +177,31 @@ export function OpportunityDetail({ view, initialTab, sprint, source }: { view: 
             <DemoNote />
           </div>
         )}
-        <dl className="grid grid-cols-2 gap-4 sm:grid-cols-[1.4fr_1fr_1fr]">
-          <div className="col-span-2 flex flex-col gap-1 sm:col-span-1">
+        <dl className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-6 gap-y-4 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+          <div className="flex min-w-0 flex-col gap-1">
             <dt className="text-sm text-muted-foreground">{copy("Likely buyer")}</dt>
             <dd className="font-medium">{view.buyer}</dd>
           </div>
           <div className="flex flex-col gap-1">
-            <dt className="text-sm text-muted-foreground">{copy("Research score")}</dt>
-            <dd className="font-semibold tabular-nums">{view.score}/100</dd>
-          </div>
-          <div className="flex flex-col gap-1">
             <dt className="text-sm text-muted-foreground">{copy("Linked sources")}</dt>
-            <dd className="flex items-center gap-1.5 font-semibold tabular-nums">
-              <Link2 className="size-4 text-primary" />
-              {view.sources.length}
+            <dd>
+              {/* The count opens the sources it counts. */}
+              <button
+                type="button"
+                onClick={() => goTo("evidence")}
+                className="-my-2 flex min-h-11 items-center gap-1.5 font-semibold tabular-nums text-primary underline decoration-primary/30 underline-offset-4 hover:decoration-primary"
+              >
+                <Link2 className="size-4" aria-hidden="true" />
+                {view.sources.length}
+                <span className="sr-only">{copy("Evidence")}</span>
+              </button>
             </dd>
           </div>
         </dl>
       </header>
       <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_300px]">
         {/* On phones the score panel comes first as a short summary card; on wide screens it is the sticky side panel. */}
-        <aside className="flex min-w-0 flex-col gap-5 xl:sticky xl:top-6 xl:order-2">
+        <aside className="flex min-w-0 flex-col gap-5 xl:sticky xl:top-[calc(var(--workspace-header-h)+1.5rem)] xl:order-2">
           <section className="surface flex flex-col gap-5 p-6" aria-labelledby="score-title">
             <div className="flex items-center justify-between gap-3">
               <h2 id="score-title" className="font-semibold">{copy("Score breakdown")}</h2>
@@ -276,7 +283,7 @@ export function OpportunityDetail({ view, initialTab, sprint, source }: { view: 
           )}
         </aside>
         <div className="flex min-w-0 flex-col gap-4 xl:order-1">
-          <div id="opportunity-tabs" role="tablist" aria-label={copy("Opportunity sections")} className="flex scroll-mt-6 overflow-x-auto border-b">
+          <div id="opportunity-tabs" role="tablist" aria-label={copy("Opportunity sections")} className="opportunity-tabs sticky top-[var(--workspace-header-h)] z-10 -mx-4 flex overflow-x-auto border-b bg-background/95 px-4 backdrop-blur md:-mx-8 md:px-8 xl:mx-0 xl:px-0">
             {tabs.map((t) => (
               <button
                 key={t}
@@ -298,7 +305,7 @@ export function OpportunityDetail({ view, initialTab, sprint, source }: { view: 
                   select(tabs[index], "tab");
                 }}
                 className={cn(
-                  "min-h-12 shrink-0 whitespace-nowrap border-b-2 border-transparent px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground sm:px-5",
+                  "min-h-12 flex-1 shrink-0 whitespace-nowrap border-b-2 border-transparent px-2 py-3 text-sm font-medium text-muted-foreground hover:text-foreground sm:flex-none sm:px-5",
                   tab === t && "border-primary text-primary",
                 )}
               >
@@ -312,7 +319,7 @@ export function OpportunityDetail({ view, initialTab, sprint, source }: { view: 
             role="tabpanel"
             aria-labelledby={`opportunity-tab-${tab}`}
             tabIndex={0}
-            className="surface min-w-0 overflow-hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="surface min-w-0 scroll-mt-14 overflow-hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             {tab === "overview" && <OverviewTab view={view} sources={sourcesByKey} openSource={openSource} goTo={goTo} />}
             {tab === "evidence" && <EvidenceTab view={view} sources={sourcesByKey} openSource={openSource} />}

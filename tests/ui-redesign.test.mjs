@@ -290,3 +290,32 @@ test("the landing page stays compact on phones without hiding content from wider
   // The footer's link columns sit side by side on phones.
   assert.match(shell, /mx-auto grid max-w-7xl grid-cols-2/);
 });
+
+test("workspace navigation shows a page-shaped loading state inside the shell, without flashing", () => {
+  const css = read("app/globals.css");
+  // Inside (workspace), below its layout, so the sidebar and header stay while a page loads.
+  assert.match(read("app/(workspace)/loading.tsx"), /<PageSkeleton \/>/);
+  assert.match(read("app/(workspace)/opportunities/[id]/loading.tsx"), /<OpportunitySkeleton \/>/);
+  const skeletons = read("components/skeletons.tsx");
+  assert.match(skeletons, /role="status"/);
+  assert.match(skeletons, /copy\("Please wait…"\)/);
+  // The fallback fades in after a delay, and the placeholders breathe with opacity only.
+  assert.match(css, /\.skeleton-screen \{\s*animation: skeleton-reveal 200ms ease-out 150ms both;/);
+  assert.match(css, /@keyframes skeleton-breathe \{\s*50% \{ opacity: 0\.55; \}/);
+  assert.doesNotMatch(read("app/loading.tsx"), /animate-pulse/);
+});
+
+test("the opportunity page keeps its tabs and score panel clear of the sticky workspace header", () => {
+  const detail = read("components/opportunity-detail.tsx");
+  const css = read("app/globals.css");
+  assert.match(css, /--workspace-header-h: 4\.4375rem;/);
+  assert.match(detail, /xl:sticky xl:top-\[calc\(var\(--workspace-header-h\)\+1\.5rem\)\]/);
+  assert.doesNotMatch(detail, /xl:top-6/);
+  assert.match(detail, /opportunity-tabs sticky top-\[var\(--workspace-header-h\)\]/);
+  // Phones share the width between the four tabs; the header no longer repeats the score.
+  assert.match(detail, /flex-1 shrink-0 whitespace-nowrap/);
+  assert.doesNotMatch(detail, /copy\("Research score"\)/);
+  // The reading guide is a quiet link; the source count opens the Evidence tab.
+  assert.match(detail, /<Button ref=\{guideButton\} variant="link"/);
+  assert.match(detail, /onClick=\{\(\) => goTo\("evidence"\)\}/);
+});
