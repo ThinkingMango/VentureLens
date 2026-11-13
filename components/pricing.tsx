@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowRight, Plus } from "lucide-react";
 import { PublicShell } from "@/components/public-shell";
 import { Button } from "@/components/ui/button";
+import { signupHref } from "@/lib/signup-source";
 import { cn } from "@/lib/utils";
 
 // Planned packages. Nothing is gated by package: every account gets the whole product, so the only real differences
@@ -218,7 +219,7 @@ export function Pricing() {
               </p>
               <div className="hero-actions flex flex-wrap gap-3 md:justify-end" data-cta-start>
                 <Button asChild size="lg">
-                  <Link href="/signup">
+                  <Link href={signupHref("pricing_hero")}>
                     {copy("Create a free account")}
                     <ArrowRight />
                   </Link>
@@ -292,7 +293,7 @@ export function Pricing() {
             </div>
             <div className="hero-actions flex flex-wrap gap-3 lg:shrink-0">
               <Button asChild size="lg">
-                <Link href="/signup">
+                <Link href={signupHref("pricing_close")}>
                   {copy("Create a free account")}
                   <ArrowRight />
                 </Link>

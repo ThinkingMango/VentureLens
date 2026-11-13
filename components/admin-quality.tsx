@@ -10,6 +10,7 @@ import { metricWindows } from "@/lib/quality-metrics";
 import { FOLLOW_DAYS, funnelSteps, type FunnelStep, type ValidationFunnel } from "@/lib/validation-funnel";
 import type { QualityReport } from "@/lib/admin-runs";
 import { cn } from "@/lib/utils";
+import type { SignupSource } from "@/lib/signup-source";
 
 function Metric({ label, value, definition }: { label: string; value: string; definition: string }) {
   return (
@@ -105,6 +106,7 @@ export function AdminQuality({ report }: { report: QualityReport }) {
           </CardContent>
         </Card>
       </div>
+      <SignupSection signups={report.signups} />
       <FunnelSection funnel={report.funnel} days={days} />
       <FeedbackSection feedback={report.feedback} />
     </div>
@@ -112,6 +114,51 @@ export function AdminQuality({ report }: { report: QualityReport }) {
 }
 
 type Copy = ReturnType<typeof useCopy>;
+
+function sourceLabel(copy: Copy, source: SignupSource | "unknown") {
+  switch (source) {
+    case "landing_hero": return copy("Landing page, top");
+    case "landing_close": return copy("Landing page, closing section");
+    case "header": return copy("Header button");
+    case "mobile_menu": return copy("Phone menu");
+    case "mobile_bar": return copy("Phone call-to-action bar");
+    case "footer": return copy("Footer");
+    case "pricing_hero": return copy("Pricing page, top");
+    case "pricing_close": return copy("Pricing page, closing section");
+    case "demo": return copy("Demo workspace");
+    case "unknown": return copy("Unknown or typed in");
+  }
+}
+
+/** New accounts in the window by the call to action they came from. Counts of accounts only, never who. */
+function SignupSection({ signups }: { signups: QualityReport["signups"] }) {
+  const copy = useCopy();
+  return (
+    <section aria-labelledby="signups-heading" className="flex flex-col gap-4">
+      <h2 id="signups-heading" className="text-lg font-semibold">{copy("Sign-ups by source")}</h2>
+      {!signups ? <p className="text-sm text-muted-foreground">{copy("Product events could not be read.")}</p> : (
+        <Card>
+          <CardHeader>
+            <CardTitle>{copy("{count, plural, one {# new account} other {# new accounts}}", { count: signups.total })}</CardTitle>
+            <CardDescription>{copy("Where new accounts in this window came from, counted once per account when it first signs in.")}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {signups.bySource.length === 0 ? <p className="text-sm text-muted-foreground">{copy("No sign-ups in this window.")}</p> : (
+              <dl className="grid grid-cols-[1fr_auto] gap-x-6 gap-y-2 text-sm">
+                {signups.bySource.map(row => (
+                  <div key={row.source} className="contents">
+                    <dt>{sourceLabel(copy, row.source)}</dt>
+                    <dd className="tabular-nums">{row.count}</dd>
+                  </div>
+                ))}
+              </dl>
+            )}
+          </CardContent>
+        </Card>
+      )}
+    </section>
+  );
+}
 function stepLabel(copy: Copy, step: FunnelStep) {
   switch (step) {
     case "viewed": return copy("Opened an opportunity");

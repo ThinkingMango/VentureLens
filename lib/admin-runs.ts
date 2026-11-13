@@ -4,6 +4,7 @@ import { isAdministrator } from "@/lib/admin-access";
 import { classificationSchema, type Evidence } from "@/lib/research-core";
 import { qualityMetrics, type MetricOpportunity, type MetricRun, type MetricSource, type MetricUsage, type MetricWindow } from "@/lib/quality-metrics";
 import { feedbackMetrics, runModel, type FeedbackMetrics } from "@/lib/feedback-core";
+import { signupSourceCounts } from "@/lib/signup-source";
 import { FOLLOW_DAYS, stepEvents, validationFunnel, type FunnelEvent, type FunnelReport, type ValidationFunnel } from "@/lib/validation-funnel";
 import {
   RUNS_PAGE_SIZE, candidateDiagnostics, filterRange, providerSwitches, runListRow, stageTimeline,
@@ -130,7 +131,23 @@ export async function qualityReport(user: Identity, days: MetricWindow, now = ne
     metrics: qualityMetrics({ runs: runs.map(run => ({ ...run, preflight_blocked: preflight.has(run.id) })), usage, sources, opportunities, detachedUsage }),
     feedback: await feedbackReport(client, since),
     funnel: await funnelReport(client, days, now),
+    signups: await signupReport(client, since),
   };
+}
+
+/**
+ * New accounts in the window by the call to action they came from (lib/signup-source.ts), from `signup_completed`
+ * events. Null when events cannot be read, so the rest of the page still loads.
+ */
+async function signupReport(client: ReturnType<typeof createAdminClient>, since: string) {
+  try {
+    const events = await readAll<{ props: unknown }>((from, to) => client.from("product_events").select("props")
+      .eq("event", "signup_completed").gte("created_at", since).order("created_at").order("id").range(from, to));
+    const bySource = signupSourceCounts(events);
+    return { total: events.length, bySource };
+  } catch {
+    return null;
+  }
 }
 
 /**

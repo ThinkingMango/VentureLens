@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { signupSources } from "./signup-source.ts";
 
 // Product events (spec WP-01 §4). Every event has a strict schema, so a caller cannot attach free text, names, emails,
 // brief or profile content by accident: only codes, counts and fixed choices are accepted. An event that does not match
@@ -39,7 +40,13 @@ export const eventSchemas = {
   // `target` since single-opportunity links; earlier events have none and were all whole-report links.
   report_shared: z.strictObject({ target: z.enum(["report", "opportunity"]).optional() }),
   report_unshared: z.strictObject({ target: z.enum(["report", "opportunity"]).optional() }),
+  // A new account signed in for the first time (lib/signup-source.ts): which call to action it came from. Recorded once
+  // per account (trackOnce in lib/events.ts), so it carries nothing else.
+  signup_completed: z.strictObject({ source: z.enum([...signupSources, "unknown"]) }),
 } as const;
+
+/** Events recorded at most once per founder, ever (see trackOnce). */
+export const onceEvents = ["signup_completed"] as const satisfies readonly ProductEvent[];
 
 /** Events recorded at most once per founder per UTC day (see trackDaily). */
 export const dailyEvents = ["opportunity_viewed"] as const satisfies readonly ProductEvent[];

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ArrowRight, Check, Plus, X } from "lucide-react";
 import { PublicShell } from "@/components/public-shell";
 import { Button } from "@/components/ui/button";
+import { signupHref } from "@/lib/signup-source";
 import { EvidencePreview } from "@/components/evidence-preview";
 import { useCopy, useFormats } from "@/i18n/use-copy";
 import { useDemoContent } from "@/i18n/demo";
@@ -307,7 +308,7 @@ function PrimaryAction({ marker }: { marker: "start" | "end" }) {
     <div className="flex flex-col gap-4">
       <div className="hero-actions flex flex-wrap gap-3" {...(marker === "start" ? { "data-cta-start": "" } : {})}>
         <Button asChild size="lg">
-          <Link href="/signup">
+          <Link href={signupHref(marker === "start" ? "landing_hero" : "landing_close")}>
             {copy("Get 10 free research runs")}
             <ArrowRight />
           </Link>

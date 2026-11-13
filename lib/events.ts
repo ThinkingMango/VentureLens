@@ -1,6 +1,6 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { dailyEvents, eventProps, utcDayStart, type EventProps, type ProductEvent } from "@/lib/events-core";
+import { dailyEvents, eventProps, onceEvents, utcDayStart, type EventProps, type ProductEvent } from "@/lib/events-core";
 
 /**
  * Records a product event. Never throws and never rejects: analytics must not break the action it describes.
@@ -29,6 +29,25 @@ export async function trackDaily<E extends (typeof dailyEvents)[number]>(event: 
   try {
     const { data, error } = await createAdminClient().from("product_events").select("id")
       .eq("event", event).eq("user_id", options.userId).gte("created_at", utcDayStart(options.now ?? new Date())).limit(1);
+    if (error) {
+      console.warn("[events] could not check for an earlier event", { event, message: error.message });
+      return;
+    }
+    if (data?.length) return;
+    await track(event, { userId: options.userId, props: options.props });
+  } catch (error) {
+    console.warn("[events] could not record an event", { event, message: error instanceof Error ? error.message : String(error) });
+  }
+}
+
+/**
+ * Records an event (`onceEvents`) unless this founder already has one. Like track(), it never throws. Two sign-ins at the
+ * same moment could both record one; sign-up counts are read per founder, so a duplicate does not change them.
+ */
+export async function trackOnce<E extends (typeof onceEvents)[number]>(event: E, options: { userId: string; props: EventProps<E> }): Promise<void> {
+  try {
+    const { data, error } = await createAdminClient().from("product_events").select("id")
+      .eq("event", event).eq("user_id", options.userId).limit(1);
     if (error) {
       console.warn("[events] could not check for an earlier event", { event, message: error.message });
       return;
