@@ -335,3 +335,15 @@ test("the landing page leads with one action, repeated at the close, and backs i
   assert.match(landing, /"@type": "FAQPage"/);
   assert.match(landing, /replace\(\/<\/g, "\\\\u003c"\)/);
 });
+
+test("project instructions keep the existing design ahead of the landing-page-design skill's visual rules", () => {
+  const agents = read("AGENTS.md");
+  // The note sits after next dev's managed block, which next dev rewrites on its own.
+  const end = agents.indexOf("<!-- END:nextjs-agent-rules -->");
+  const note = agents.indexOf("## Design system");
+  assert.ok(end !== -1 && note > end);
+  assert.match(agents, /takes precedence over the visual rules \(Part B\) of the `landing-page-design` skill/);
+  for (const kept of ["Newsreader", "lucide-react", "--ease-out", "150–250ms"]) assert.ok(agents.includes(kept), kept);
+  // The skill the note refers to is installed.
+  assert.match(read(".claude/skills/landing-page-design/SKILL.md"), /^name: landing-page-design$/m);
+});
