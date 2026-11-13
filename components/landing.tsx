@@ -1,14 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
 import { ArrowRight, Check, Plus, X } from "lucide-react";
 import { PublicShell } from "@/components/public-shell";
 import { Button } from "@/components/ui/button";
 import { EvidencePreview } from "@/components/evidence-preview";
-import { useCopy } from "@/i18n/use-copy";
+import { useCopy, useFormats } from "@/i18n/use-copy";
 import { useDemoContent } from "@/i18n/demo";
 import { REVIEW_MAX_PENALTY } from "@/lib/research-core";
+import { plans } from "@/components/pricing";
 
 const steps = [
   {
@@ -91,34 +91,23 @@ const rules = [
   },
 ];
 
-const reportParts = [
+// What a founder gets from a report, each outcome backed by the part of the report that delivers it.
+const benefits = [
   {
-    title: "Ranked opportunity hypotheses",
-    text: "Up to eight concrete, narrow business ideas matched to your profile, each stated as a hypothesis to test rather than a promise.",
+    title: "Know which idea has real buyers",
+    text: "Each hypothesis names who pays, what hurts, and what they use today, backed by pages where people describe the problem in their own words.",
   },
   {
-    title: "A named buyer and a real pain",
-    text: "Who pays, what hurts, what they do today instead, and the trigger that makes them look for help.",
+    title: "Check every claim yourself",
+    text: "Claims are numbered to the page they came from, with the excerpt in its original language, the website, and the date it was read.",
   },
   {
-    title: "Claims tied to their sources",
-    text: "Each claim is numbered to the pages that support or contradict it, with the excerpt in its original language, the website, and the date it was read.",
+    title: "See exactly why an idea scored what it did",
+    text: "Five weighted dimensions, a cap set by the evidence, and a second review that can only take points away.",
   },
   {
-    title: "An explainable score",
-    text: "Five weighted dimensions with visible weights and caps. Scores compare hypotheses; they are never success probabilities.",
-  },
-  {
-    title: "An adversarial critique",
-    text: "A second pass argues against each idea, names the free alternatives and regulatory risks, and can only deduct points.",
-  },
-  {
-    title: "A validation plan you can run",
-    text: "The riskiest assumption, a falsification test, and the first conversations and paid pilot to attempt this month.",
-  },
-  {
-    title: "Yours to keep and question",
-    text: "Reports stay in your private library. Export one as Markdown or PDF, and flag any claim or source you think is wrong.",
+    title: "Leave with a test you can run this week",
+    text: "The riskiest assumption, how to disprove it, and the first conversations and paid pilot to try, ready to turn into a 7, 14 or 30 day validation sprint.",
   },
 ];
 
@@ -137,6 +126,8 @@ const audiences = [
   },
 ];
 
+// The pricing answer reads the cheapest planned package from the pricing page, so the two never disagree.
+const pricingQuestion = "What happens after the 10 free research runs?";
 const faqs = [
   {
     q: "Is this just an AI idea generator?",
@@ -157,6 +148,18 @@ const faqs = [
   {
     q: "Which languages are supported?",
     a: "The interface is available in English, Simplified Chinese, and Traditional Chinese. Source excerpts are always kept in their original language so you can verify them yourself.",
+  },
+  {
+    q: "How is this different from asking a chatbot?",
+    a: "A chatbot answers from what it remembers. VentureLens reads live web pages, drops any idea that lacks support from two independent websites, and shows you every page it used, so you can check the evidence instead of trusting the answer.",
+  },
+  {
+    q: pricingQuestion,
+    a: "Paid packages are planned, starting at {price} for {runs} runs. Final prices are published before checkout opens, and nothing is charged today.",
+  },
+  {
+    q: "What happens to my data?",
+    a: "Your founder profile and reports are private to your account. We never sell your data or use it to train our own AI models, and deleting your account deletes your profile, briefs and reports with it.",
   },
   {
     q: "Is live research available today?",
@@ -289,12 +292,60 @@ function RunLedger() {
   );
 }
 
-// Phones show the first parts of the report and the rest on request; wider screens always show all of them.
-const reportPartsOnPhones = 4;
+// Facts shown beside the primary action. Each is enforced in code (lib/research-core.ts, the refund trigger), never a
+// quote or a number we cannot back.
+const proofPoints = [
+  "Every claim links to its source",
+  "Ideas need two independent websites",
+  "Runs that fail on our side are returned",
+];
+
+/** The one primary action, used in the hero and again at the close, with the reassurance that removes its risk. */
+function PrimaryAction({ marker }: { marker: "start" | "end" }) {
+  const copy = useCopy();
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="hero-actions flex flex-wrap gap-3" {...(marker === "start" ? { "data-cta-start": "" } : {})}>
+        <Button asChild size="lg">
+          <Link href="/signup">
+            {copy("Get 10 free research runs")}
+            <ArrowRight />
+          </Link>
+        </Button>
+      </div>
+      <p className="max-w-[34rem] text-sm text-muted-foreground">
+        {copy(
+          "Free account, no card or password. Your runs stay valid for 90 days, and a full run usually takes 5–10 minutes.",
+        )}
+      </p>
+      {/* The demo stays one step away, as a link rather than a second button competing with the account. */}
+      <Link
+        href="/demo/dashboard"
+        className="-my-2 inline-flex min-h-11 w-fit items-center gap-1.5 text-sm font-medium text-primary underline decoration-primary/30 underline-offset-4 hover:decoration-primary"
+      >
+        {copy("Or explore the demo first, no account needed")}
+        <ArrowRight className="size-4" aria-hidden="true" />
+      </Link>
+    </div>
+  );
+}
 
 export function Landing() {
   const copy = useCopy();
-  const [allParts, setAllParts] = useState(false);
+  const format = useFormats();
+  const entry = plans.reduce((low, plan) => (plan.price < low.price ? plan : low));
+  const faqAnswer = (faq: (typeof faqs)[number]) =>
+    copy(faq.a, faq.q === pricingQuestion ? { price: format.usd(entry.price, 0), runs: entry.runs } : undefined);
+  // FAQ structured data for search and answer engines, in the page's language and built from the same list.
+  const faqSchema = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: faqs.map((faq) => ({
+      "@type": "Question",
+      name: copy(faq.q),
+      acceptedAnswer: { "@type": "Answer", text: faqAnswer(faq) },
+    })),
+  };
   return (
     <PublicShell>
       <main id="main-content" tabIndex={-1}>
@@ -309,56 +360,27 @@ export function Landing() {
                   "Start from your experience, or from an idea you already have. VentureLens searches the web for independent evidence, drops what it can’t support, and gives you a scored report with a plan to test what’s left.",
                 )}
               </p>
-              <div className="hero-actions flex flex-wrap gap-3" data-cta-start>
-                <Button asChild size="lg">
-                  <Link href="/demo/dashboard">
-                    {copy("Try the demo")}
-                    <ArrowRight />
-                  </Link>
-                </Button>
-                <Button asChild variant="outline" size="lg">
-                  <Link href="/signup">{copy("Create a free account")}</Link>
-                </Button>
-              </div>
-              <p className="max-w-[34rem] text-sm text-muted-foreground">
-                {copy(
-                  "The demo needs no account. Every confirmed account includes 10 free research runs, and a full run usually takes 5–10 minutes.",
-                )}
-              </p>
+              <PrimaryAction marker="start" />
+              <ul aria-label={copy("Why you can trust a report")} className="flex flex-col gap-2 border-t pt-5 text-sm">
+                {proofPoints.map((point) => (
+                  <li key={point} className="flex items-start gap-2">
+                    <Check className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
+                    {copy(point)}
+                  </li>
+                ))}
+              </ul>
             </div>
             <EvidencePreview />
           </div>
         </section>
 
-        <section id="how-it-works" className="mx-auto max-w-7xl px-5 md:px-8">
-          <div className="landing-rule flex flex-col gap-10 py-16 md:gap-14 md:py-24">
-            <h2 className="landing-heading max-w-2xl">
-              {copy("A better question than “What should I build?”")}
-            </h2>
-            <ol className="grid gap-8 md:grid-cols-3 md:gap-10 lg:gap-16">
-              {steps.map((step, index) => (
-                <li
-                  key={step.title}
-                  className="grid grid-cols-[2.25rem_minmax(0,1fr)] gap-x-3 gap-y-2 md:flex md:flex-col md:gap-3"
-                >
-                  <span
-                    aria-hidden="true"
-                    className="row-span-3 font-display text-4xl leading-none text-primary/80 md:text-5xl"
-                  >
-                    {index + 1}
-                  </span>
-                  <h3 className="text-lg font-semibold md:mt-2">{copy(step.title)}</h3>
-                  <p className="leading-relaxed text-muted-foreground">{copy(step.text)}</p>
-                  <p className="text-sm font-medium text-primary">{copy(step.detail)}</p>
-                </li>
-              ))}
-            </ol>
-          </div>
-        </section>
-
+        {/* Problem, then the proof that answers it: the run ledger. */}
         <section id="research-run" className="border-y bg-card">
-          <div className="mx-auto max-w-7xl px-5 py-16 md:px-8 md:py-24">
-            <div className="grid gap-6 lg:grid-cols-[1.2fr_1fr] lg:items-end lg:gap-16">
+          <div className="mx-auto max-w-7xl px-5 py-14 md:px-8 md:py-24">
+            <p className="max-w-3xl text-pretty font-display text-2xl leading-snug text-muted-foreground md:text-3xl">
+              {copy("Idea lists are easy to find. Knowing which idea has paying buyers is the hard part.")}
+            </p>
+            <div className="mt-8 grid gap-6 md:mt-10 lg:grid-cols-[1.2fr_1fr] lg:items-end lg:gap-16">
               <h2 className="landing-heading max-w-2xl">
                 {copy("Most ideas don’t survive the research. That’s the point.")}
               </h2>
@@ -384,10 +406,10 @@ export function Landing() {
           </div>
         </section>
 
-        <section id="whats-inside" className="mx-auto max-w-7xl px-5 py-16 md:px-8 md:py-24">
+        <section id="whats-inside" className="mx-auto max-w-7xl px-5 py-14 md:px-8 md:py-24">
           <div className="grid gap-10 lg:grid-cols-[0.8fr_1.2fr] lg:gap-16">
             <div className="flex flex-col gap-4 lg:sticky lg:top-28 lg:self-start">
-              <h2 className="landing-heading">{copy("Inside every research report")}</h2>
+              <h2 className="landing-heading">{copy("What every report gives you")}</h2>
               <p className="max-w-md text-muted-foreground">
                 {copy(
                   "Not a chat transcript. A structured, saved brief you can read in ten minutes and act on the same day.",
@@ -397,34 +419,40 @@ export function Landing() {
                 <Link href="/demo/research/results">{copy("Read a sample report")}</Link>
               </Button>
             </div>
-            <div>
-            <dl id="report-parts">
-              {reportParts.map((part, index) => (
-                <div
-                  key={part.title}
-                  className={`landing-rule grid gap-1.5 py-4 sm:grid-cols-[minmax(0,0.85fr)_minmax(0,1.5fr)] sm:gap-8 md:py-5${
-                    !allParts && index >= reportPartsOnPhones ? " max-md:hidden" : ""
-                  }`}
-                >
-                  <dt className="font-semibold leading-snug">{copy(part.title)}</dt>
-                  <dd className="leading-relaxed text-muted-foreground">{copy(part.text)}</dd>
+            <dl>
+              {benefits.map((benefit) => (
+                <div key={benefit.title} className="landing-rule flex flex-col gap-2 py-5 md:py-6">
+                  <dt className="text-lg font-semibold leading-snug">{copy(benefit.title)}</dt>
+                  <dd className="leading-relaxed text-muted-foreground">{copy(benefit.text)}</dd>
                 </div>
               ))}
             </dl>
-            {!allParts && (
-              <Button
-                type="button"
-                variant="link"
-                className="landing-rule min-h-11 w-full justify-start rounded-none px-0 md:hidden"
-                aria-expanded={false}
-                aria-controls="report-parts"
-                onClick={() => setAllParts(true)}
-              >
-                {copy("Show all {count}", { count: reportParts.length })}
-                <Plus aria-hidden="true" />
-              </Button>
-            )}
-            </div>
+          </div>
+        </section>
+
+        <section id="how-it-works" className="mx-auto max-w-7xl px-5 md:px-8">
+          <div className="landing-rule flex flex-col gap-10 py-14 md:gap-14 md:py-24">
+            <h2 className="landing-heading max-w-2xl">
+              {copy("A better question than “What should I build?”")}
+            </h2>
+            <ol className="grid gap-8 md:grid-cols-3 md:gap-10 lg:gap-16">
+              {steps.map((step, index) => (
+                <li
+                  key={step.title}
+                  className="grid grid-cols-[2.25rem_minmax(0,1fr)] gap-x-3 gap-y-2 md:flex md:flex-col md:gap-3"
+                >
+                  <span
+                    aria-hidden="true"
+                    className="row-span-3 font-display text-4xl leading-none text-primary/80 md:text-5xl"
+                  >
+                    {index + 1}
+                  </span>
+                  <h3 className="text-lg font-semibold md:mt-2">{copy(step.title)}</h3>
+                  <p className="leading-relaxed text-muted-foreground">{copy(step.text)}</p>
+                  <p className="text-sm font-medium text-primary">{copy(step.detail)}</p>
+                </li>
+              ))}
+            </ol>
           </div>
         </section>
 
@@ -445,7 +473,7 @@ export function Landing() {
         </section>
 
         <section id="faq" className="mx-auto max-w-7xl px-5 md:px-8">
-          <div className="landing-rule grid gap-8 py-16 md:grid-cols-[0.8fr_1.2fr] md:gap-16 md:py-24">
+          <div className="landing-rule grid gap-8 py-14 md:grid-cols-[0.8fr_1.2fr] md:gap-16 md:py-24">
             <div className="flex flex-col gap-4">
               <h2 className="landing-heading">{copy("Straight answers before you start")}</h2>
               <p className="max-w-md text-muted-foreground">
@@ -462,15 +490,21 @@ export function Landing() {
                       className="size-4 shrink-0 text-primary transition-transform group-open:rotate-45"
                     />
                   </summary>
-                  <p className="max-w-2xl pb-5 leading-relaxed text-muted-foreground">{copy(faq.a)}</p>
+                  <p className="max-w-2xl pb-5 leading-relaxed text-muted-foreground">{faqAnswer(faq)}</p>
                 </details>
               ))}
             </div>
           </div>
+          <script
+            type="application/ld+json"
+            // The FAQ text is our own copy; escaping "<" keeps it from ever closing the script element.
+            dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema).replace(/</g, "\\u003c") }}
+          />
         </section>
 
+        {/* The close repeats the hero's action and reassurance, word for word. */}
         <section className="border-t bg-card" data-cta-end>
-          <div className="mx-auto flex max-w-7xl flex-col gap-8 px-5 py-16 md:px-8 md:py-24 lg:flex-row lg:items-end lg:justify-between">
+          <div className="mx-auto flex max-w-7xl flex-col gap-8 px-5 py-14 md:px-8 md:py-24 lg:flex-row lg:items-end lg:justify-between">
             <div className="flex max-w-3xl flex-col gap-4">
               <h2 className="landing-heading">{copy("Your next chapter deserves a clearer lens.")}</h2>
               <p className="max-w-xl text-pretty text-muted-foreground">
@@ -479,16 +513,8 @@ export function Landing() {
                 )}
               </p>
             </div>
-            <div className="hero-actions flex flex-wrap gap-3 lg:shrink-0">
-              <Button asChild size="lg">
-                <Link href="/signup">
-                  {copy("Build your founder profile")}
-                  <ArrowRight />
-                </Link>
-              </Button>
-              <Button asChild variant="outline" size="lg">
-                <Link href="/demo/dashboard">{copy("Try the demo")}</Link>
-              </Button>
+            <div className="lg:shrink-0">
+              <PrimaryAction marker="end" />
             </div>
           </div>
         </section>
