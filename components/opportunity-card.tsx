@@ -34,7 +34,7 @@ export function OpportunityCard({
     <Card
       role="article"
       aria-label={o.title}
-      className="lift flex h-full min-w-0 flex-col overflow-hidden"
+      className="lift card-link group flex h-full min-w-0 flex-col overflow-hidden"
     >
       <CardHeader className="gap-4 p-5 pb-4 sm:p-6 sm:pb-5">
         <div className="flex items-start justify-between gap-3">
@@ -86,7 +86,8 @@ export function OpportunityCard({
             <h3 className="text-xl font-semibold leading-snug sm:text-2xl">
               <Link
                 href={`/opportunities/${o.id}`}
-                className="rounded-sm hover:text-primary"
+                // Stretches over the whole card (globals.css .card-link), so anywhere on it opens the report.
+                className="card-link-target rounded-sm group-hover:text-primary"
               >
                 {o.title}
               </Link>
@@ -145,7 +146,7 @@ export function OpportunityCard({
         )}
       </CardContent>
 
-      <CardFooter className="flex-col items-stretch gap-4 border-t bg-background/45 px-5 py-5 sm:px-6">
+      <CardFooter className="flex-wrap items-center justify-between gap-x-4 gap-y-3 border-t bg-background/45 px-5 py-4 sm:px-6">
         <p className="text-sm text-muted-foreground">
           {isDemo
             ? copy("Demo assessment")
@@ -154,13 +155,13 @@ export function OpportunityCard({
                 { count: reportEvidenceCount([original]) },
               )}
         </p>
-        <Button asChild className="w-full">
+        <Button asChild variant="outline" size="sm" className="group-hover:border-primary/40">
           <Link
             href={`/opportunities/${o.id}`}
             aria-label={copy("Read report: {title}", { title: o.title })}
           >
             {copy("Read report")}
-            <ArrowRight data-icon="inline-end" />
+            <ArrowRight data-icon="inline-end" className="transition-transform duration-200 group-hover:translate-x-0.5" />
           </Link>
         </Button>
       </CardFooter>

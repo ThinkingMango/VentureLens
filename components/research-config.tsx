@@ -123,6 +123,42 @@ function ChoiceChip({
     </label>
   );
 }
+// The form's sections are numbered, so a long brief reads as a short sequence of steps.
+function StepNumber({ n, done = false }: { n: number; done?: boolean }) {
+  return (
+    <span aria-hidden="true" className="step-number" data-done={done || undefined}>
+      {done ? <Check className="size-3.5" strokeWidth={2.5} /> : n}
+    </span>
+  );
+}
+type BriefStep = { id: string; title: string; summary?: string; done: boolean; optional?: boolean };
+// Wide screens: a sticky outline of the brief, with what has been chosen so far and a link to each section.
+function BriefOutline({ steps }: { steps: BriefStep[] }) {
+  const copy = useCopy();
+  return (
+    <nav aria-label={copy("On this page")} className="surface hidden flex-col gap-4 p-6 xl:sticky xl:top-24 xl:flex">
+      <h2 className="font-semibold">{copy("Your brief")}</h2>
+      <ol className="brief-outline flex flex-col">
+        {steps.map((step, index) => (
+          <li key={step.id}>
+            <a href={`#${step.id}`} className="flex gap-3 rounded-lg py-2 pr-2 hover:text-primary">
+              <StepNumber n={index + 1} done={step.done} />
+              <span className="flex min-w-0 flex-col">
+                <span className="text-sm font-medium leading-snug">
+                  {copy(step.title)}
+                  {step.optional && <span className="font-normal text-muted-foreground"> {copy("(optional)")}</span>}
+                </span>
+                {step.summary && (
+                  <span className="truncate text-sm text-muted-foreground">{step.summary}</span>
+                )}
+              </span>
+            </a>
+          </li>
+        ))}
+      </ol>
+    </nav>
+  );
+}
 export function ResearchConfig({ initialBrief }: { initialBrief?: ResearchBrief } = {}) {
   const copy = useCopy();
   const { run, setRun, profile, isDemo, href, busy, refresh, data } = useDemo();
@@ -169,6 +205,60 @@ export function ResearchConfig({ initialBrief }: { initialBrief?: ResearchBrief 
   const router = useRouter();
   const locale = useLocale() as Locale;
   const accessBlocked = !isDemo && !data?.access.enabled;
+  const modeTitle = discoveryModes.find((mode) => mode.value === (draft.discovery_mode ?? "combined"))?.title;
+  const list = (values: readonly string[]) => values.map((value) => copy(value)).join(", ");
+  const ideaReady = [idea.title, idea.buyer, idea.pain].every((value) => value.trim());
+  const steps: BriefStep[] = [
+    {
+      id: "research-kind",
+      title: "What would you like to do?",
+      summary: copy(verify ? "I have an idea — check it" : "Find opportunities for me"),
+      done: true,
+    },
+    ...(verify
+      ? [{ id: "brief-idea", title: "Your idea", summary: idea.title.trim() || undefined, done: ideaReady }]
+      : [
+          { id: "brief-focus", title: "Set your research focus", summary: draft.name.trim() || undefined, done: !!draft.name.trim() },
+          {
+            id: "brief-preferences",
+            title: "Discovery preferences",
+            summary: [modeTitle && copy(modeTitle), list(draft.sectors)].filter(Boolean).join(" · "),
+            done: true,
+          },
+          {
+            id: "brief-constraints",
+            title: "Your real-world constraints",
+            summary: angles.length ? copy("{count} of {max} chosen", { count: angles.length, max: maxAngles }) : undefined,
+            done: angles.length > 0 || !!draft.explore_new || !!draft.context?.trim(),
+            optional: true,
+          },
+        ]),
+    { id: "brief-review", title: "Review and start", done: false },
+  ];
+  const runMeta = (
+    <>
+      {isDemo ? (
+        copy("0 credits used in demo mode")
+      ) : accessBlocked ? (
+        copy("Saves the brief only · No live run on this account yet")
+      ) : (
+        <>
+          <Clock3 className="size-4 shrink-0" />
+          {verify
+            ? copy("About 2–3 minutes (an estimate until enough checks have run) · Uses one research run, returned if the run fails (within a per-account limit)")
+            : copy(
+                "Usually 5–10 minutes · Uses one research run, returned if the run fails (within a per-account limit)",
+              )}
+          {" · "}
+          {copy("Report in {language}", {
+            language: localeNames[locale],
+          })}
+        </>
+      )}
+    </>
+  );
+  const number = (id: string) => steps.findIndex((step) => step.id === id) + 1;
+  const done = (id: string) => steps.find((step) => step.id === id)?.done ?? false;
   return (
     <>
       <Link
@@ -215,9 +305,10 @@ export function ResearchConfig({ initialBrief }: { initialBrief?: ResearchBrief 
         </div>
       )}
       <div className="grid gap-6 xl:grid-cols-[1.6fr_1fr]">
-        <section className="surface p-6 md:p-8">
+        <section className="surface min-w-0 p-6 md:p-8">
           <form
-            className="flex flex-col gap-7"
+            id="research-form"
+            className="flex flex-col gap-8"
             noValidate
             onSubmit={async (e) => {
               e.preventDefault();
@@ -302,7 +393,8 @@ export function ResearchConfig({ initialBrief }: { initialBrief?: ResearchBrief 
             }}
           >
             <FieldSet id="research-kind" className="gap-3">
-              <FieldLegend className="text-lg font-semibold">
+              <FieldLegend className="flex items-center gap-3 text-lg font-semibold">
+                <StepNumber n={1} done />
                 {copy("What would you like to do?")}
               </FieldLegend>
               <div className="grid gap-3 sm:grid-cols-2">
@@ -337,10 +429,12 @@ export function ResearchConfig({ initialBrief }: { initialBrief?: ResearchBrief 
             {verify ? (
             <FieldGroup>
               <section
+                id="brief-idea"
                 aria-labelledby="idea-group"
-                className="flex flex-col gap-5 rounded-xl bg-background/65 p-4 sm:p-5"
+                className="brief-section flex flex-col gap-5"
               >
-                <h2 id="idea-group" className="text-lg font-semibold">
+                <h2 id="idea-group" className="flex items-center gap-3 text-lg font-semibold">
+                  <StepNumber n={number("brief-idea")} done={done("brief-idea")} />
                   {copy("Your idea")}
                 </h2>
                 <Field data-invalid={!!ideaErrors.title}>
@@ -451,10 +545,12 @@ export function ResearchConfig({ initialBrief }: { initialBrief?: ResearchBrief 
             ) : (
             <FieldGroup>
               <section
+                id="brief-focus"
                 aria-labelledby="research-focus-group"
-                className="flex flex-col gap-5 rounded-xl bg-background/65 p-4 sm:p-5"
+                className="brief-section flex flex-col gap-5"
               >
-                <h2 id="research-focus-group" className="text-lg font-semibold">
+                <h2 id="research-focus-group" className="flex items-center gap-3 text-lg font-semibold">
+                  <StepNumber n={number("brief-focus")} done={done("brief-focus")} />
                   {copy("Set your research focus")}
                 </h2>
               <Field data-invalid={!!nameError}>
@@ -490,10 +586,12 @@ export function ResearchConfig({ initialBrief }: { initialBrief?: ResearchBrief 
               </Field>
               </section>
               <section
+                id="brief-preferences"
                 aria-labelledby="discovery-preferences-group"
-                className="flex flex-col gap-5 rounded-xl bg-background/65 p-4 sm:p-5"
+                className="brief-section flex flex-col gap-5"
               >
-                <h2 id="discovery-preferences-group" className="text-lg font-semibold">
+                <h2 id="discovery-preferences-group" className="flex items-center gap-3 text-lg font-semibold">
+                  <StepNumber n={number("brief-preferences")} done={done("brief-preferences")} />
                   {copy("Discovery preferences")}
                 </h2>
               <FieldSet id="discovery-mode" className="gap-3">
@@ -666,10 +764,12 @@ export function ResearchConfig({ initialBrief }: { initialBrief?: ResearchBrief 
               </Field>
               </section>
               <section
+                id="brief-constraints"
                 aria-labelledby="research-constraints-group"
-                className="flex flex-col gap-5 rounded-xl bg-background/65 p-4 sm:p-5"
+                className="brief-section flex flex-col gap-5"
               >
-                <h2 id="research-constraints-group" className="text-lg font-semibold">
+                <h2 id="research-constraints-group" className="flex items-center gap-3 text-lg font-semibold">
+                  <StepNumber n={number("brief-constraints")} done={done("brief-constraints")} />
                   {copy("Your real-world constraints")}
                 </h2>
               <FieldSet id="angles" aria-describedby="angles-help angles-count" className="gap-3">
@@ -761,38 +861,45 @@ export function ResearchConfig({ initialBrief }: { initialBrief?: ResearchBrief 
             </FieldGroup>
             )}
             <section
+              id="brief-review"
               aria-labelledby="research-review-group"
-              className="flex flex-col gap-5 rounded-xl border bg-card p-4 sm:p-5"
+              className="brief-section flex flex-col gap-5"
             >
-              <h2 id="research-review-group" className="text-lg font-semibold">
+              <h2 id="research-review-group" className="flex items-center gap-3 text-lg font-semibold">
+                <StepNumber n={number("brief-review")} />
                 {copy("Review and start")}
               </h2>
+              {/* What this run will use, so the founder checks the brief without scrolling back up. */}
+              <dl className="grid gap-x-6 gap-y-4 rounded-xl bg-background/65 p-4 sm:grid-cols-2 sm:p-5">
+                {(verify
+                  ? [
+                      ["Your idea", idea.title.trim() || "—"],
+                      ["Target market", copy(draft.geography)],
+                    ]
+                  : [
+                      ["Discovery mode", modeTitle ? copy(modeTitle) : "—"],
+                      ["Industry or market", list(draft.sectors) || "—"],
+                      ["Business model", list(draft.models) || "—"],
+                      ["Target market", copy(draft.geography)],
+                    ]
+                ).map(([label, value]) => (
+                  <div key={label} className="flex min-w-0 flex-col gap-1">
+                    <dt className="text-sm text-muted-foreground">{copy(label)}</dt>
+                    <dd className="font-medium leading-snug">{value}</dd>
+                  </div>
+                ))}
+              </dl>
+              <p className="flex items-center gap-2 text-sm text-muted-foreground sm:hidden">{runMeta}</p>
             {formError && (
               <p role="alert" className="rounded-lg border p-4 text-sm">
                 {copy(formError)}
               </p>
             )}
-            <div className="flex flex-col items-stretch justify-between gap-4 border-t pt-5 sm:flex-row sm:items-center">
-              <span className="flex items-center gap-2 text-sm text-muted-foreground">
-                {isDemo ? (
-                  copy("0 credits used in demo mode")
-                ) : accessBlocked ? (
-                  copy("Saves the brief only · No live run on this account yet")
-                ) : (
-                  <>
-                    <Clock3 className="size-4 shrink-0" />
-                    {verify
-                      ? copy("About 2–3 minutes (an estimate until enough checks have run) · Uses one research run, returned if the run fails (within a per-account limit)")
-                      : copy(
-                          "Usually 5–10 minutes · Uses one research run, returned if the run fails (within a per-account limit)",
-                        )}
-                    {" · "}
-                    {copy("Report in {language}", {
-                      language: localeNames[locale],
-                    })}
-                  </>
-                )}
-              </span>
+            </section>
+            {/* Pinned to the bottom of the screen while the form is in view, so the run can start from anywhere. */}
+            <div className="brief-actions flex flex-col items-stretch justify-between gap-3 sm:flex-row sm:items-center">
+              {/* Phones pin the button alone; the run details sit in the review step above. */}
+              <span className="hidden items-center gap-2 text-sm text-muted-foreground sm:flex">{runMeta}</span>
               <Button
                 type="submit"
                 className="shrink-0"
@@ -811,7 +918,6 @@ export function ResearchConfig({ initialBrief }: { initialBrief?: ResearchBrief 
                 <ArrowRight />
               </Button>
             </div>
-            </section>
           </form>
         </section>
         <aside className="flex flex-col gap-5">
@@ -901,6 +1007,7 @@ export function ResearchConfig({ initialBrief }: { initialBrief?: ResearchBrief 
             )}
           </section>
           <DemoNote />
+          <BriefOutline steps={steps} />
         </aside>
       </div>
     </>

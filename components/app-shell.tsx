@@ -90,7 +90,7 @@ export function AppShell({
                 : nav.find((n) => n.href === path)?.title || "Workspace";
   const sidebar = (
     <>
-      <div className="flex h-16 items-center justify-between px-6">
+      <div className="flex h-16 shrink-0 items-center justify-between px-6">
         <Brand />
         <Button
           variant="ghost"
@@ -102,8 +102,8 @@ export function AppShell({
           <X />
         </Button>
       </div>
-      <div className="flex flex-1 flex-col px-4 py-3">
-        <div className="mb-5 flex items-center gap-3 rounded-lg border p-3">
+      <div className="flex flex-1 flex-col px-3 py-3">
+        <div className="mb-5 flex items-center gap-3 rounded-lg border bg-card p-3">
           <span aria-hidden="true" className="flex size-8 items-center justify-center rounded-md bg-secondary font-semibold text-primary">
             {profile.name.slice(0, 1) || copy("F")}
           </span>
@@ -146,7 +146,9 @@ export function AppShell({
               <n.icon className="size-[18px]" />
               {copy(n.title)}
               {n.href === "/saved" && (
-                <span className="ml-auto text-sm">{saved.length}</span>
+                <span className="ml-auto min-w-6 rounded-full bg-background px-1.5 text-center text-xs font-semibold tabular-nums leading-5">
+                  {saved.length}
+                </span>
               )}
             </Link>
           ))}
@@ -168,7 +170,7 @@ export function AppShell({
             {copy("New research")}
           </Link>
         </Button>
-        <div className="mt-auto flex flex-col gap-5 pt-12">
+        <div className="mt-auto flex flex-col gap-5 pt-8">
           {!isDemo && <ResearchAccessCard compact />}
           {isDemo && (
             <div className="rounded-lg border bg-background p-4">
@@ -241,7 +243,7 @@ export function AppShell({
       <Link
         href="/profile"
         onClick={() => setOpen(false)}
-        className="flex items-center gap-3 border-t px-6 py-5"
+        className="flex shrink-0 items-center gap-3 border-t px-6 py-4 hover:bg-secondary/60"
       >
         <span aria-hidden="true" className="flex size-9 items-center justify-center rounded-full bg-secondary font-semibold text-primary">
           {profile.name.slice(0, 1)}
@@ -273,7 +275,7 @@ export function AppShell({
             event.preventDefault();
             navTrigger.current?.focus();
           }}
-          className="workspace-sidebar left-0 top-0 flex h-dvh w-72 max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-y-auto rounded-none border-0 bg-card p-0 text-foreground sm:rounded-none [&>button]:hidden"
+          className="dialog-sheet workspace-sidebar left-0 top-0 flex h-dvh w-72 max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-y-auto rounded-none border-0 bg-card p-0 text-foreground sm:rounded-none [&>button]:hidden"
         >
           <DialogTitle className="sr-only">
             {copy("Workspace navigation")}
@@ -318,7 +320,7 @@ export function AppShell({
             </Badge>
             <button
               aria-label={copy("Help & resources")}
-              className="hidden size-11 items-center justify-center rounded-md text-muted-foreground hover:bg-secondary sm:flex"
+              className="hidden size-11 items-center justify-center rounded-md text-muted-foreground hover:bg-secondary active:scale-[0.96] sm:flex"
               onClick={(event) => {
                 helpTrigger.current = event.currentTarget;
                 setHelp(true);
@@ -373,7 +375,7 @@ export function AppShell({
               aria-current={active ? "page" : undefined}
               className={cn(
                 "flex min-h-16 flex-col items-center justify-center gap-1 px-1 py-2 text-[11px] font-medium leading-4 text-muted-foreground",
-                active && "bg-secondary text-primary",
+                active && "text-primary",
               )}
             >
               <item.icon className="size-5" aria-hidden="true" />

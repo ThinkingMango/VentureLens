@@ -88,7 +88,7 @@ test("research history uses card-like mobile rows and a persistent search", () =
 
 test("research setup uses its inline validation instead of native bubbles", () => {
   const config = read("components/research-config.tsx");
-  assert.match(config, /<form\s+className="flex flex-col gap-7"\s+noValidate/);
+  assert.match(config, /<form\s+id="research-form"\s+className="[^"]*"\s+noValidate/);
 });
 
 
@@ -226,4 +226,67 @@ test("every public promise of free runs matches the signup grant: 10 runs for 90
   for (const page of ["components/pricing.tsx", "components/support.tsx", "components/landing.tsx"])
     if (/valid for/.test(read(page))) assert.match(read(page), /valid for 90 days/, page);
   assert.match(JSON.parse(read("messages/en.json")).metadata.description, /first 10 runs are free/);
+});
+
+test("motion uses the shared easing tokens and real animations, not missing plugin classes", () => {
+  const css = read("app/globals.css");
+  const dialog = read("components/ui/dialog.tsx");
+  const shell = read("components/app-shell.tsx");
+  for (const token of ["--ease-out", "--ease-in-out", "--ease-drawer"]) assert.match(css, new RegExp(`${token}:\\s*cubic-bezier`));
+  // tailwindcss-animate is not installed, so its classes would silently do nothing.
+  assert.doesNotMatch(dialog, /animate-in|zoom-in-95|slide-in-from/);
+  assert.match(dialog, /dialog-overlay/);
+  assert.match(dialog, /dialog-content/);
+  assert.match(css, /\.dialog-content\[data-state="closed"\]/);
+  assert.match(shell, /dialog-sheet workspace-sidebar/);
+  // Hover lifts only with a real pointer, and reduced motion keeps colour feedback.
+  assert.match(css, /@media \(hover: hover\) and \(pointer: fine\) \{\s*\.lift:hover/);
+  assert.match(css, /prefers-reduced-motion: reduce\)[\s\S]*transition-property: color/);
+});
+
+test("the workspace sidebar never squashes its header or footer when it overflows", () => {
+  const shell = read("components/app-shell.tsx");
+  assert.match(shell, /flex h-16 shrink-0 items-center/);
+  assert.match(shell, /flex shrink-0 items-center gap-3 border-t/);
+});
+
+test("opportunity cards open from anywhere and keep one quiet call to action", () => {
+  const card = read("components/opportunity-card.tsx");
+  const css = read("app/globals.css");
+  assert.match(card, /card-link group/);
+  assert.match(card, /card-link-target/);
+  assert.doesNotMatch(card, /<Button asChild className="w-full">/);
+  assert.match(css, /\.card-link \.card-link-target::after/);
+  assert.match(css, /\.card-link :is\(button, a:not\(\.card-link-target\)\)/);
+});
+
+test("the research brief reads as numbered steps with a start button always in reach", () => {
+  const config = read("components/research-config.tsx");
+  const css = read("app/globals.css");
+  // Sections are divided by hairlines, not grey boxes nested inside the card.
+  assert.doesNotMatch(config, /rounded-xl bg-background\/65 p-4 sm:p-5"\s*>\s*<h2/);
+  for (const id of ["brief-focus", "brief-preferences", "brief-constraints", "brief-review", "brief-idea"]) {
+    assert.match(config, new RegExp(`id="${id}"`));
+  }
+  assert.match(config, /<StepNumber n=\{number\("brief-review"\)\}/);
+  // The start row is a direct child of the form, so position: sticky spans the whole form.
+  assert.match(config, /<\/section>\s*\{\/\*[^*]*\*\/\}\s*<div className="brief-actions/);
+  assert.match(css, /\.brief-actions \{[^}]*position: sticky;[^}]*bottom: calc\(4rem \+ env\(safe-area-inset-bottom\)\)/s);
+  // The review step summarises what the run will use; the outline is a wide-screen aid only.
+  assert.match(config, /\["Industry or market", list\(draft\.sectors\)/);
+  assert.match(config, /<BriefOutline steps=\{steps\} \/>/);
+  assert.match(config, /hidden flex-col gap-4 p-6 xl:sticky xl:top-24 xl:flex/);
+});
+
+test("the landing page stays compact on phones without hiding content from wider screens", () => {
+  const landing = read("components/landing.tsx");
+  const shell = read("components/public-shell.tsx");
+  // Report parts beyond the first few wait behind "Show all" on phones only.
+  assert.match(landing, /const reportPartsOnPhones = 4;/);
+  assert.match(landing, /index >= reportPartsOnPhones \? " max-md:hidden"/);
+  assert.match(landing, /copy\("Show all \{count\}", \{ count: reportParts\.length \}\)/);
+  // The ledger's score sentence stays available to screen readers when the number moves beside the title.
+  assert.match(landing, /<p className="sr-only">\s*\{copy\("In the report with a score of \{score\}"/);
+  // The footer's link columns sit side by side on phones.
+  assert.match(shell, /mx-auto grid max-w-7xl grid-cols-2/);
 });
