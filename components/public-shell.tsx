@@ -10,8 +10,8 @@ import { Button } from "@/components/ui/button";
 import { mailto, supportEmail } from "@/lib/contact";
 // In the order the sections appear on the landing page.
 const links = [
-  { href: "/#how-it-works", label: "How it works" },
   { href: "/#whats-inside", label: "What you get" },
+  { href: "/#how-it-works", label: "How it works" },
   { href: "/demo/dashboard", label: "Demo" },
   { href: "/pricing", label: "Pricing" },
   { href: "/#faq", label: "FAQ" },

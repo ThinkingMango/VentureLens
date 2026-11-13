@@ -202,7 +202,9 @@ test("public pages keep a call to action in reach on phones and share with a pro
   }
   assert.doesNotMatch(shell, /"Live demo"/);
   // The menu follows the order of the landing page's sections.
-  assert.ok(shell.indexOf('"/#how-it-works"') < shell.indexOf('"/#whats-inside"'));
+  assert.ok(shell.indexOf('"/#whats-inside"') < shell.indexOf('"/#how-it-works"'));
+  const landing = read("components/landing.tsx");
+  assert.ok(landing.indexOf('id="whats-inside"') < landing.indexOf('id="how-it-works"'));
   // The landing states run time with the same figure the run page shows.
   assert.match(read("components/research-run.tsx"), /A full run usually takes 5–10 minutes\./);
   assert.match(read("components/landing.tsx"), /a full run usually takes 5–10 minutes\./);
@@ -281,10 +283,6 @@ test("the research brief reads as numbered steps with a start button always in r
 test("the landing page stays compact on phones without hiding content from wider screens", () => {
   const landing = read("components/landing.tsx");
   const shell = read("components/public-shell.tsx");
-  // Report parts beyond the first few wait behind "Show all" on phones only.
-  assert.match(landing, /const reportPartsOnPhones = 4;/);
-  assert.match(landing, /index >= reportPartsOnPhones \? " max-md:hidden"/);
-  assert.match(landing, /copy\("Show all \{count\}", \{ count: reportParts\.length \}\)/);
   // The ledger's score sentence stays available to screen readers when the number moves beside the title.
   assert.match(landing, /<p className="sr-only">\s*\{copy\("In the report with a score of \{score\}"/);
   // The footer's link columns sit side by side on phones.
@@ -318,4 +316,22 @@ test("the opportunity page keeps its tabs and score panel clear of the sticky wo
   // The reading guide is a quiet link; the source count opens the Evidence tab.
   assert.match(detail, /<Button ref=\{guideButton\} variant="link"/);
   assert.match(detail, /onClick=\{\(\) => goTo\("evidence"\)\}/);
+});
+
+test("the landing page leads with one action, repeated at the close, and backs it only with true facts", () => {
+  const landing = read("components/landing.tsx");
+  // One primary button, used in the hero and the closing section; the demo is a link, not a competing button.
+  assert.equal(landing.match(/copy\("Get 10 free research runs"\)/g)?.length, 1);
+  assert.match(landing, /<PrimaryAction marker="start" \/>/);
+  assert.match(landing, /<PrimaryAction marker="end" \/>/);
+  assert.doesNotMatch(landing, /<Button asChild variant="outline" size="lg">\s*<Link href="\/demo\/dashboard">/);
+  assert.match(landing, /Free account, no card or password\./);
+  // Proof is product facts, never a testimonial or invented number.
+  assert.doesNotMatch(landing, /testimonial|customers|users trust/i);
+  // The pricing answer reads the planned packages instead of typing a price.
+  assert.match(landing, /import \{ plans \} from "@\/components\/pricing";/);
+  assert.doesNotMatch(landing, /\$\d/);
+  // FAQ structured data comes from the same list, with "<" escaped inside the script element.
+  assert.match(landing, /"@type": "FAQPage"/);
+  assert.match(landing, /replace\(\/<\/g, "\\\\u003c"\)/);
 });
