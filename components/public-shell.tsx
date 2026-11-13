@@ -106,8 +106,8 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
       {children}
       <MobileCtaBar />
       <footer className="border-t bg-background">
-        <div className="mx-auto grid max-w-7xl gap-10 px-5 py-12 sm:grid-cols-2 md:grid-cols-[1.4fr_1fr_1fr_1fr] md:px-8">
-          <div className="flex flex-col gap-3 sm:col-span-2 md:col-span-1">
+        <div className="mx-auto grid max-w-7xl grid-cols-2 gap-x-6 gap-y-8 px-5 py-10 md:grid-cols-[1.4fr_1fr_1fr_1fr] md:gap-10 md:px-8 md:py-12">
+          <div className="col-span-2 flex flex-col gap-3 md:col-span-1">
             <Brand />
             <p className="max-w-sm text-sm text-muted-foreground">
               {copy(
@@ -115,44 +115,44 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
               )}
             </p>
           </div>
-          <div className="flex flex-col gap-2 text-sm">
-            <p className="font-semibold">{copy("Product")}</p>
+          <div className="flex flex-col gap-0.5 text-sm md:gap-2">
+            <p className="pb-1 font-semibold md:pb-0">{copy("Product")}</p>
             <Link
               href="/#whats-inside"
-              className="text-muted-foreground hover:text-primary"
+              className="py-1.5 text-muted-foreground hover:text-primary md:py-0"
             >
               {copy("What you get")}
             </Link>
             <Link
               href="/#how-it-works"
-              className="text-muted-foreground hover:text-primary"
+              className="py-1.5 text-muted-foreground hover:text-primary md:py-0"
             >
               {copy("How it works")}
             </Link>
             <Link
               href="/pricing"
-              className="text-muted-foreground hover:text-primary"
+              className="py-1.5 text-muted-foreground hover:text-primary md:py-0"
             >
               {copy("Pricing")}
             </Link>
             <Link
               href="/demo/dashboard"
-              className="text-muted-foreground hover:text-primary"
+              className="py-1.5 text-muted-foreground hover:text-primary md:py-0"
             >
               {copy("Explore demo")}
             </Link>
           </div>
-          <div className="flex flex-col gap-2 text-sm">
-            <p className="font-semibold">{copy("Account")}</p>
+          <div className="flex flex-col gap-0.5 text-sm md:gap-2">
+            <p className="pb-1 font-semibold md:pb-0">{copy("Account")}</p>
             <Link
               href="/login"
-              className="text-muted-foreground hover:text-primary"
+              className="py-1.5 text-muted-foreground hover:text-primary md:py-0"
             >
               {copy("Log in")}
             </Link>
             <Link
               href="/signup"
-              className="text-muted-foreground hover:text-primary"
+              className="py-1.5 text-muted-foreground hover:text-primary md:py-0"
             >
               {copy("Create a free account")}
             </Link>
@@ -162,12 +162,12 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
               )}
             </p>
           </div>
-          <div className="flex flex-col gap-2 text-sm">
-            <p className="font-semibold">{copy("Help")}</p>
-            <Link href="/support" className="text-muted-foreground hover:text-primary">
+          <div className="flex flex-col gap-0.5 text-sm md:gap-2">
+            <p className="pb-1 font-semibold md:pb-0">{copy("Help")}</p>
+            <Link href="/support" className="py-1.5 text-muted-foreground hover:text-primary md:py-0">
               {copy("Support")}
             </Link>
-            <Link href="/privacy" className="text-muted-foreground hover:text-primary">
+            <Link href="/privacy" className="py-1.5 text-muted-foreground hover:text-primary md:py-0">
               {copy("Privacy Policy")}
             </Link>
             <a href={mailto(supportEmail)} className="mt-2 break-all text-muted-foreground hover:text-primary">

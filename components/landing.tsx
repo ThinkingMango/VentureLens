@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { ArrowRight, Check, Plus, X } from "lucide-react";
 import { PublicShell } from "@/components/public-shell";
 import { Button } from "@/components/ui/button";
@@ -196,9 +197,10 @@ function RunLedger() {
           return (
             <li
               key={index}
-              className="ledger-row border-b px-5 py-5 last:border-b-0 sm:px-6 lg:py-4"
+              className="ledger-row border-b px-5 py-4 last:border-b-0 sm:px-6"
             >
               <div className="min-w-0">
+                <div className="flex items-baseline justify-between gap-4">
                 {opportunity ? (
                   <Link
                     href={`/demo/opportunities/${opportunity.id}`}
@@ -209,8 +211,14 @@ function RunLedger() {
                 ) : (
                   <s className="ledger-struck leading-snug">{title}</s>
                 )}
+                {opportunity && (
+                  <span aria-hidden="true" className="terminal-number text-xl text-primary lg:hidden">
+                    {opportunity.score}
+                  </span>
+                )}
+                </div>
                 {/* Phones: one track of four gates and a plain-language status. */}
-                <div className="mt-4 flex flex-col gap-3 lg:hidden">
+                <div className="mt-3 flex flex-col gap-2 lg:hidden">
                   <span className="ledger-track" aria-hidden="true">
                     {gates.map((gate, gateIndex) => (
                       <span
@@ -226,7 +234,7 @@ function RunLedger() {
                     ))}
                   </span>
                   {opportunity ? (
-                    <p className="text-sm text-primary">
+                    <p className="sr-only">
                       {copy("In the report with a score of {score}", { score: opportunity.score })}
                     </p>
                   ) : (
@@ -281,12 +289,16 @@ function RunLedger() {
   );
 }
 
+// Phones show the first parts of the report and the rest on request; wider screens always show all of them.
+const reportPartsOnPhones = 4;
+
 export function Landing() {
   const copy = useCopy();
+  const [allParts, setAllParts] = useState(false);
   return (
     <PublicShell>
       <main id="main-content" tabIndex={-1}>
-        <section className="mx-auto max-w-7xl px-5 pb-16 pt-12 md:px-8 md:pb-24 md:pt-20">
+        <section className="mx-auto max-w-7xl px-5 pb-14 pt-10 md:px-8 md:pb-24 md:pt-20">
           <div className="hero-layout">
             <h1 className="hero-title landing-title">
               {copy("Find a business worth building.")} {copy("Then prove it.")}
@@ -323,16 +335,19 @@ export function Landing() {
             <h2 className="landing-heading max-w-2xl">
               {copy("A better question than “What should I build?”")}
             </h2>
-            <ol className="grid gap-10 md:grid-cols-3 md:gap-10 lg:gap-16">
+            <ol className="grid gap-8 md:grid-cols-3 md:gap-10 lg:gap-16">
               {steps.map((step, index) => (
-                <li key={step.title} className="flex flex-col gap-3">
+                <li
+                  key={step.title}
+                  className="grid grid-cols-[2.25rem_minmax(0,1fr)] gap-x-3 gap-y-2 md:flex md:flex-col md:gap-3"
+                >
                   <span
                     aria-hidden="true"
-                    className="font-display text-5xl leading-none text-primary/80"
+                    className="row-span-3 font-display text-4xl leading-none text-primary/80 md:text-5xl"
                   >
                     {index + 1}
                   </span>
-                  <h3 className="mt-2 text-lg font-semibold">{copy(step.title)}</h3>
+                  <h3 className="text-lg font-semibold md:mt-2">{copy(step.title)}</h3>
                   <p className="leading-relaxed text-muted-foreground">{copy(step.text)}</p>
                   <p className="text-sm font-medium text-primary">{copy(step.detail)}</p>
                 </li>
@@ -353,10 +368,10 @@ export function Landing() {
                 )}
               </p>
             </div>
-            <div className="mt-10 md:mt-14">
+            <div className="mt-8 md:mt-14">
               <RunLedger />
             </div>
-            <ul className="mt-12 grid gap-8 sm:grid-cols-2 lg:grid-cols-4 lg:gap-10">
+            <ul className="mt-10 grid gap-6 sm:grid-cols-2 md:mt-12 md:gap-8 lg:grid-cols-4 lg:gap-10">
               {rules.map((rule) => (
                 <li key={rule.title} className="landing-rule flex flex-col gap-2 pt-5">
                   <h3 className="font-semibold">{copy(rule.title)}</h3>
@@ -382,22 +397,39 @@ export function Landing() {
                 <Link href="/demo/research/results">{copy("Read a sample report")}</Link>
               </Button>
             </div>
-            <dl>
-              {reportParts.map((part) => (
+            <div>
+            <dl id="report-parts">
+              {reportParts.map((part, index) => (
                 <div
                   key={part.title}
-                  className="landing-rule grid gap-1.5 py-5 sm:grid-cols-[minmax(0,0.85fr)_minmax(0,1.5fr)] sm:gap-8"
+                  className={`landing-rule grid gap-1.5 py-4 sm:grid-cols-[minmax(0,0.85fr)_minmax(0,1.5fr)] sm:gap-8 md:py-5${
+                    !allParts && index >= reportPartsOnPhones ? " max-md:hidden" : ""
+                  }`}
                 >
                   <dt className="font-semibold leading-snug">{copy(part.title)}</dt>
                   <dd className="leading-relaxed text-muted-foreground">{copy(part.text)}</dd>
                 </div>
               ))}
             </dl>
+            {!allParts && (
+              <Button
+                type="button"
+                variant="link"
+                className="landing-rule min-h-11 w-full justify-start rounded-none px-0 md:hidden"
+                aria-expanded={false}
+                aria-controls="report-parts"
+                onClick={() => setAllParts(true)}
+              >
+                {copy("Show all {count}", { count: reportParts.length })}
+                <Plus aria-hidden="true" />
+              </Button>
+            )}
+            </div>
           </div>
         </section>
 
         <section className="mx-auto max-w-7xl px-5 md:px-8">
-          <div className="landing-rule py-16 md:py-24">
+          <div className="landing-rule py-14 md:py-24">
             <h2 className="landing-heading max-w-3xl">
               {copy("Built for people who would rather test than guess")}
             </h2>
