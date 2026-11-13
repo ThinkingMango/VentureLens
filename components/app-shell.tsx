@@ -36,7 +36,7 @@ import {
 } from "@/components/ui/dialog";
 import { useDemo } from "@/components/demo-provider";
 import { ResearchAccessCard } from "@/components/research-access-card";
-import { cn } from "@/lib/utils";
+import { cn, progressFill } from "@/lib/utils";
 const nav = [
   { title: "Overview", href: "/dashboard", icon: LayoutDashboard },
   { title: "My research", href: "/research", icon: Telescope },
@@ -190,7 +190,7 @@ export function AppShell({
                 </span>
               </p>
               <div className="progress-track mt-3">
-                <div className="progress-fill w-4/5" />
+                <div className="progress-fill" style={progressFill(80)} />
               </div>
               <Link
                 href="/billing"

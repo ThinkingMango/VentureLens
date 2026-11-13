@@ -4,7 +4,7 @@ import { ArrowRight, FlaskConical, Lock } from "lucide-react";
 import { useCopy, useFormats } from "@/i18n/use-copy";
 import { useDemo } from "@/components/demo-provider";
 import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
+import { cn, progressFill } from "@/lib/utils";
 
 // The research allowance shown in the sidebar, on New research, on Billing and on the dashboard. It lives on its own
 // so the app shell and billing do not pull the whole live workspace module into every bundle.
@@ -47,9 +47,7 @@ export function ResearchAccessCard({ compact = false }: { compact?: boolean }) {
           <div className="progress-track" aria-hidden="true">
             <div
               className="progress-fill"
-              style={{
-                width: `${access.maxRuns ? (access.remaining / access.maxRuns) * 100 : 0}%`,
-              }}
+              style={progressFill(access.maxRuns ? (access.remaining / access.maxRuns) * 100 : 0)}
             />
           </div>
         )}

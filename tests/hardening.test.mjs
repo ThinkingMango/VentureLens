@@ -85,6 +85,7 @@ test("live billing shows the same research allowance as the sidebar and never cl
     "@/components/pricing": { PlanTable: () => null },
     "@/components/demo-provider": { useDemo: () => ({ isDemo: false }) },
     "@/components/research-access-card": { ResearchAccessCard: () => createElement("aside", null, "ACCESS-CARD") },
+    "@/lib/utils": { progressFill: (p) => ({ transform: `translateX(${p - 100}%)` }) },
   });
   const html = renderToStaticMarkup(createElement(Billing));
   assert.match(html, /ACCESS-CARD/);

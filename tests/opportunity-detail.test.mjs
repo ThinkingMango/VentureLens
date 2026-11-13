@@ -58,7 +58,7 @@ function feedbackModule(copy, posted = []) {
     "@/i18n/use-copy": { useCopy: () => copy }, "@/i18n/errors": { feedbackSource: code => String(code) },
     "@/lib/api-client": { postJson: async (url, body) => { posted.push(body); return { ok: true, status: 200, body: {} }; } },
     "@/lib/feedback-core": feedbackCore, "sonner": { toast: { success() {}, info() {}, error() {} } },
-    "@/components/ui/button": { Button: pass("button") }, "@/components/ui/dialog": dialog(), "@/lib/utils": { cn: (...c) => c.filter(Boolean).join(" ") },
+    "@/components/ui/button": { Button: pass("button") }, "@/components/ui/dialog": dialog(), "@/lib/utils": { cn: (...c) => c.filter(Boolean).join(" "), progressFill: (p) => ({ transform: `translateX(${p - 100}%)` }) },
   });
 }
 /** The validation sprint controls (WP-10), with network and toast dependencies replaced; `sent` collects requests. */
@@ -67,7 +67,7 @@ function sprintModule(copy, sent = []) {
     "@/i18n/use-copy": { useCopy: () => copy, useFormats: () => ({ date: value => `date(${value})` }) }, "@/i18n/errors": { feedbackSource: code => String(code) },
     "@/lib/api-client": { postJson: async (url, body) => { sent.push(body); return { ok: true, status: 200, body: {} }; } },
     "@/lib/sprint-core": sprintCore, "sonner": { toast: { success() {}, info() {}, error() {} } },
-    "@/components/ui/button": { Button: pass("button") }, "@/lib/utils": { cn: (...c) => c.filter(Boolean).join(" ") },
+    "@/components/ui/button": { Button: pass("button") }, "@/lib/utils": { cn: (...c) => c.filter(Boolean).join(" "), progressFill: (p) => ({ transform: `translateX(${p - 100}%)` }) },
     "@/components/demo-provider": { useOptionalWorkspace: () => null },
   });
 }
@@ -84,7 +84,7 @@ function detailModule(copy, { guide = false } = {}) {
     "@/components/report-feedback": feedbackModule(copy),
     "@/components/validation-sprint": sprintModule(copy),
     "@/lib/sprint-core": sprintCore,
-    "@/lib/utils": { cn: (...c) => c.filter(Boolean).join(" ") },
+    "@/lib/utils": { cn: (...c) => c.filter(Boolean).join(" "), progressFill: (p) => ({ transform: `translateX(${p - 100}%)` }) },
     "@/i18n/demo": { useDemoContent: () => ({ opportunity: o => o, report: id => researchReports[id] }) },
     "@/lib/report-presentation": presentation,
     "@/lib/opportunity-view": view,

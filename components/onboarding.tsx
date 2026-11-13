@@ -44,7 +44,7 @@ import {
   type Profile,
 } from "@/lib/workspace-schema";
 import { starterProfiles, starterTextFields } from "@/lib/starter-profiles";
-import { cn } from "@/lib/utils";
+import { cn, progressFill } from "@/lib/utils";
 const steps = [
   {
     title: "Your starting point",
@@ -281,7 +281,7 @@ export function Onboarding({ editing = false }: { editing?: boolean }) {
             <div className="progress-track flex-1" aria-hidden="true">
               <div
                 className="progress-fill"
-                style={{ width: `${((step + 1) / steps.length) * 100}%` }}
+                style={progressFill(((step + 1) / steps.length) * 100)}
               />
             </div>
           </div>

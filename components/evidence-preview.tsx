@@ -6,6 +6,7 @@ import { ArrowUpRight, FileText } from "lucide-react";
 import { useCopy } from "@/i18n/use-copy";
 import { useDemoContent } from "@/i18n/demo";
 import { scoreLabels } from "@/lib/demo-data";
+import { progressFill } from "@/lib/utils";
 
 /** An interactive, clearly labeled synthetic report using the actual demo fixtures. */
 export function EvidencePreview() {
@@ -132,7 +133,7 @@ export function EvidencePreview() {
                 <div className="progress-track mt-2" aria-hidden="true">
                   <div
                     className="progress-fill"
-                    style={{ width: `${lead.scores[i]}%` }}
+                    style={progressFill(lead.scores[i])}
                   />
                 </div>
               </div>

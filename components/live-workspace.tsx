@@ -24,7 +24,7 @@ import { Button } from "@/components/ui/button";
 import { OpportunityCard } from "@/components/opportunity-card";
 import type { WorkspaceOpportunity } from "@/lib/workspace-schema";
 import { stageLabels } from "@/lib/research-core";
-import { cn } from "@/lib/utils";
+import { cn, progressFill } from "@/lib/utils";
 import { ResearchAccessCard } from "@/components/research-access-card";
 import { ActiveSprintCard } from "@/components/active-sprint-card";
 
@@ -180,7 +180,7 @@ export function LiveDashboard() {
           <div className="progress-track" aria-hidden="true">
             <div
               className="progress-fill"
-              style={{ width: `${(doneCount / checklist.length) * 100}%` }}
+              style={progressFill((doneCount / checklist.length) * 100)}
             />
           </div>
           <p className="text-sm text-muted-foreground md:hidden">

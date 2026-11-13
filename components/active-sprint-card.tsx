@@ -4,7 +4,7 @@ import { ArrowRight, CalendarDays, Target } from "lucide-react";
 import { useCopy, useFormats } from "@/i18n/use-copy";
 import { Button } from "@/components/ui/button";
 import { isOverdue, sprintDay, type ActiveSprintSummary } from "@/lib/sprint-core";
-import { cn } from "@/lib/utils";
+import { cn, progressFill } from "@/lib/utils";
 
 /** "Your active sprint" (WP-10): the newest active validation sprint, its progress and next three tasks. */
 export function ActiveSprintCard({ sprint, others = 0 }: { sprint: ActiveSprintSummary; others?: number }) {
@@ -26,7 +26,7 @@ export function ActiveSprintCard({ sprint, others = 0 }: { sprint: ActiveSprintS
       </div>
       <p className="font-medium">{sprint.opportunityTitle}</p>
       <div className="progress-track" aria-hidden="true">
-        <div className="progress-fill" style={{ width: `${sprint.total ? (sprint.done / sprint.total) * 100 : 0}%` }} />
+        <div className="progress-fill" style={progressFill(sprint.total ? (sprint.done / sprint.total) * 100 : 0)} />
       </div>
       {sprint.next.length ? (
         <div className="flex flex-col gap-2">

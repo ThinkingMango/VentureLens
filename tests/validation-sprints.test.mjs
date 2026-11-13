@@ -175,7 +175,7 @@ test("the sprint panel and starter render in every language, and finished sprint
     const { SprintPanel, SprintStarter } = load("../components/validation-sprint.tsx", {
       "@/i18n/use-copy": { useCopy: () => copy, useFormats: () => ({ date: value => value }) }, "@/i18n/errors": { feedbackSource: c => c },
       "@/lib/api-client": { postJson: async () => ({ ok: true, status: 200, body: {} }) }, "@/lib/sprint-core": core,
-      "sonner": { toast: { info() {}, error() {}, success() {} } }, "@/components/ui/button": { Button: pass("button") }, "@/lib/utils": { cn: (...c) => c.filter(Boolean).join(" ") },
+      "sonner": { toast: { info() {}, error() {}, success() {} } }, "@/components/ui/button": { Button: pass("button") }, "@/lib/utils": { cn: (...c) => c.filter(Boolean).join(" "), progressFill: (p) => ({ transform: `translateX(${p - 100}%)` }) },
       "@/components/demo-provider": { useOptionalWorkspace: () => null },
     });
     const sprint = demoSprint("o1", ["One", "Two", "Three"], "3 of 10 pay");

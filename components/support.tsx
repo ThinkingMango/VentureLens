@@ -218,10 +218,10 @@ export function Support({ disclosure }: { disclosure: ProviderDisclosure }) {
                   {copy(topic.title)}
                 </h3>
                 {topic.questions.map((item) => (
-                  <details key={item.q} className="surface group p-5">
+                  <details key={item.q} className="surface accordion group p-5">
                     <summary className="flex cursor-pointer items-center justify-between gap-4 font-medium">
                       {copy(item.q)}
-                      <ArrowRight className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-90" />
+                      <ArrowRight className="size-4 shrink-0 text-muted-foreground transition-transform duration-200 ease-[var(--ease-out)] group-open:rotate-90" />
                     </summary>
                     {item.a.map((text) => (
                       <p

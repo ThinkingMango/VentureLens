@@ -174,7 +174,7 @@ test("the quality page shows flag counts by reason, flagged domains and ratings 
       "@/components/shared": { PageHeader: ({ title, children }) => createElement("header", null, title, children) },
       "@/components/admin-nav": { AdminNav: () => null }, "@/components/admin-labels": labels,
       "@/components/ui/card": { Card: pass("div"), CardContent: pass("div"), CardDescription: pass("p"), CardHeader: pass("div"), CardTitle: pass("h3") },
-      "@/lib/quality-metrics": quality, "@/lib/validation-funnel": funnelCore, "@/lib/feedback-core": core, "@/lib/utils": { cn: (...c) => c.filter(Boolean).join(" ") },
+      "@/lib/quality-metrics": quality, "@/lib/validation-funnel": funnelCore, "@/lib/feedback-core": core, "@/lib/utils": { cn: (...c) => c.filter(Boolean).join(" "), progressFill: (p) => ({ transform: `translateX(${p - 100}%)` }) },
     });
     const DAY = 86_400_000, now = new Date("2026-11-30T12:00:00Z"), ago = d => new Date(now.getTime() - d * DAY).toISOString();
     const funnel = funnelCore.validationFunnel({

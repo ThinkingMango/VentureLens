@@ -103,7 +103,7 @@ function renderOnboarding(props = {}) {
     "@/components/ui/button": { Button: passthrough("button") }, "@/components/ui/input": { Input: props => createElement("input", props) },
     "@/components/ui/field": { Field: passthrough("div"), FieldLabel: passthrough("label"), FieldGroup: passthrough("div") },
     "@/components/profile-choice": { ProfileChoice: () => null },
-    "@/lib/profile-options": profileOptions, "@/lib/workspace-schema": workspaceSchema, "@/lib/utils": { cn: (...c) => c.filter(Boolean).join(" ") },
+    "@/lib/profile-options": profileOptions, "@/lib/workspace-schema": workspaceSchema, "@/lib/utils": { cn: (...c) => c.filter(Boolean).join(" "), progressFill: (p) => ({ transform: `translateX(${p - 100}%)` }) },
     "@/lib/starter-profiles": starterProfilesModule,
   });
   return { html: renderToStaticMarkup(createElement(Onboarding, props)), missing };

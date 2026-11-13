@@ -18,7 +18,7 @@ import { demoSprint, firstSteps, type Sprint } from "@/lib/sprint-core";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { cn } from "@/lib/utils";
+import { cn, progressFill } from "@/lib/utils";
 import { useDemoContent } from "@/i18n/demo";
 import { claimsBySection, dimensionLabels, scoreBand, sourceAnchor, type claimSectionOrder } from "@/lib/report-presentation";
 import {
@@ -222,9 +222,9 @@ export function OpportunityDetail({ view, initialTab, sprint, source }: { view: 
               onClick={() => setDetailsOpen(!detailsOpen)}
             >
               {detailsOpen ? copy("Hide score details") : copy("Show score details")}
-              <ChevronDown className={cn("transition-transform", detailsOpen && "rotate-180")} />
+              <ChevronDown className={cn("transition-transform duration-200 ease-[var(--ease-out)]", detailsOpen && "rotate-180")} />
             </Button>
-            <div id="score-details" className={cn("flex flex-col gap-5", !detailsOpen && "hidden xl:flex")}>
+            <div id="score-details" data-open={detailsOpen} className={cn("reveal flex flex-col gap-5", !detailsOpen && "hidden xl:flex")}>
               <dl className="flex flex-col gap-4 border-t pt-5">
                 {dimensionLabels.map((label, i) => (
                   <div key={label} className="flex flex-col gap-2">
@@ -236,7 +236,7 @@ export function OpportunityDetail({ view, initialTab, sprint, source }: { view: 
                       </dd>
                     </div>
                     <div className="progress-track" aria-hidden="true">
-                      <div className="progress-fill" style={{ width: `${view.scores[i]}%` }} />
+                      <div className="progress-fill" style={progressFill(view.scores[i])} />
                     </div>
                   </div>
                 ))}
