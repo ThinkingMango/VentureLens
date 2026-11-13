@@ -61,6 +61,10 @@
   --chart-1: var(--primary);
   --shadow-card: 0 2px 8px rgba(34, 62, 48, 0.035);
   --shadow-float: 0 24px 60px -28px rgba(23, 53, 45, 0.28);
+  /* Motion. Built-in CSS easings are too weak; these give UI movement a deliberate start and a soft landing. */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 * {
@@ -160,14 +164,15 @@ button {
   overflow-wrap: anywhere;
 }
 
+/* Colour changes ease; the press scale is quicker and uses the strong ease-out so it answers the finger at once. */
 a,
 button {
   transition:
-    background-color 0.2s,
-    color 0.2s,
-    border-color 0.2s,
-    box-shadow 0.2s,
-    transform 0.2s;
+    background-color 150ms ease,
+    color 150ms ease,
+    border-color 150ms ease,
+    box-shadow 200ms ease,
+    transform 160ms var(--ease-out);
 }
 
 .font-display,
@@ -204,16 +209,24 @@ button {
   display: flex;
   min-height: 44px;
   align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
+  gap: 10px;
+  padding: 10px;
   border-radius: 10px;
   color: var(--muted-foreground);
+  font-size: 0.9375rem;
   font-weight: 500;
+  line-height: 1.35;
 }
 
-.nav-link:hover {
-  background: var(--secondary);
-  color: var(--foreground);
+.nav-link > svg {
+  flex-shrink: 0;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .nav-link:hover {
+    background: var(--secondary);
+    color: var(--foreground);
+  }
 }
 
 .nav-link.active {
@@ -270,21 +283,51 @@ button {
   white-space: nowrap;
 }
 
-.float {
-  box-shadow: var(--shadow-float);
-}
-
+/* Cards that open something. Hover lifts only with a real pointer: on touch, a tap would leave the card stuck up. */
 .lift {
   transition:
-    transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
-    box-shadow 0.2s,
-    border-color 0.16s;
+    transform 200ms var(--ease-out),
+    box-shadow 200ms ease,
+    border-color 150ms ease;
 }
 
-.lift:hover {
-  transform: translateY(-3px);
-  border-color: color-mix(in srgb, var(--primary) 35%, var(--border));
-  box-shadow: var(--shadow-float);
+@media (hover: hover) and (pointer: fine) {
+  .lift:hover {
+    transform: translateY(-2px);
+    border-color: color-mix(in srgb, var(--primary) 35%, var(--border));
+    box-shadow: var(--shadow-float);
+  }
+}
+
+/* A whole-card link: the title's link stretches over the card, controls inside sit above it. */
+.card-link {
+  position: relative;
+}
+
+.card-link .card-link-target::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+
+.card-link .card-link-target:focus-visible {
+  outline: none;
+}
+
+.card-link:has(.card-link-target:focus-visible) {
+  outline: 2px solid var(--primary);
+  outline-offset: 3px;
+}
+
+.card-link :is(button, a:not(.card-link-target)) {
+  position: relative;
+  z-index: 1;
+}
+
+/* Pressing the card itself (not a control on it) gives the same confirmation a button does, scaled for its size. */
+.card-link:has(.card-link-target:active) {
+  transform: scale(0.99);
 }
 
 .eyebrow {
@@ -363,7 +406,7 @@ progress::-moz-progress-bar {
   height: 100%;
   background: var(--primary);
   border-radius: 999px;
-  transition: width 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: width 400ms var(--ease-out);
 }
 
 .workspace-sidebar {
@@ -379,39 +422,86 @@ progress::-moz-progress-bar {
   background: color-mix(in srgb, var(--card) 96%, transparent);
 }
 
-@keyframes enter {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+/* Phone tab bar: the current tab is marked by a short bar and colour, not a filled block. */
+.mobile-workspace-nav a {
+  position: relative;
 }
 
-.enter {
-  animation: enter 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-
-@keyframes pulse-ring {
-  0% {
-    transform: scale(0.9);
-    opacity: 0.8;
-  }
-  100% {
-    transform: scale(1.6);
-    opacity: 0;
-  }
-}
-
-.pulse-ring::after {
+.mobile-workspace-nav a[aria-current="page"]::before {
   content: "";
   position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  border: 2px solid var(--primary);
-  animation: pulse-ring 1.8s ease-out infinite;
+  top: 0;
+  left: 50%;
+  width: 28px;
+  height: 2px;
+  border-radius: 0 0 2px 2px;
+  background: var(--primary);
+  translate: -50% 0;
+}
+
+.mobile-workspace-nav a:active svg {
+  transform: scale(0.92);
+}
+
+.mobile-workspace-nav svg {
+  transition: transform 160ms var(--ease-out);
+}
+
+/* Dialogs and the phone navigation sheet (Radix). Radix waits for an exit animation before unmounting, so these
+   are keyframes, not transitions. Exits are quicker than entrances: the system answers, the user decides.
+   Tailwind's translate-* utilities set the separate "translate" property, so these transforms compose with them. */
+@keyframes overlay-in {
+  from { opacity: 0; }
+}
+
+@keyframes overlay-out {
+  to { opacity: 0; }
+}
+
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
+@keyframes dialog-out {
+  to {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}
+
+@keyframes sheet-in {
+  from { transform: translateX(-100%); }
+}
+
+@keyframes sheet-out {
+  to { transform: translateX(-100%); }
+}
+
+.dialog-overlay[data-state="open"] {
+  animation: overlay-in 200ms ease-out;
+}
+
+.dialog-overlay[data-state="closed"] {
+  animation: overlay-out 150ms ease-out forwards;
+}
+
+.dialog-content[data-state="open"] {
+  animation: dialog-in 200ms var(--ease-out);
+}
+
+.dialog-content[data-state="closed"] {
+  animation: dialog-out 150ms var(--ease-out) forwards;
+}
+
+.dialog-content.dialog-sheet[data-state="open"] {
+  animation: sheet-in 320ms var(--ease-drawer);
+}
+
+.dialog-content.dialog-sheet[data-state="closed"] {
+  animation: sheet-out 200ms var(--ease-drawer) forwards;
 }
 
 /* Landing page. One bold element (the run ledger); everything else is type and hairlines. */
@@ -538,7 +628,7 @@ html:lang(zh-Hant) :is(.landing-title, .landing-heading) {
   background: color-mix(in srgb, var(--card) 94%, transparent);
   backdrop-filter: blur(8px);
   transform: translateY(100%);
-  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 250ms var(--ease-out);
 }
 
 .mobile-cta[data-visible="true"] {
@@ -653,13 +743,24 @@ main[id] {
   }
 }
 
+/* Reduced motion means no movement, not no feedback: colour changes stay, dialogs fade instead of scaling or sliding. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
     animation: none !important;
-    transition: none !important;
+    transition-property: color, background-color, border-color, opacity !important;
     scroll-behavior: auto !important;
+  }
+
+  .dialog-overlay[data-state="open"],
+  .dialog-content[data-state="open"] {
+    animation: overlay-in 150ms ease-out !important;
+  }
+
+  .dialog-overlay[data-state="closed"],
+  .dialog-content[data-state="closed"] {
+    animation: overlay-out 120ms ease-out forwards !important;
   }
 }
 

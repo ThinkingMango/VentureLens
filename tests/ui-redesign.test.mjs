@@ -227,3 +227,35 @@ test("every public promise of free runs matches the signup grant: 10 runs for 90
     if (/valid for/.test(read(page))) assert.match(read(page), /valid for 90 days/, page);
   assert.match(JSON.parse(read("messages/en.json")).metadata.description, /first 10 runs are free/);
 });
+
+test("motion uses the shared easing tokens and real animations, not missing plugin classes", () => {
+  const css = read("app/globals.css");
+  const dialog = read("components/ui/dialog.tsx");
+  const shell = read("components/app-shell.tsx");
+  for (const token of ["--ease-out", "--ease-in-out", "--ease-drawer"]) assert.match(css, new RegExp(`${token}:\\s*cubic-bezier`));
+  // tailwindcss-animate is not installed, so its classes would silently do nothing.
+  assert.doesNotMatch(dialog, /animate-in|zoom-in-95|slide-in-from/);
+  assert.match(dialog, /dialog-overlay/);
+  assert.match(dialog, /dialog-content/);
+  assert.match(css, /\.dialog-content\[data-state="closed"\]/);
+  assert.match(shell, /dialog-sheet workspace-sidebar/);
+  // Hover lifts only with a real pointer, and reduced motion keeps colour feedback.
+  assert.match(css, /@media \(hover: hover\) and \(pointer: fine\) \{\s*\.lift:hover/);
+  assert.match(css, /prefers-reduced-motion: reduce\)[\s\S]*transition-property: color/);
+});
+
+test("the workspace sidebar never squashes its header or footer when it overflows", () => {
+  const shell = read("components/app-shell.tsx");
+  assert.match(shell, /flex h-16 shrink-0 items-center/);
+  assert.match(shell, /flex shrink-0 items-center gap-3 border-t/);
+});
+
+test("opportunity cards open from anywhere and keep one quiet call to action", () => {
+  const card = read("components/opportunity-card.tsx");
+  const css = read("app/globals.css");
+  assert.match(card, /card-link group/);
+  assert.match(card, /card-link-target/);
+  assert.doesNotMatch(card, /<Button asChild className="w-full">/);
+  assert.match(css, /\.card-link \.card-link-target::after/);
+  assert.match(css, /\.card-link :is\(button, a:not\(\.card-link-target\)\)/);
+});
